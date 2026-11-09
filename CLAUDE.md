@@ -1,0 +1,121 @@
+# CLAUDE.md
+
+App web personal para contar hidratos de carbono y calcular el bolo de insulina rápida (diabetes tipo 1). Es mobile-first: se usa desde Safari en iPhone, agregada a la pantalla de inicio. **No es un dispositivo médico.**
+
+## Dónde está cada cosa
+
+- **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2.
+- **[docs/plan.md](docs/plan.md)**: en qué orden se construye. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
+
+Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
+
+Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dejala anotada en la descripción del PR, para revisarla. No inventes abstracciones, parámetros ni capas "por las dudas": se agregan cuando un caso concreto las necesita.
+
+## Reglas que no se negocian
+
+1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
+2. **El cálculo vive solo en `src/domain/dose/`.** Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman al módulo. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador.
+3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y la key anon/publishable, que es pública por diseño. La `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
+4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español.
+5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados.
+6. **Cambios de esquema solo por migraciones.** Nunca se cambia el esquema desde el panel. Una migración ya aplicada no se edita: se crea una nueva.
+7. **El cálculo no recibe la glucemia.** Si en el futuro se integra LibreLinkUp, el valor se muestra como referencia y nunca entra al cálculo (spec §13).
+
+## Comandos
+
+Los scripts de npm se crean en la etapa 0. Si cambian, se actualiza esta sección.
+
+```bash
+npm install
+npm run dev           # servidor local de Vite
+npm run build         # chequeo de tipos + build de producción (tsc -b && vite build)
+npm run typecheck     # tsc -b (el tsconfig usa project references; tsc --noEmit no chequea nada)
+npm run lint          # oxlint, con los warnings tratados como error
+npm run format        # Prettier (escribe)
+npm run format:check  # Prettier (solo verifica; lo usa la CI)
+npm test              # vitest run (lo mismo que corre la CI)
+npm run test:watch    # vitest en modo watch
+```
+
+Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube):
+
+```bash
+supabase link --project-ref <ref-dev>
+supabase migration new <descriptive_name>
+supabase db push
+supabase gen types typescript --project-id <ref-dev> > src/lib/database.types.ts
+supabase functions deploy transcribe-label --use-api
+supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
+```
+
+Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.
+
+Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests, no se despliega.
+
+## Convenciones de código
+
+- **TypeScript en modo `strict`.** No se usa `any`. Los datos externos (respuestas de la Edge Function, JSON en general) entran como `unknown` y se validan con zod.
+- **Tipos de la base**: se generan en `src/lib/database.types.ts` y ese archivo no se edita a mano. Se regeneran después de cada migración.
+- **Componentes**: funciones con named exports, en archivos `PascalCase.tsx`. El resto de los archivos va en `camelCase.ts`, los hooks son `useSomething.ts` y los tests van junto al archivo que prueban, como `something.test.ts`.
+- **Números**: ningún valor se redondea en la lógica ni al guardar. Solo se redondea al mostrar, con los helpers de formato de `src/domain/dose/`. No uses `toFixed` suelto en componentes.
+- **Fechas**: en la base son `timestamptz`, y en la UI se muestran en `America/Argentina/Buenos_Aires` con `Intl.DateTimeFormat`.
+- **Estilos**: clases de Tailwind en el componente, diseño mobile-first. Los elementos táctiles tienen que tener un tamaño cómodo para el dedo (44 px como mínimo).
+- **SQL**: `snake_case`. En las políticas se usa `(select auth.uid())` y no `auth.uid()` suelto. Las funciones son `security invoker`, salvo que haya un motivo documentado.
+- **Edge Function**: `provider.ts` es el único archivo que conoce a Gemini (spec §9.2). Recibe la configuración y `fetch` por parámetro, sin leer `Deno.env` adentro, para que se pueda testear con Vitest.
+- No se loguean datos de salud (HC, dosis, alimentos) en la consola ni en los logs de la Edge Function.
+
+## Estructura de un feature
+
+```
+src/
+  domain/            # lógica pura, sin dependencias: dose/, label/
+  lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts
+  components/        # UI reutilizable, sin lógica de negocio
+  features/
+    foods/
+      api.ts         # ÚNICO lugar del feature que llama a Supabase
+      queries.ts     # query keys + hooks de react-query (useFoods, useCreateFood…)
+      types.ts       # tipos del feature, derivados de database.types.ts
+      components/    # componentes propios del feature
+      pages/         # pantallas (una por ruta)
+```
+
+Dirección de dependencias: `pages → components / queries → api → lib`. Cualquiera de ellos puede usar `domain`, pero `domain` no importa nada del proyecto. Los componentes no llaman a Supabase directo. Un feature no importa archivos internos de otro: si algo se comparte, se mueve a `components/`, `lib/` o `domain/`.
+
+## Cuándo usar react-query
+
+**Sí:**
+- Toda **lectura** del servidor va con `useQuery`, con las query keys centralizadas en `queries.ts` de cada feature, por ejemplo `['foods', 'list', { search }]` o `['foods', 'detail', id]`.
+- Toda **escritura** va con `useMutation`, y al terminar invalida las keys afectadas.
+- La llamada a `transcribe-label` también es una `useMutation`, porque es una acción y no un dato que se cachea.
+
+**No:**
+- **Para el cálculo de dosis.** Es síncrono y puro: se deriva en el render (con `useMemo` si hace falta) a partir del estado del formulario.
+- Para el estado del formulario o de la UI: eso va en estado local del componente.
+- **Sin optimistic updates** en registros de comida ni en alimentos. La UI muestra "guardado" solo cuando el servidor lo confirma.
+
+## Manejo de errores en la UI
+
+Hay cuatro tipos de error, y cada uno se muestra distinto:
+
+| Tipo | Ejemplo | Cómo se muestra |
+|---|---|---|
+| Error de validación del cálculo | `INVALID_QUANTITY`, `MISSING_COOKING_FACTOR` (spec §8.4) | Al lado del campo o del ítem, **cuando el usuario sale del campo (blur)**, no en cada tecla. Bloquea "Guardar". |
+| Advertencia | `DOSE_ABOVE_THRESHOLD` (spec §8.5) | Pide una confirmación explícita antes de guardar. No bloquea. |
+| Error esperable del backend | `VISION_QUOTA_EXCEEDED`, `DAILY_CAP_REACHED` (spec §9.3) | El mensaje de la tabla del spec, junto con la acción que corresponda ("Cargar a mano", "Reintentar"). |
+| Error inesperado | Red caída, 500, excepción | Un mensaje genérico ("No se pudo guardar. Revisá la conexión y reintentá"), con la opción de reintentar y sin perder lo que se cargó. |
+
+Reglas:
+- Los errores de validación aparecen al salir del campo, para que no salten mientras el usuario está escribiendo (por ejemplo, un campo vacío a mitad de tipeo). El desglose en vivo se sigue calculando con cada tecla; lo que espera al blur es solo el mensaje de error. Al tocar "Guardar" se muestran todos los errores pendientes, aunque el usuario no haya pasado por esos campos.
+- Al usuario **nunca** se le muestran códigos, stack traces ni mensajes crudos de Supabase o Gemini.
+- La traducción de código a mensaje en español se centraliza en `src/lib/errors.ts`, en un solo lugar.
+- Un 401 o una sesión vencida llevan al login.
+- Cada ruta tiene un error boundary, para que un fallo de render no deje la pantalla en blanco.
+- Ante un error, el formulario conserva lo que el usuario cargó.
+
+## Tests
+
+- `src/domain/` tiene que estar cubierto por tests, **con casos borde** y no solo el caso normal (lista mínima en spec §8.6). Un cambio en el cálculo sin test no se acepta.
+- Si cambia el comportamiento del cálculo, se sube `CALC_VERSION`.
+- El mapeo de errores de `provider.ts` se testea con un `fetch` simulado.
+- El aislamiento por RLS se prueba con `scripts/rls-check/` (plan, etapa 2), y se actualiza con cada tabla o política nueva.
