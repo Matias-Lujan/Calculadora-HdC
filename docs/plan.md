@@ -52,8 +52,8 @@ Incluye:
 
 **Terminada cuando**:
 - [x] `npm run dev` levanta una página mínima.
-- [ ] Un push a `main` despliega en Vercel y la página abre desde el iPhone.
-- [ ] La CI corre y falla si se rompe un test de ejemplo.
+- [x] Un push a `main` despliega en Vercel y la página abre desde el iPhone (https://calculadora-hdc.vercel.app/).
+- [x] La CI corre y falla si se rompe un test de ejemplo.
 - [x] El README tiene el aviso médico.
 
 ## Etapa 1 — Módulo de cálculo
@@ -69,9 +69,9 @@ Incluye:
 No incluye: UI, Supabase ni Gemini.
 
 **Terminada cuando**:
-- [ ] Están implementados y pasan todos los casos de spec §8.6.
-- [ ] El ejemplo de spec §8.3 es un test y da exactamente ese desglose.
-- [ ] El módulo no importa nada de React, Supabase ni del navegador. Esto lo verifica una regla de lint o un test.
+- [x] Están implementados y pasan todos los casos de spec §8.6.
+- [x] El ejemplo de spec §8.3 es un test y da exactamente ese desglose.
+- [x] El módulo no importa nada de React, Supabase ni del navegador. Lo verifica una regla de oxlint (override de `src/domain/**` en `.oxlintrc.json`).
 
 ## Etapa 1b — Prueba de Gemini con un script
 

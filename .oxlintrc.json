@@ -7,5 +7,34 @@
     "react/exhaustive-deps": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }],
     "typescript/no-explicit-any": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/domain/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**", "!./**", "!vitest"],
+                "message": "src/domain is pure TypeScript: it may only import files from its own folder (and vitest in tests). See CLAUDE.md."
+              }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          "window",
+          "document",
+          "navigator",
+          "location",
+          "localStorage",
+          "sessionStorage",
+          "fetch",
+          "console"
+        ]
+      }
+    }
+  ]
 }
