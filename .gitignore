@@ -147,3 +147,12 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# --- Calculadora de HdC ---
+*.local
+.vercel
+supabase/.temp/
+supabase/.branches/
+# Real label photos used for testing never go to the repo
+scripts/gemini-probe/samples/
+.claude/settings.local.json

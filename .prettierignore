@@ -1,0 +1,5 @@
+dist
+coverage
+package-lock.json
+# Docs are edited by hand; Prettier would realign every Markdown table.
+*.md
