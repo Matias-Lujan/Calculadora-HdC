@@ -192,7 +192,7 @@ Formulario con nombre, marca opcional, HC/100 g, estado, factor si corresponde, 
 1. El usuario elige uno o varios alimentos del catálogo.
 2. Para cada uno carga la cantidad:
    - en **gramos**, como se come (si el alimento es `raw_cooked`, el peso es cocido); o
-   - en **unidades**, solo si el alimento tiene peso por unidad, por ejemplo productos cerrados como alfajores o chocolates. Se aceptan decimales (0,5 unidades).
+   - en **unidades**, solo si el alimento tiene peso por unidad, por ejemplo productos cerrados como alfajores o chocolates. Se aceptan decimales (0,5 unidades). **Solo para alimentos `as_eaten`**: el peso por unidad sale de la etiqueta (el producto tal como se vende), pero un alimento `raw_cooked` siempre se carga en gramos cocidos. Mezclar las dos cosas subestimaría los HC en la proporción del factor de cocción.
 3. La app calcula en vivo y muestra el **desglose completo** (§8.3): por ítem, gramos → HC/100 g usado (y de dónde sale, si hay factor) → HC del ítem; después, HC total → ÷ ratio → dosis.
 4. La dosis se muestra con su **valor exacto**, sin redondear al incremento de la lapicera. El usuario decide cuánto aplicarse.
 5. Campo **"dosis aplicada"**: arranca con el valor calculado y el usuario lo cambia por lo que realmente se aplicó.
@@ -308,7 +308,7 @@ Además, unique `(id, user_id)`.
 | `position` | int not null | Orden en pantalla |
 | `food_name`, `food_brand` | text | Copia del nombre y la marca |
 | `food_source`, `food_state` | text not null | Copia de la fuente y el estado |
-| `quantity_mode` | text not null | `grams` / `units` |
+| `quantity_mode` | text not null | `grams` / `units`. Check: `units` solo si `food_state = as_eaten` |
 | `units` | numeric null | Requerido si `quantity_mode = units`. Check > 0 |
 | `unit_weight_g` | numeric null | Copia. Requerido si `quantity_mode = units` |
 | `grams` | numeric not null | Gramos comidos. Check > 0 |
@@ -374,7 +374,13 @@ HC total           = Σ HC de los ítems
 Dosis (U)          = HC total ÷ ratio (g/U)
 ```
 
-**Precisión**: no se redondea ningún valor intermedio ni el resultado que se guarda. Solo se redondea **al mostrar**: HC con 1 decimal y dosis con **2 decimales**. El redondeo de presentación tiene su propia función, testeada para casos como 1,005 y 2,675, donde el redondeo nativo de JavaScript se equivoca por la representación binaria.
+Reglas que completan las fórmulas:
+- En un alimento `as_eaten` el factor de cocción **se ignora**, aunque venga cargado (la base además lo impide, §7.1).
+- La carga por unidades solo se acepta en alimentos `as_eaten` (§6.6).
+- El umbral de gramos se compara contra los gramos comidos, también cuando se cargan unidades (unidades × peso por unidad).
+- Los umbrales advierten solo si el valor los **supera**: igual al umbral no advierte.
+
+**Precisión**: no se redondea ningún valor intermedio ni el resultado que se guarda. Solo se redondea **al mostrar**: HC con 1 decimal y dosis con **2 decimales**, con coma decimal y sin separador de miles ("128,2", "8,55"). El redondeo de presentación tiene su propia función, testeada para casos como 1,005 y 2,675, donde el redondeo nativo de JavaScript se equivoca por la representación binaria. Redondea la mitad hacia arriba, sobre el valor decimal que se ve (1,005 → 1,01).
 
 ### 8.3 Ejemplo (valores ilustrativos, no reales)
 
@@ -404,6 +410,7 @@ La pantalla muestra exactamente este desglose.
 | `MISSING_COOKING_FACTOR` | `raw_cooked` sin factor |
 | `INVALID_COOKING_FACTOR` | Factor ≤ 0, NaN o infinito |
 | `MISSING_UNIT_WEIGHT` | Se cargan unidades y el alimento no tiene peso por unidad, o el peso es ≤ 0 |
+| `UNITS_NOT_ALLOWED_FOR_RAW_COOKED` | Se cargan unidades de un alimento `raw_cooked` (§6.6) |
 | `EFFECTIVE_CARBS_OVER_100` | El valor efectivo da > 100 g/100 g. Pasa si el factor es menor a 1 y el valor crudo es alto: físicamente imposible, así que indica un dato erróneo |
 
 ### 8.5 Advertencias (piden confirmación, no bloquean)
@@ -420,7 +427,7 @@ Como mínimo:
 
 - **Caso feliz**: un ítem `as_eaten`; un ítem `raw_cooked`; un ítem por unidades; una comida mixta como la de §8.3.
 - **Cantidades**: gramos = 0 da error; gramos negativos dan error; `NaN`, `Infinity` o vacío dan error; unidades = 0 da error; unidades fraccionarias (0,5) funcionan; cantidades muy chicas (0,1 g) se calculan bien.
-- **Factor de cocción**: ausente en `raw_cooked` da error; 0, negativo, `NaN` o `Infinity` dan error; un factor en `as_eaten` se ignora o se rechaza, según lo que defina la implementación, pero con un test explícito; factor < 1 con HC alto da `EFFECTIVE_CARBS_OVER_100`; factor fuera de 1,0–4,0 da advertencia.
+- **Factor de cocción**: ausente en `raw_cooked` da error; 0, negativo, `NaN` o `Infinity` dan error; un factor en `as_eaten` se ignora (test explícito); factor < 1 con HC alto da `EFFECTIVE_CARBS_OVER_100`; factor fuera de 1,0–4,0 da advertencia; cargar unidades de un alimento `raw_cooked` da error.
 - **HC/100 g**: 0 es válido (alimento sin HC) y da HC 0; 100 es válido; > 100 o negativo dan error.
 - **Ratio**: 0, negativo o `NaN` dan error; un ratio no entero (12,5) funciona.
 - **Comida**: sin ítems da error; varios ítems con un solo error (el cálculo no devuelve dosis, pero informa el ítem que falló); el mismo alimento dos veces suma bien.
@@ -555,6 +562,20 @@ El alta por etiqueta **nunca depende de que el modelo responda**. Ante cualquier
 
 La conversión de texto a número y la cuenta por porción las hace **el cliente**, con funciones puras testeadas (§8.6), nunca el modelo. La pantalla de confirmación muestra el texto original al lado del número interpretado.
 
+Reglas de conversión (`src/domain/label/`). Ante la duda, el campo **queda vacío** para que lo complete el usuario; la app nunca elige un valor por él:
+
+| Texto | Resultado | Por qué |
+|---|---|---|
+| "12,5", "12", "0", "0,0" | 12,5 · 12 · 0 · 0 | Formato argentino: coma decimal |
+| "1.234,5" | 1234,5 | Punto de miles + coma decimal |
+| "12.5", "0.25" | 12,5 · 0,25 | Un punto seguido de 1–2 dígitos solo puede ser decimal |
+| "12,5 g", "30 gr", "30 grs." | 12,5 · 30 · 30 | Se ignora la unidad en gramos |
+| "<0,5", "≤ 1", "menos de 0,5" | vacío | Es una cota, no un valor. Por porción, la diferencia puede ser grande (en una porción de 1 g, "<0,5" puede ser hasta 50 g por 100 g) |
+| "1.234" | vacío | Ambiguo: puede ser mil doscientos treinta y cuatro o uno coma dos tres cuatro |
+| "-", "no aporta cantidades significativas", "-5", "12%" | vacío | No es un número válido para una etiqueta |
+
+La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error si la porción es ≤ 0 o vacía, si los HC son negativos o vacíos, o si los HC superan los gramos de la porción (más de 100 g por 100 g indica un error de lectura).
+
 ## 10. Autenticación y sesión
 
 - **Email + contraseña.** No se usa magic link: en una app agregada a la pantalla de inicio de iOS, el link se abre en Safari y no en la app instalada, que tiene su propio almacenamiento.
@@ -655,6 +676,9 @@ Tiene que incluir:
 | 20 | Conexión | Siempre online |
 | 21 | Entornos | Sin Docker; dos proyectos Supabase en la nube; migraciones en el repo |
 | 22 | Idioma | Código en inglés; UI y docs en español |
+| 23 | Unidades en `raw_cooked` | No se permiten: error `UNITS_NOT_ALLOWED_FOR_RAW_COOKED` (etapa 1) |
+| 24 | Factor en `as_eaten` | Se ignora (etapa 1) |
+| 25 | Texto ambiguo en la etiqueta | Cotas ("<0,5") y separadores ambiguos ("1.234") quedan vacíos para que decida el usuario (etapa 1) |
 
 ## 15. Pendientes
 
