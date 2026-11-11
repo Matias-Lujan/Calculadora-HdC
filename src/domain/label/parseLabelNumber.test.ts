@@ -23,6 +23,11 @@ describe('parseLabelNumber', () => {
     ['30 gr', 30],
     ['30 grs.', 30],
     ['30 G', 30],
+    // Real labels (stage 1b probe): "Porción: 80 gramos (1 plato)".
+    ['80 gramos', 80],
+    ['80gramos', 80],
+    ['80 Gramos', 80],
+    ['1 gramo', 1],
   ])('ignora la unidad: "%s" → %s', (text, expected) => {
     expect(parseLabelNumber(text)).toBe(expected)
   })

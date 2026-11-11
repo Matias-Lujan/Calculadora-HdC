@@ -155,4 +155,5 @@ supabase/.temp/
 supabase/.branches/
 # Real label photos used for testing never go to the repo
 scripts/gemini-probe/samples/
+scripts/gemini-probe/output/
 .claude/settings.local.json

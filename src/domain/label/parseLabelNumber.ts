@@ -11,8 +11,8 @@ const THOUSANDS_DOT_DECIMAL_COMMA = /^\d{1,3}(?:\.\d{3})+,\d+$/
  */
 const DECIMAL_DOT = /^\d+\.(?:\d{1,2}|\d{4,})$/
 
-/** Unit suffix printed next to the number: "12,5 g", "30gr", "30 grs." */
-const GRAMS_SUFFIX = /\s*(?:g|gr|grs)\.?$/i
+/** Unit suffix printed next to the number: "12,5 g", "30gr", "30 grs.", "80 gramos" */
+const GRAMS_SUFFIX = /\s*(?:g|gr|grs|gramos?)\.?$/i
 
 /**
  * Turns a number transcribed from a nutrition label into a number (spec §9.7).

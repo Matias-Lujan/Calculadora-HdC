@@ -97,9 +97,9 @@ Incluye:
 - Las respuestas cumplen el esquema.
 
 **Terminada cuando**:
-- [ ] Las tres etiquetas pasaron por los dos modelos.
-- [ ] Los resultados están anotados en `docs/notas/gemini-probe.md`: aciertos, errores y datos inventados, si hubo, **sin incluir las fotos**.
-- [ ] Hay una decisión: qué modelo usar, y si hay que ajustar instrucciones o esquema. Si aparece un dato inventado que no se corrige ajustando las instrucciones, se replantea el proveedor antes de la etapa 6. Como el proveedor está encapsulado en `provider.ts`, el cambio es barato.
+- [x] Las etiquetas pasaron por los dos modelos. En lugar de tres fotos elegidas por caso se usaron cinco productos reales de la alacena, sacados como lo haría un usuario común; ninguno traía columna por 100 g ni "preparado" (ver limitaciones en las notas).
+- [x] Los resultados están anotados en [docs/notas/gemini-probe.md](notas/gemini-probe.md): aciertos, errores y datos inventados (ninguno), **sin incluir las fotos**.
+- [x] Hay una decisión: `gemini-3.5-flash-lite`, con tres reglas nuevas en las instrucciones (tabla en español; observaciones en español; regla estricta para fotos borrosas, porque sin ella el modelo inventó números) y el esquema sin cambios. Además, la Edge Function va a reintentar una vez ante fallas momentáneas (spec §9.3).
 
 ## Etapa 2 — Supabase: esquema, RLS y storage
 
@@ -206,6 +206,7 @@ Incluye:
 - Secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev`.
 - Tope diario propio en `vision_requests`.
 - Tests del mapeo de errores de `provider.ts`, con un `fetch` simulado.
+- Reintento automático único ante 5xx o error de red (spec §9.3), con tests: un 503 seguido de un 200 da éxito; dos 503 dan `VISION_UNAVAILABLE`; un 429 o un timeout no se reintentan.
 - En el cliente:
   - captura o selección de la foto;
   - redimensión a JPEG y subida a `food-photos`;
@@ -217,6 +218,8 @@ Incluye:
 
 **Terminada cuando**:
 - [ ] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
+- [ ] En la pantalla de confirmación, la porción y los HC se ven destacados y juntos, con la foto a la vista (spec §6.1).
+- [ ] **Prueba con desenfoque real**: sacar tres fotos de etiquetas deliberadamente apuradas (movidas o mal enfocadas) y pasarlas por `scripts/gemini-probe/`. El desenfoque gaussiano de la etapa 1b degrada la imagen en forma pareja. Una foto real deja zonas legibles y zonas que no, y ahí es donde el modelo tiende a completar. Anotar los resultados en `docs/notas/gemini-probe.md` y, si aparece un número inventado, ajustar las instrucciones antes de cerrar la etapa.
 - [ ] Simulando la cuota agotada (por ejemplo, forzando un 429 en `provider.ts` en `dev`), la app muestra el mensaje y la carga a mano funciona con la foto.
 - [ ] El tope diario propio corta en el valor configurado.
 - [ ] Una foto que no es una etiqueta da el mensaje correspondiente.
