@@ -97,7 +97,7 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 | Instalación en iPhone | **PWA** (manifest + íconos) | Con esto "Agregar a pantalla de inicio" abre la app a pantalla completa, sin barra de Safari. No hace falta Mac ni App Store. |
 | Hosting del frontend | **Vercel** | Es gratis para este uso y despliega solo con cada push a GitHub. Además crea una URL de *preview* por cada rama. |
 | Backend | **Supabase** | Ya lo conocés. Postgres + Auth + Storage + Edge Functions cubren todo el backend. |
-| Modelo de visión | **Gemini (Flash / Flash-Lite) vía Google AI Studio, capa gratuita**, llamado desde una Edge Function | La capa gratuita alcanza para pocas etiquetas por semana, sin costo y sin facturación automática. La llamada queda encapsulada en un solo archivo (§9.2), así que cambiar de proveedor no toca el resto. |
+| Modelo de visión | **Gemini Flash-Lite vía Google AI Studio, capa gratuita**, llamado desde una Edge Function | La capa gratuita alcanza para pocas etiquetas por semana, sin costo y sin facturación automática. La llamada queda encapsulada en un solo archivo (§9.2), así que cambiar de proveedor no toca el resto. |
 | Tests | **Vitest** | Es el test runner nativo del ecosistema Vite, rápido y con una sintaxis estándar. |
 | Estilos | **Tailwind CSS** | Los estilos se escriben como clases utilitarias en el mismo componente. Evita mantener archivos CSS aparte y facilita el diseño mobile-first. |
 
@@ -155,6 +155,7 @@ Caso borde: una etiqueta importada con formato EE.UU. ("Total Carbohydrate") **i
    - El usuario elige el estado (`as_eaten` / `raw_cooked`). Si es `raw_cooked`, puede cargar el factor de cocción en ese momento o más tarde.
    - Si la porción está expresada en unidades ("1 unidad = 50 g"), se ofrece guardar ese dato como peso por unidad.
    - Todos los campos son editables. No se guarda nada hasta que el usuario confirma.
+   - **Requisito de diseño: la porción y los HC van destacados y juntos**, uno al lado del otro y por encima del resto de los campos, con la foto a la vista para compararlos. No es un detalle de maquetado. En la prueba de la etapa 1b, con una foto borrosa, el modelo leyó mal los dos valores a la vez (porción "30 g" y HC "24 g" en lugar de 50 g y 38 g) y el resultado quedó coherente: 80 g/100 g contra 76 reales. En un caso así, el control de HC contra gramos de porción no detecta nada, y **el único resguardo real es que el usuario revise esos dos números contra el paquete**. La pantalla tiene que facilitar esa revisión, no esconderla entre otros campos.
 6. Al guardar, se crea el alimento con `source = label`, la ruta de la foto y la transcripción original en `label_transcription`, para tener trazabilidad. Si la transcripción fue manual, `label_transcription` queda en `null`.
 7. Si el usuario cancela, el cliente borra la foto subida. La limpieza de fotos huérfanas (por ejemplo, si se corta la conexión) queda fuera del MVP.
 
@@ -441,8 +442,8 @@ También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "
 
 ### 9.1 Proveedor: Gemini, capa gratuita
 
-- Se usa **Gemini vía Google AI Studio, en la capa gratuita**, con los modelos Flash o Flash-Lite. Alcanza para el volumen esperado: pocas etiquetas por semana, y cada vez menos a medida que se llena el catálogo. El costo es cero.
-- El modelo se define en el secret `GEMINI_MODEL`, para cambiarlo sin tocar código. Por defecto va un modelo Flash; si la cuota de Flash queda corta, la alternativa es Flash-Lite. La elección final se hace al implementar, probando con etiquetas reales.
+- Se usa **Gemini vía Google AI Studio, en la capa gratuita**. Alcanza para el volumen esperado: pocas etiquetas por semana, y cada vez menos a medida que se llena el catálogo. El costo es cero.
+- El modelo se define en el secret `GEMINI_MODEL`, para cambiarlo sin tocar código. Por defecto va **`gemini-3.5-flash-lite`**, elegido en la prueba con etiquetas reales de la etapa 1b ([docs/notas/gemini-probe.md](notas/gemini-probe.md)): fue igual de exacto que Flash y respondió en 2–11 s, contra 15–143 s de Flash. Flash queda como alternativa.
 - **Los límites de la capa gratuita se aplican por proyecto de Google**, no por key. Son límites de pedidos por minuto y por día. Al superarlos, la API responde con un error (HTTP 429, `RESOURCE_EXHAUSTED`) y **no se cobra nada automáticamente**. La app trata ese caso como un error esperable (§9.4).
 - Conviene un **proyecto de Google dedicado** a esta app y **sin facturación habilitada**: si se habilita, el uso deja de ser gratuito. `dev` y `prod` pueden compartir ese proyecto; comparten cuota, pero alcanza.
 - **Privacidad**: en la capa gratuita, Google puede usar lo que se le envía para mejorar sus productos (hay que verificarlo en los términos vigentes). Lo único que se envía es la foto de la etiqueta de un producto comercial, sin datos personales ni de salud. No se envía nada más.
@@ -498,7 +499,7 @@ Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. N
 - Orden de ejecución:
   1. verificar el tope diario propio;
   2. descargar la imagen;
-  3. llamar a `provider.transcribe`;
+  3. llamar a `provider.transcribe`. **Si falla con `UNAVAILABLE` por un 5xx o un error de red, se reintenta una sola vez, después de 1 segundo.** No se reintenta ante un timeout (duplicaría la espera), ante `QUOTA_EXCEEDED` (gastaría cuota sin resultado) ni ante `BLOCKED` o `BAD_RESPONSE`. En la prueba de la etapa 1b, el 14 % de las llamadas devolvió 503 por alta demanda y los reintentos inmediatos funcionaron. Con Flash-Lite, el peor caso queda en unos 20 s;
   4. validar la respuesta con zod (si no cumple el esquema, es error y nunca se devuelven datos a medias);
   5. registrar el pedido en `vision_requests`;
   6. responder.
@@ -510,7 +511,7 @@ Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. N
 |---|---|---|---|---|
 | `VISION_QUOTA_EXCEEDED` | 429 | Se superó el límite de la capa gratuita de Gemini | sí | "Se alcanzó el límite gratuito de lecturas de etiquetas. Podés cargar los datos a mano o probar de nuevo más tarde." |
 | `DAILY_CAP_REACHED` | 429 | Se alcanzó el tope diario propio | no (hasta mañana) | "Llegaste al máximo de lecturas automáticas de hoy. Podés cargar los datos a mano." |
-| `VISION_UNAVAILABLE` | 503 | El proveedor no responde (5xx, red, timeout) | sí | "El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar." |
+| `VISION_UNAVAILABLE` | 503 | El proveedor no responde (5xx, red, timeout), también después del reintento automático | sí | "El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar." |
 | `VISION_BAD_RESPONSE` | 502 | La respuesta no es válida o fue bloqueada | sí | "No se pudo interpretar la lectura de la etiqueta. Podés cargar los datos a mano o reintentar." |
 | `INVALID_REQUEST` | 400 | La ruta es ajena, no existe o no es una imagen | no | Error técnico genérico |
 | `UNAUTHORIZED` | 401 | No hay sesión | no | Redirige al login |
@@ -529,9 +530,15 @@ El alta por etiqueta **nunca depende de que el modelo responda**. Ante cualquier
 
 - Transcribir **solo** lo que está impreso. **Nunca** completar, estimar ni corregir con conocimiento propio.
 - Si un campo no se lee con certeza, marcarlo `illegible`. Si no está en la imagen, marcarlo `not_present`.
+- Un número es legible solo si cada dígito se ve nítido sin adivinar. En una foto borrosa, los números son ilegibles y **nunca** se completan con un valor típico del producto. Esta regla surgió de la prueba de la etapa 1b: sin ella, con una foto borrosa el modelo devolvió como legibles una porción y unos HC inventados.
 - Copiar los números **tal como aparecen**, como texto (con coma decimal, "<0,5", etc.). No convertir unidades ni hacer cuentas.
-- Si hay varias columnas (por 100 g / por porción, "tal como se vende" / "preparado"), devolver **cada columna por separado**, con el rótulo textual que la identifica.
+- Si hay varias columnas (por 100 g / por porción, "tal como se vende" / "preparado"), devolver **cada columna por separado**, con el rótulo textual que la identifica. La columna "%VD" no es una columna de cantidades.
+- Tomar la fila de **carbohidratos totales**, nunca subfilas como "azúcares".
+- Si el envase tiene varias tablas (otros países u otros idiomas), usar **solo la tabla en español**; si hay varias en español, la de Argentina. Las ignoradas se mencionan en las observaciones. Esta regla surgió de la prueba de la etapa 1b: un envase importado tenía además una tabla en árabe por 100 g.
+- Las observaciones se escriben en español, porque las lee el usuario.
 - Si la imagen no es una tabla nutricional, indicarlo y no devolver datos.
+
+El texto completo de las instrucciones parte de `scripts/gemini-probe/prompt.ts`, validado con etiquetas reales en la etapa 1b.
 
 ### 9.6 Esquema de la transcripción
 
@@ -655,7 +662,7 @@ Tiene que incluir:
 |---|---|---|
 | 1 | Frontend | React + Vite + TypeScript, PWA |
 | 2 | Hosting | Vercel |
-| 3 | Modelo de visión | Gemini Flash / Flash-Lite (capa gratuita de Google AI Studio), detrás de una Edge Function. El proveedor queda encapsulado en `provider.ts` y el modelo es configurable. Si se agota la cuota, mensaje claro y carga a mano |
+| 3 | Modelo de visión | Gemini `gemini-3.5-flash-lite` (capa gratuita de Google AI Studio), elegido en la prueba de la etapa 1b, detrás de una Edge Function. El proveedor queda encapsulado en `provider.ts` y el modelo es configurable. Si se agota la cuota, mensaje claro y carga a mano |
 | 4 | Etiqueta solo por porción | El modelo transcribe; el código calcula por 100 g |
 | 5 | Etiqueta con varias columnas | Se transcriben todas; el usuario elige |
 | 6 | Fibra | HC siempre sin fibra |
@@ -679,14 +686,14 @@ Tiene que incluir:
 | 23 | Unidades en `raw_cooked` | No se permiten: error `UNITS_NOT_ALLOWED_FOR_RAW_COOKED` (etapa 1) |
 | 24 | Factor en `as_eaten` | Se ignora (etapa 1) |
 | 25 | Texto ambiguo en la etiqueta | Cotas ("<0,5") y separadores ambiguos ("1.234") quedan vacíos para que decida el usuario (etapa 1) |
+| 26 | Falla momentánea de Gemini | La Edge Function reintenta una vez, después de 1 s, ante 5xx o error de red; recién después muestra el error (etapa 1b) |
 
 ## 15. Pendientes
 
 - Elegir los `fdc_id` concretos del seed USDA y verificar que informen la fibra.
 - Revisar el texto vigente de la Res. GMC 05/25 (rotulado nutricional) y ajustar las instrucciones de transcripción si cambia el formato de las etiquetas.
 - Definir el tope diario de la Edge Function y el umbral de dosis máxima, este último en la primera configuración.
-- Elegir entre Gemini Flash y Flash-Lite probando con etiquetas reales, y revisar los límites y términos vigentes de la capa gratuita.
-- Crear un proyecto de Google dedicado, sin facturación, y generar la API key en AI Studio.
+- Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).- Crear un proyecto de Google dedicado, sin facturación, y generar la API key en AI Studio.
 
 ## Fuentes consultadas
 
