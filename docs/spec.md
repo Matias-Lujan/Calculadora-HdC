@@ -269,7 +269,7 @@ Además, unique `(id, user_id)` para las FK compuestas.
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | uuid PK | |
-| `reference_db` | text not null | Hoy solo `usda_fdc` |
+| `reference_db` | text not null | Hoy solo se cargan filas de `usda_fdc`. La columna acepta también `argenfoods`, igual que `foods.reference_db`, para sumar ARGENFOODS sin migrar si algún día se permite (§5.2) |
 | `reference_code` | text not null | `fdc_id` |
 | `description_original` | text not null | Descripción en inglés |
 | `name_es` | text not null | Nombre para mostrar y buscar |
@@ -314,7 +314,7 @@ Además, unique `(id, user_id)`.
 | `unit_weight_g` | numeric null | Copia. Requerido si `quantity_mode = units` |
 | `grams` | numeric not null | Gramos comidos. Check > 0 |
 | `carbs_per_100g` | numeric not null | Copia del valor del alimento (crudo si `raw_cooked`) |
-| `cooking_factor` | numeric null | Copia. Requerido si `food_state = raw_cooked` |
+| `cooking_factor` | numeric null | Copia. Requerido si `food_state = raw_cooked`, y `null` si `as_eaten`: se guarda solo el factor que se usó en la cuenta (§8.2) |
 | `effective_carbs_per_100g` | numeric not null | HC/100 g en el estado en que se comió |
 | `carbs_g` | numeric not null | HC del ítem |
 
@@ -340,9 +340,11 @@ En las políticas se usa `(select auth.uid())`, que Postgres evalúa una vez por
 
 "Propias" significa `user_id = (select auth.uid())`. Una celda con "—" indica que no hay política, así que la operación queda denegada.
 
+Además de las políticas, cada migración da los **permisos de tabla explícitos**, porque los proyectos no exponen las tablas automáticamente (§12.1): primero `revoke all ... from anon, authenticated`, después solo los `grant` que coinciden con la tabla de arriba. El rol `anon` (sin sesión) no tiene permisos sobre ninguna tabla.
+
 ### 7.4 Storage
 
-- Bucket `food-photos`, **privado**.
+- Bucket `food-photos`, **privado**. Acepta solo `image/jpeg` de hasta 5 MB, porque el cliente convierte y achica la foto antes de subirla (§6.1). Cualquier otra cosa la rechaza el propio bucket.
 - Políticas sobre `storage.objects`: select, insert y delete solo si `bucket_id = 'food-photos'` y la primera carpeta de la ruta es el usuario (`(storage.foldername(name))[1] = (select auth.uid())::text`).
 - Para mostrar las fotos se usan URLs firmadas de corta duración.
 
@@ -610,12 +612,16 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
 
 | | Desarrollo | Producción |
 |---|---|---|
-| Supabase | proyecto `dev` | proyecto `prod` |
+| Supabase | `calculadora-hdc-dev` | `calculadora-hdc-prd` |
 | Frontend | `npm run dev` local, o *preview* de Vercel | Vercel, rama `main` |
 | Variables en Vercel | entorno *Preview* → `dev` | entorno *Production* → `prod` |
 
+- Los dos proyectos están en **São Paulo (`sa-east-1`)**, la región más cercana a Argentina, y tienen la misma configuración:
+  - Data API activada;
+  - **exposición automática de tablas desactivada**: cada migración da los permisos explícitamente (§7.3);
+  - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
-- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI: `supabase link` y `supabase db push`, primero en `dev` y después en `prod`. La Edge Function se despliega con `supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
+- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
 - Los proyectos del plan gratuito se **pausan después de una semana sin actividad**. Con uso diario no le pasa a `prod`, pero sí le puede pasar a `dev`, que se reactiva desde el panel.
 
 ### 12.2 Estructura del repo
@@ -687,6 +693,7 @@ Tiene que incluir:
 | 24 | Factor en `as_eaten` | Se ignora (etapa 1) |
 | 25 | Texto ambiguo en la etiqueta | Cotas ("<0,5") y separadores ambiguos ("1.234") quedan vacíos para que decida el usuario (etapa 1) |
 | 26 | Falla momentánea de Gemini | La Edge Function reintenta una vez, después de 1 s, ante 5xx o error de red; recién después muestra el error (etapa 1b) |
+| 27 | Proyectos Supabase | São Paulo (`sa-east-1`) los dos; exposición automática de tablas desactivada (permisos explícitos en cada migración) y RLS automática activada como red de seguridad (etapa 2) |
 
 ## 15. Pendientes
 

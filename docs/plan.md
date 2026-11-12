@@ -106,23 +106,23 @@ Incluye:
 **Objetivo**: la base de datos de spec §7 en `dev`, con la seguridad probada.
 
 Incluye:
-- Crear los proyectos `dev` y `prod`. A `prod` todavía no se le aplica nada.
-- Supabase CLI vinculada a `dev` (`supabase link`). Las migraciones van en `supabase/migrations/` y se aplican con `supabase db push`.
+- Crear los proyectos `dev` y `prod`, en São Paulo y con la configuración de spec §12.1. A `prod` todavía no se le aplica nada.
+- Supabase CLI instalada como dependencia del proyecto y vinculada a `dev` (`npx supabase link`). Las migraciones van en `supabase/migrations/` y se aplican con `npx supabase db push --remote`.
 - Migraciones:
   - tablas `user_settings`, `foods`, `reference_foods` (**vacía**: el seed va en la etapa 7), `meals`, `meal_items` y `vision_requests`;
   - todos los CHECK, las FK compuestas y los índices de spec §7;
   - RLS activada y con políticas en **todas** las tablas (§7.3);
-  - privilegios por columna en `meals` (solo `deleted_at` se puede actualizar);
+  - permisos explícitos por tabla (la exposición automática está desactivada), y por columna en `meals` (solo `deleted_at` se puede actualizar);
   - trigger que crea `user_settings` al dar de alta un usuario;
   - bucket privado `food-photos` y sus políticas (§7.4).
 - Las FK de `user_id` a `auth.users` van con `on delete cascade`, para que borrar un usuario desde el panel borre también sus datos. Lo necesita la limpieza de la prueba de aislamiento.
-- Crear el usuario propio desde el panel y **deshabilitar el registro** de usuarios en `dev`.
+- **Deshabilitar el registro** de usuarios en `dev`. El usuario propio se crea desde el panel después de la prueba de aislamiento, con la base limpia.
 
 No incluye: `create_meal` ni el seed USDA (pasan a la etapa 7).
 
 **Prueba de aislamiento**:
-1. Crear a mano, desde el panel, un **segundo usuario de prueba**. Se puede aunque el registro esté deshabilitado.
-2. Correr un script (`scripts/rls-check/`) que se loguea con supabase-js como cada usuario y pasa por la API, igual que la app. Las credenciales están en `.env.local`. El script verifica que el usuario B:
+1. Crear a mano, desde el panel, **dos usuarios de prueba descartables**, A y B. Se puede aunque el registro esté deshabilitado. Se usan dos usuarios de prueba, en lugar del propio y uno de prueba, para que la limpieza sea solo borrarlos.
+2. Correr `scripts/rls-check/check.ts`, que se loguea con supabase-js como cada usuario y pasa por la API, igual que la app. Las credenciales están en `.env.local`. El script verifica que el usuario B:
    - **no** ve filas del usuario A en `user_settings`, `foods`, `meals`, `meal_items` ni `vision_requests`;
    - **no** puede insertar filas con el `user_id` de A;
    - **no** puede actualizar ni borrar filas de A;
@@ -130,17 +130,16 @@ No incluye: `create_meal` ni el seed USDA (pasan a la etapa 7).
    - **no** puede listar, descargar ni subir archivos en la carpeta de A dentro de `food-photos`;
    - puede leer `reference_foods`, pero **no** escribir en ella.
 
-   Además verifica que ningún usuario puede actualizar columnas de `meals` distintas de `deleted_at`, ni borrar filas de `foods` o `meals`.
+   Además verifica que ningún usuario puede actualizar columnas de `meals` distintas de `deleted_at`, ni borrar filas de `foods` o `meals`; que sin sesión no se lee ninguna tabla; y que los CHECK principales (unidades en `raw_cooked`, coherencia de HC y dosis) rechazan datos incoherentes.
 3. Limpieza:
-   - el script borra los archivos de prueba que subió B;
-   - se **borra el usuario B desde el panel**, y el `cascade` se lleva sus datos;
-   - las filas de prueba del usuario propio se borran desde el SQL editor del panel, que corre sin RLS.
+   - el script borra las fotos de prueba, porque los archivos no se borran con el usuario;
+   - se **borran los dos usuarios desde el panel**, y el `cascade` se lleva sus datos.
 
 **Terminada cuando**:
-- [ ] `supabase db push` aplica las migraciones en `dev` desde cero, sin errores.
-- [ ] El script de aislamiento pasa completo.
-- [ ] El usuario de prueba está borrado y no quedan datos suyos.
-- [ ] El registro de usuarios está deshabilitado en `dev`.
+- [x] `npx supabase db push --remote` aplica las migraciones en `dev` desde cero, sin errores.
+- [x] El script de aislamiento pasa completo: 42 de 42 chequeos. Además se verificó que cada rechazo viene del mecanismo esperado (RLS, permisos, FK, CHECK o tipo de archivo) y no de un error del script.
+- [x] Los usuarios de prueba están borrados y no quedan datos suyos: después de borrarlos, todas las tablas y el bucket quedaron en 0. Borrar al usuario A, que tenía una comida con un ítem que apuntaba a un alimento, confirmó que la cascada funciona en toda la cadena.
+- [x] El registro de usuarios está deshabilitado en `dev`. El usuario propio ya está creado.
 
 ## Etapa 3 — Login, sesión, configuración y app instalable
 

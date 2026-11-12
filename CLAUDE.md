@@ -13,7 +13,7 @@ Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dej
 
 ## Reglas que no se negocian
 
-1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
+1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Los proyectos tienen desactivada la exposición automática de tablas, así que la misma migración da los permisos explícitos (`revoke all ... from anon, authenticated` y después solo los `grant` necesarios, por columna cuando corresponde). Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
 2. **El cálculo vive solo en `src/domain/dose/`.** Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman al módulo. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
 3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y la key anon/publishable, que es pública por diseño. La `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
 4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español.
@@ -37,15 +37,16 @@ npm test              # vitest run (lo mismo que corre la CI)
 npm run test:watch    # vitest en modo watch
 ```
 
-Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube):
+Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube). La CLI está instalada como dependencia del proyecto, por eso se usa con `npx`:
 
 ```bash
-supabase link --project-ref <ref-dev>
-supabase migration new <descriptive_name>
-supabase db push
-supabase gen types typescript --project-id <ref-dev> > src/lib/database.types.ts
-supabase functions deploy transcribe-label --use-api
-supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
+npx supabase link --project-ref <ref-dev>
+npx supabase migration new <descriptive_name>
+npx supabase db push --remote
+npx supabase gen types typescript --project-id <ref-dev> > src/lib/database.types.ts
+npx supabase functions deploy transcribe-label --use-api
+npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
+node --env-file=.env.local scripts/rls-check/check.ts   # prueba de aislamiento (etapa 2)
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.
