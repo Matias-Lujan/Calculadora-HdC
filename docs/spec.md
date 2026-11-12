@@ -105,7 +105,7 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 Librerías puntuales:
 - `@supabase/supabase-js`: cliente oficial. Instalado en la etapa 2.
 - `zod`: validación de datos en runtime. Instalado en la etapa 1b; lo usan los scripts y lo van a usar la Edge Function y el cliente.
-- `react-router` (navegación entre pantallas) y `@tanstack/react-query` (lectura y caché de datos del servidor): se suman en la etapa 3.
+- `react-router` v8, en *Data mode* (navegación entre pantallas; todo se importa de `react-router`, salvo `RouterProvider`, que viene de `react-router/dom`), y `@tanstack/react-query` v5 (lectura y caché de datos del servidor): instalados en la etapa 3.
 
 ## 5. Fuentes de datos de referencia
 
@@ -625,6 +625,7 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
   - **No** activar en Auth el "time-box" de sesiones ni el timeout por inactividad.
   - Resultado: el usuario se loguea una vez en la app instalada y la sesión se mantiene mientras la use. Si iOS limpia el almacenamiento de la app (por ejemplo, después de mucho tiempo sin abrirla o si se reinstala), hay que volver a loguearse.
 - El login se hace **dentro de la app instalada**, no en Safari, porque no comparten sesión.
+- **Sesión revocada o vencida**: si el servidor responde 401 (por ejemplo, un JWT rechazado por PostgREST) o rechaza el *refresh token*, la app cierra la sesión local y vuelve al login, sin mensaje (§14, decisión 33). **Ante una falla de red**, en cambio, supabase-js conserva la sesión: un `AuthRetryableFetchError` no la borra, y la renovación se reintenta sola.
 
 ## 11. Seguridad y datos personales
 
@@ -673,9 +674,11 @@ docs/
 src/
   domain/dose/            # cálculo puro + tests
   domain/label/           # parseo de transcripción + tests
-  lib/                    # database.types.ts (generado); supabase.ts, errors.ts… desde la etapa 3
+  lib/                    # database.types.ts (generado); supabase.ts, queryClient.ts y errors.ts (etapa 3)
   features/foods/ meals/ history/ settings/ auth/
-  components/             # UI reutilizable
+  components/             # UI reutilizable (AppLayout, LoadingScreen, RouteErrorBoundary)
+  router.tsx              # rutas de la app; es el armado, así que puede importar páginas de los features
+  vite-env.d.ts           # tipos de las variables VITE_ (import.meta.env)
 supabase/
   config.toml             # solo para un stack local, que no se usa (§12.1)
   migrations/             # esquema, RLS, storage; el seed USDA llega en la etapa 7
@@ -746,6 +749,7 @@ Tiene que incluir:
 | 30 | Lint y formato | oxlint (el que trae la plantilla de Vite) y Prettier (etapa 0) |
 | 31 | Credenciales en archivos | En `.env.local` solo van usuarios de prueba descartables, nunca el usuario real (etapa 2) |
 | 32 | Flujo con agentes | Cada funcionalidad pasa por planner → implementer → tester → reviewer, con un máximo de 2 vueltas de corrección. La sesión principal coordina y es la única que commitea o aplica migraciones, con el OK del usuario. Detalle en `CLAUDE.md` |
+| 33 | Navegación y sesión en la UI | Rutas en inglés: `/login`, `/foods`, `/history` y `/settings`, con Inicio en `/`. La protección es por componente (`RequireAuth`, que escucha `onAuthStateChange`), sin loaders ni middleware del router. Después del login siempre se va a Inicio. Ante un 401 o una sesión vencida, el `onError` global de react-query llama a `signOut({ scope: 'local' })` y la app vuelve al login sin mensaje; los 401 no se reintentan (las demás lecturas, hasta 3 reintentos). Por ahora la cache de react-query no se limpia al cerrar sesión, porque todavía no hay datos cacheados; se decide en la funcionalidad 4 de la etapa (configuración y "Cerrar sesión") (etapa 3) |
 
 ## 15. Pendientes
 

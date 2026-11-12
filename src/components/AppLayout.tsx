@@ -1,0 +1,37 @@
+import { NavLink, Outlet } from 'react-router'
+
+const sections = [
+  { to: '/', label: 'Inicio' },
+  { to: '/foods', label: 'Catálogo' },
+  { to: '/history', label: 'Historial' },
+  { to: '/settings', label: 'Configuración' },
+]
+
+export function AppLayout() {
+  return (
+    <>
+      <main className="mx-auto min-h-dvh max-w-md px-4 pt-6 pb-24 text-slate-900">
+        <Outlet />
+      </main>
+      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white">
+        <ul className="mx-auto flex max-w-md">
+          {sections.map(({ to, label }) => (
+            <li key={to} className="flex-1">
+              <NavLink
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `flex min-h-14 items-center justify-center px-1 text-sm ${
+                    isActive ? 'font-semibold text-slate-900' : 'text-slate-500'
+                  }`
+                }
+              >
+                {label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
+  )
+}
