@@ -4,26 +4,45 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 
 ## Dónde está cada cosa
 
-- **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2.
-- **[docs/plan.md](docs/plan.md)**: en qué orden se construye. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
+- **[docs/plan.md](docs/plan.md)**: en qué orden se construye y **en qué etapa estamos** (encabezado y tabla de resumen). Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
+- **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1; las decisiones tomadas, en §14.
+- **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
+- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real.
 
 Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
 
 Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dejala anotada en la descripción del PR, para revisarla. No inventes abstracciones, parámetros ni capas "por las dudas": se agregan cuando un caso concreto las necesita.
 
+## Flujo de trabajo
+
+Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día.
+
+1. **Al empezar**: leer el estado en `docs/plan.md` y crear la rama de la etapa desde `main` actualizado (`etapa-<n>-<tema>`).
+2. **Durante la etapa**: lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
+3. **Al terminar**:
+   - pasar los chequeos de la sección Comandos;
+   - marcar los "Terminada cuando" del plan;
+   - actualizar el encabezado y la tabla de resumen del plan;
+   - registrar las decisiones nuevas en el spec (§14) y en las secciones que correspondan.
+4. **Pedir confirmación antes de cada commit, push y PR.** No se hacen sin el OK explícito del usuario.
+5. Los mensajes de commit van en inglés. La descripción del PR va en español: un resumen de lo hecho y una sección "Decisiones para revisar" con todo lo que se resolvió donde el spec no decía nada.
+6. El usuario revisa y mergea el PR. Después se vuelve a `main` con `git checkout main` y `git pull`. Las ramas mergeadas se conservan.
+
+Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.md` (por ejemplo, Codex), el contenido de este archivo pasa a `AGENTS.md`, y acá queda una sola línea, `@AGENTS.md`, que lo importa. Así hay una sola fuente de reglas.
+
 ## Reglas que no se negocian
 
 1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Los proyectos tienen desactivada la exposición automática de tablas, así que la misma migración da los permisos explícitos (`revoke all ... from anon, authenticated` y después solo los `grant` necesarios, por columna cuando corresponde). Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
-2. **El cálculo vive solo en `src/domain/dose/`.** Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman al módulo. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
-3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y la key anon/publishable, que es pública por diseño. La `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
+2. **Las cuentas viven solo en `src/domain/`**: el cálculo de HC y dosis, y el formato para mostrarlos, en `dose/`; la conversión del texto de una etiqueta a número y de porción a 100 g, en `label/`. Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman a esos módulos. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
+3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, que es pública por diseño. En la app, la `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Los scripts locales leen `GEMINI_API_KEY` y las credenciales de los usuarios de prueba de `.env.local`, que no se commitea. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
 4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español.
-5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados.
+5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados. Las credenciales del usuario real no se guardan en ningún archivo, ni siquiera en `.env.local`: las pruebas usan usuarios descartables. El repo es privado por ahora, pero se va a hacer público: todo lo que se commitea se trata como público.
 6. **Cambios de esquema solo por migraciones.** Nunca se cambia el esquema desde el panel. Una migración ya aplicada no se edita: se crea una nueva.
 7. **El cálculo no recibe la glucemia.** Si en el futuro se integra LibreLinkUp, el valor se muestra como referencia y nunca entra al cálculo (spec §13).
 
 ## Comandos
 
-Los scripts de npm se crean en la etapa 0. Si cambian, se actualiza esta sección.
+Si cambian los scripts de npm, se actualiza esta sección.
 
 ```bash
 npm install
@@ -37,16 +56,26 @@ npm test              # vitest run (lo mismo que corre la CI)
 npm run test:watch    # vitest en modo watch
 ```
 
-Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube). La CLI está instalada como dependencia del proyecto, por eso se usa con `npx`:
+Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube). La CLI está instalada como dependencia del proyecto, por eso se usa con `npx`. Los proyectos y sus *refs* están en spec §12.1. En esta máquina la CLI ya está vinculada a `dev`.
 
 ```bash
-npx supabase link --project-ref <ref-dev>
+npx supabase link --project-ref xyolhiklqqoejkapqbxt        # vincular dev (ya hecho)
 npx supabase migration new <descriptive_name>
-npx supabase db push --remote
-npx supabase gen types typescript --project-id <ref-dev> > src/lib/database.types.ts
+npx supabase db push --remote                               # sin --remote, la CLI 3 busca una base local
+npx supabase migration list --remote                        # qué migraciones están aplicadas
+npx supabase gen types typescript --project-id xyolhiklqqoejkapqbxt > src/lib/database.types.ts
 npx supabase functions deploy transcribe-label --use-api
 npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
-node --env-file=.env.local scripts/rls-check/check.ts   # prueba de aislamiento (etapa 2)
+```
+
+**No usar `npx supabase config push`**: `supabase/config.toml` es solo para un stack local que no se usa, y pisaría la configuración real de Auth (por ejemplo, podría reabrir el registro). La configuración de Auth se cambia desde el panel.
+
+Scripts (leen `.env.local`; ver `.env.example`):
+
+```bash
+node --env-file=.env.local scripts/rls-check/check.ts                 # aislamiento; crear antes los dos usuarios de prueba
+node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-flash-lite
+node scripts/gemini-probe/summarize.ts <corrida>
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.
