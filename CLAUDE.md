@@ -8,6 +8,7 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 - **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1; las decisiones tomadas, en §14.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
 - **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real.
+- **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer). Ver "Flujo de trabajo".
 
 Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
 
@@ -18,7 +19,7 @@ Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dej
 Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día.
 
 1. **Al empezar**: leer el estado en `docs/plan.md` y crear la rama de la etapa desde `main` actualizado (`etapa-<n>-<tema>`).
-2. **Durante la etapa**: lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
+2. **Durante la etapa**: cada funcionalidad pasa por el [ciclo de agentes](#ciclo-por-funcionalidad-agentes). Una funcionalidad es un punto del "Incluye" de la etapa, o un grupo chico de puntos relacionados. Lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
 3. **Al terminar**:
    - pasar los chequeos de la sección Comandos;
    - marcar los "Terminada cuando" del plan;
@@ -29,6 +30,23 @@ Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo
 6. El usuario revisa y mergea el PR. Después se vuelve a `main` con `git checkout main` y `git pull`. Las ramas mergeadas se conservan.
 
 Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.md` (por ejemplo, Codex), el contenido de este archivo pasa a `AGENTS.md`, y acá queda una sola línea, `@AGENTS.md`, que lo importa. Así hay una sola fuente de reglas.
+
+### Ciclo por funcionalidad (agentes)
+
+Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le pasa a cada agente lo que necesita, le muestra los resultados al usuario y **no escribe código**. Cada agente arranca sin la conversación, así que el pedido tiene que incluir la funcionalidad y lo que dejó el paso anterior (el plan o los hallazgos).
+
+| Paso | Agente | Herramientas | Qué hace |
+|---|---|---|---|
+| 1 | `planner` | Lectura y documentación web | Arma el plan de implementación. Si encuentra una contradicción con el spec o algo que necesita una decisión del usuario, el ciclo se frena hasta que conteste. |
+| 2 | `implementer` | Lectura, escritura y `Bash` solo para comandos locales | Implementa el plan, escribe los tests que pide el spec, anota las decisiones en el spec y el plan, y deja pasando los chequeos. |
+| 3 | `tester` | Lectura, escritura de tests y `Bash` | Corre todos los chequeos, agrega casos borde, rompe el código a propósito para comprobar que los tests lo detectan y arma la lista de verificación manual (iPhone, paneles). |
+| 4 | `reviewer` | Lectura y `Bash` solo para git de lectura | Revisa los cambios contra el spec, las reglas de este archivo y la documentación. Responde "Sin hallazgos" o una lista de problemas. |
+
+- **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos, y después pasa otra vez por el tester y el reviewer. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
+- **Migraciones**: el implementer las crea, pero no las aplica. Antes del tester, la sesión principal las aplica en `dev` (`npx supabase db push --remote`), con el OK del usuario, o le pide que corra el comando.
+- **Los agentes nunca** hacen commit, push ni PR, ni corren `db push`, `secrets set` o `config push`, ni cambian la configuración de Supabase o Vercel. Eso lo hace la sesión principal, con el OK del usuario (punto 4 del flujo).
+- Las restricciones de `Bash` del implementer y del reviewer están escritas en sus definiciones. La herramienta no permite limitar `Bash` a ciertos comandos.
+- **Cambios chicos** (corregir un texto, un comentario, un typo o una línea de documentación) no pasan por el ciclo: los hace la sesión principal, pasando igual los chequeos.
 
 ## Reglas que no se negocian
 

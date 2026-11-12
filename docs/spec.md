@@ -663,7 +663,8 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
 ### 12.2 Estructura del repo
 
 ```
-CLAUDE.md                 # reglas y convenciones para trabajar en el repo
+CLAUDE.md                 # reglas, convenciones y flujo de trabajo
+.claude/agents/           # agentes del ciclo por funcionalidad (CLAUDE.md, Flujo de trabajo)
 README.md
 docs/
   spec.md                 # qué hace la app (este documento)
@@ -744,6 +745,7 @@ Tiene que incluir:
 | 29 | Visibilidad del repo | Privado por ahora; se hace público sin fecha. Todo lo que se commitea se trata como público |
 | 30 | Lint y formato | oxlint (el que trae la plantilla de Vite) y Prettier (etapa 0) |
 | 31 | Credenciales en archivos | En `.env.local` solo van usuarios de prueba descartables, nunca el usuario real (etapa 2) |
+| 32 | Flujo con agentes | Cada funcionalidad pasa por planner → implementer → tester → reviewer, con un máximo de 2 vueltas de corrección. La sesión principal coordina y es la única que commitea o aplica migraciones, con el OK del usuario. Detalle en `CLAUDE.md` |
 
 ## 15. Pendientes
 
