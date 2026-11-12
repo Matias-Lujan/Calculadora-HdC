@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-Estado: borrador v1 · Fecha: 2026-11-09
+**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Próxima: etapa 3.** Última actualización: 2026-11-12.
 
 ---
 
@@ -15,24 +15,25 @@ Estado: borrador v1 · Fecha: 2026-11-09
 
 ## Convenciones de trabajo
 
-- Una rama por etapa (`etapa-0-base`, `etapa-1-calculo`, …). Se mergea a `main` cuando se cumplen todos los puntos de "Terminada cuando".
+- Una rama por etapa (`etapa-0-base`, `etapa-1-calculo`, …). Se mergea a `main` cuando se cumplen todos los puntos de "Terminada cuando". Las ramas mergeadas se conservan.
 - La CI (etapa 0) tiene que pasar en cada PR.
+- **Cada etapa se trabaja en una sesión nueva de Claude Code**, que arranca solo con lo que está escrito en el repo. Por eso, al cerrar una etapa se actualizan el estado de este plan (encabezado, tabla de resumen y "Terminada cuando") y el spec, con sus decisiones en §14. El flujo completo está en `CLAUDE.md`.
 - **Backend hasta la etapa 7**: la URL de producción de Vercel apunta al proyecto Supabase `dev`. El proyecto `prod` se crea en la etapa 2, pero recién se usa en la etapa 7 (§ Etapa 7, "Cambio a prod").
 - Ningún secret, configuración personal ni dato real se commitea (spec §11). Las fotos de etiquetas que se usen para probar van en carpetas incluidas en `.gitignore`.
 
 ## Resumen
 
-| # | Etapa | Terminada cuando… |
-|---|---|---|
-| 0 | Base del repo | Un push a `main` despliega en Vercel y la CI corre |
-| 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base |
-| 1b | Prueba de Gemini con un script | Tres etiquetas reales transcriptas y evaluadas; modelo elegido |
-| 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app |
-| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone |
-| 5 | Registro de comida e historial | **La app se puede usar todos los días** |
-| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano |
-| 7 | `create_meal`, seed USDA, pulido y paso a producción | Uso real sobre `prod` |
+| # | Etapa | Terminada cuando… | Estado |
+|---|---|---|---|
+| 0 | Base del repo | Un push a `main` despliega en Vercel y la CI corre | ✅ PR #1 |
+| 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
+| 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
+| 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **Próxima** |
+| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
+| 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
+| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
+| 7 | `create_meal`, seed USDA, pulido y paso a producción | Uso real sobre `prod` | |
 
 ---
 
@@ -77,7 +78,7 @@ No incluye: UI, Supabase ni Gemini.
 
 **Objetivo**: validar **temprano** que Gemini transcribe bien las etiquetas reales y respeta la consigna de no inventar datos. Es una etapa corta: no se integra nada a la app.
 
-Requisitos previos (spec §15):
+Requisitos previos (cumplidos):
 - Un proyecto de Google dedicado, **sin facturación**.
 - Una API key generada en Google AI Studio, guardada en `.env.local` (no se commitea).
 
@@ -150,8 +151,10 @@ Incluye:
 - Pantalla de login con email y contraseña. Las rutas protegidas redirigen al login.
 - Pantalla de configuración: ratio, umbral de dosis máxima (se pide la primera vez) y umbral de gramos por ítem (spec §6.8).
 - PWA: manifest, íconos y pantalla completa al abrirla desde la pantalla de inicio.
-- Navegación básica entre secciones (inicio, catálogo, historial, configuración), mobile-first.
-- Variables de Vercel apuntando a `dev`.
+- Navegación básica entre secciones (inicio, catálogo, historial, configuración), mobile-first. Se instalan `react-router` y `@tanstack/react-query` (spec §4.2).
+- **Regla de redirección en `vercel.json`** para que todas las rutas sirvan `index.html`. Sin ella, recargar o abrir directamente una pantalla que no sea la inicial da 404 en Vercel.
+- **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec.
+- Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`.
 - En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad.
 
 **Terminada cuando**:
@@ -168,7 +171,7 @@ Incluye:
 - Lista del catálogo con búsqueda por nombre y marca, y detalle de cada alimento.
 - **Alta manual** (§6.3), con nota obligatoria.
 - **Alta desde tabla de referencia, variante ARGENFOODS** (§5.2, §6.2): formulario con `reference_db = 'argenfoods'`, código, descripción y HC asimilables ingresados a mano.
-- **Factor de cocción** (§6.4): medición asistida (peso crudo y peso cocido), carga directa, edición, y advertencia si queda fuera de 1,0–4,0.
+- **Factor de cocción** (§6.4): medición asistida (peso crudo y peso cocido), carga directa, edición, y advertencia si queda fuera de 1,0–4,0. La cuenta `cocido ÷ crudo` es una cuenta como cualquier otra: va en `src/domain/dose/`, como función pura con tests de casos borde (pesos en 0, negativos o vacíos), y no en el componente (CLAUDE.md, regla 2).
 - Peso por unidad opcional.
 - Editar y archivar alimentos.
 
@@ -185,6 +188,7 @@ No incluye: la búsqueda en `reference_foods`, que necesita el seed y por eso pa
 
 Incluye:
 - Pantalla de nueva comida: elegir alimentos, cargar gramos o unidades, ver el **desglose en vivo** calculado por el módulo de la etapa 1, la dosis exacta, el campo de dosis aplicada y la fecha y hora ajustables.
+- Formato para mostrar gramos (por ejemplo, 0,5 unidades × 45 g = 22,5 g), agregado a `src/domain/dose/format.ts` con tests. Hoy solo existen `formatCarbs` y `formatDose`, y `CLAUDE.md` prohíbe `toFixed` suelto en los componentes.
 - Confirmación extra cuando hay advertencias (§8.5).
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.
 - **Guardado provisorio sin `create_meal`**: el cliente inserta primero el `meal` y después sus `meal_items`. No es atómico. Si falla el segundo insert, el cliente marca el `meal` como borrado (`deleted_at`, que sí se puede actualizar), para que no quede un registro sin ítems. Los CHECK de la base siguen actuando. En la etapa 7 se reemplaza por `create_meal`.
@@ -234,8 +238,9 @@ Incluye:
 - **Búsqueda en `reference_foods`** (§6.2), que se construye y prueba junto con el seed.
 - Pulido: estados vacíos, mensajes de error y revisión general de la UI en el iPhone.
 - **Cambio a prod**:
-  - aplicar todas las migraciones en `prod`;
-  - crear el usuario propio y deshabilitar el registro;
+  - aplicar todas las migraciones en `prod`: `npx supabase link --project-ref zoxlvutjqolwfjcsbtog`, `npx supabase db push --remote`, y después volver a vincular `dev` (`npx supabase link --project-ref xyolhiklqqoejkapqbxt`), porque la CLI queda vinculada a un solo proyecto;
+  - correr la prueba de aislamiento contra `prod`, con dos usuarios de prueba creados ahí y borrados al terminar;
+  - crear el usuario propio desde el panel (el registro ya está cerrado desde la etapa 2);
   - cargar los secrets de Gemini;
   - apuntar las variables de Production de Vercel a `prod`;
   - volver a loguearse en la app instalada (al cambiar de proyecto, la sesión anterior no sirve).
@@ -246,5 +251,5 @@ Incluye:
 - [ ] `create_meal` está en uso y el guardado no atómico ya no existe.
 - [ ] El seed USDA está cargado y la búsqueda funciona.
 - [ ] La app funciona sobre `prod` desde el iPhone.
-- [ ] El registro de usuarios está deshabilitado en `prod`.
+- [x] El registro de usuarios está deshabilitado en `prod` (se cerró en la etapa 2, para que nadie pudiera crearse una cuenta mientras tanto).
 - [ ] Se tomó la decisión sobre los datos de `dev`.

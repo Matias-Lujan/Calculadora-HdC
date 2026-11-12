@@ -2,7 +2,7 @@
 
 > **Aviso.** Proyecto personal. **No es un dispositivo médico** y no reemplaza la indicación de un profesional de la salud. Los valores que muestra son una ayuda para hacer una cuenta que el usuario igual revisa y decide.
 
-Estado: borrador v1 · Fecha: 2026-11-09
+Estado: vigente. Última revisión: 2026-11-12, al cerrar la etapa 2. El avance por etapas está en [plan.md](plan.md).
 
 ---
 
@@ -99,13 +99,13 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 | Backend | **Supabase** | Ya lo conocés. Postgres + Auth + Storage + Edge Functions cubren todo el backend. |
 | Modelo de visión | **Gemini Flash-Lite vía Google AI Studio, capa gratuita**, llamado desde una Edge Function | La capa gratuita alcanza para pocas etiquetas por semana, sin costo y sin facturación automática. La llamada queda encapsulada en un solo archivo (§9.2), así que cambiar de proveedor no toca el resto. |
 | Tests | **Vitest** | Es el test runner nativo del ecosistema Vite, rápido y con una sintaxis estándar. |
+| Lint y formato | **oxlint** y **Prettier** | oxlint es el linter que trae la plantilla actual de Vite: cumple la función de ESLint y es mucho más rápido. Además hace cumplir que `src/domain/` no importe nada de la app (CLAUDE.md, regla 2). Prettier unifica el formato. |
 | Estilos | **Tailwind CSS** | Los estilos se escriben como clases utilitarias en el mismo componente. Evita mantener archivos CSS aparte y facilita el diseño mobile-first. |
 
-Librerías puntuales, a confirmar al implementar:
-- `@supabase/supabase-js`: cliente oficial.
-- `react-router`: navegación entre pantallas.
-- `@tanstack/react-query`: lectura y caché de datos del servidor.
-- `zod`: validación de datos en runtime; se usa también en la Edge Function.
+Librerías puntuales:
+- `@supabase/supabase-js`: cliente oficial. Instalado en la etapa 2.
+- `zod`: validación de datos en runtime. Instalado en la etapa 1b; lo usan los scripts y lo van a usar la Edge Function y el cliente.
+- `react-router` (navegación entre pantallas) y `@tanstack/react-query` (lectura y caché de datos del servidor): se suman en la etapa 3.
 
 ## 5. Fuentes de datos de referencia
 
@@ -126,7 +126,7 @@ Hay muy pocos alimentos sin etiqueta (papa, banana, manzana, tapa de tarta cocid
 
 1. **Tabla `reference_foods` precargada con USDA FDC**. Es un subconjunto chico y curado, cargado por migración, que se puede publicar en el repo porque es dominio público. Cada fila guarda el `fdc_id` y la descripción original, y el valor de HC/100 g ya viene **sin fibra** (`carbohydrate − fiber`). Si una entrada de USDA no informa la fibra, no se carga.
 2. **ARGENFOODS como fuente preferida para alimentos locales, pero cargada por el usuario.** Como no tiene una licencia explícita, sus datos **no se suben al repo**. El usuario consulta la tabla, crea el alimento con `source = reference`, `reference_db = 'argenfoods'`, el código y la descripción de ARGENFOODS, y usa el valor de **HC asimilables**. Así el dato queda solo en su base.
-3. Si en el futuro se obtiene permiso de ARGENFOODS, se puede agregar al seed sin cambiar el modelo de datos.
+3. **No se va a pedir permiso a ARGENFOODS**: sus datos nunca se redistribuyen. Cada usuario los consulta y los carga solo en su propia base.
 
 Candidatos iniciales del seed USDA (los `fdc_id` y valores exactos se fijan al implementar, consultando FDC):
 - papa hervida sin piel;
@@ -136,7 +136,9 @@ Candidatos iniciales del seed USDA (los `fdc_id` y valores exactos se fijan al i
 
 ### 5.3 Etiquetas argentinas
 
-En el rotulado nutricional Mercosur, "carbohidratos" son los que se digieren y absorben, así que **la fibra ya está excluida** y el valor de la etiqueta se usa tal cual. La norma vigente durante años (Res. GMC 46/03) fue reemplazada por la Res. GMC 05/25, así que durante la transición van a convivir formatos de etiqueta distintos. Por ejemplo, algunas traen columna por 100 g y otras solo por porción. La transcripción contempla los dos casos (§9).
+En el rotulado nutricional Mercosur, "carbohidratos" son los que se digieren y absorben, así que **la fibra ya está excluida** y el valor de la etiqueta se usa tal cual. La norma vigente durante años (Res. GMC 46/03) fue reemplazada por la Res. GMC 05/25, así que durante la transición van a convivir formatos de etiqueta distintos. Por ejemplo, algunas traen columna por 100 g y otras solo por porción. La transcripción contempla los dos casos (§9). En la prueba con etiquetas reales de la etapa 1b, las cinco informaban solo por porción.
+
+Una etiqueta puede no seguir la norma al pie de la letra. En la prueba de la etapa 1b, un envase importado parecía incluir la fibra dentro de los carbohidratos ([notas](notas/gemini-probe.md#observación-sobre-una-etiqueta)). La app transcribe lo impreso y no puede detectarlo.
 
 Caso borde: una etiqueta importada con formato EE.UU. ("Total Carbohydrate") **incluye** la fibra. La transcripción devuelve el rótulo textual del renglón de carbohidratos. Si ese rótulo no es el habitual del Mercosur, la confirmación muestra un aviso y permite ingresar la fibra para restarla.
 
@@ -269,7 +271,7 @@ Además, unique `(id, user_id)` para las FK compuestas.
 | Columna | Tipo | Notas |
 |---|---|---|
 | `id` | uuid PK | |
-| `reference_db` | text not null | Hoy solo se cargan filas de `usda_fdc`. La columna acepta también `argenfoods`, igual que `foods.reference_db`, para sumar ARGENFOODS sin migrar si algún día se permite (§5.2) |
+| `reference_db` | text not null | Solo se cargan filas de `usda_fdc`, y es la única fuente que va a tener esta tabla: los datos de ARGENFOODS no se redistribuyen (§5.2). La columna también acepta `argenfoods` (quedó así en la migración de la etapa 2), pero no se usa |
 | `reference_code` | text not null | `fdc_id` |
 | `description_original` | text not null | Descripción en inglés |
 | `name_es` | text not null | Nombre para mostrar y buscar |
@@ -318,7 +320,20 @@ Además, unique `(id, user_id)`.
 | `effective_carbs_per_100g` | numeric not null | HC/100 g en el estado en que se comió |
 | `carbs_g` | numeric not null | HC del ítem |
 
+Además, unique `(meal_id, position)`: dos ítems de una misma comida no pueden ocupar la misma posición.
+
 Cada registro guarda los valores que se usaron, así que editar el alimento después no cambia nada hacia atrás.
+
+**`vision_requests`**: registro de las lecturas de etiquetas, para el tope diario de la Edge Function (§9.3).
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | bigint identity PK | |
+| `user_id` | uuid not null default `auth.uid()` | FK `auth.users` |
+| `created_at` | timestamptz not null default now() | |
+| `status` | text not null | Resultado de la lectura. Los valores los define la Edge Function (etapa 6) |
+
+No se puede actualizar ni borrar, así el tope diario no se puede resetear.
 
 ### 7.2 Integridad
 
@@ -337,6 +352,9 @@ En las políticas se usa `(select auth.uid())`, que Postgres evalúa una vez por
 | `reference_foods` | autenticados | — | — | — |
 | `meals` | propias | `with check` propias | propias (solo `deleted_at`, por privilegio de columna) | — |
 | `meal_items` | propias | `with check` propias | — | — |
+| `vision_requests` | propias | `with check` propias | — | — (el tope no se resetea) |
+
+Las fotos tienen sus propias políticas (§7.4).
 
 "Propias" significa `user_id = (select auth.uid())`. Una celda con "—" indica que no hay política, así que la operación queda denegada.
 
@@ -353,6 +371,8 @@ Además de las políticas, cada migración da los **permisos de tabla explícito
 - `foods (user_id, name)` con `archived_at is null`.
 - `meals (user_id, eaten_at desc)` con `deleted_at is null`.
 - `meal_items (meal_id)`.
+- `meal_items (food_id, user_id)`: la FK hacia `foods`.
+- `vision_requests (user_id, created_at desc)`: para contar las lecturas del día.
 
 ## 8. Capa de cálculo de dosis
 
@@ -362,6 +382,7 @@ Además de las políticas, cada migración da los **permisos de tabla explícito
 - Es el único lugar donde se hace la cuenta. Los componentes solo la llaman y muestran el resultado.
 - **No lanza excepciones por entradas inválidas.** Devuelve un resultado tipado con errores o advertencias, para que la UI los muestre.
 - Exporta una constante `CALC_VERSION`, que se guarda en cada registro.
+- Punto de entrada: `src/domain/dose/index.ts`, con `calculateMeal`, `formatCarbs`, `formatDose`, `CALC_VERSION` y los tipos. Las conversiones de la etiqueta (§9.7) están en `src/domain/label/index.ts`: `parseLabelNumber` y `carbsPer100gFromPortion`.
 
 ### 8.2 Fórmulas
 
@@ -438,7 +459,7 @@ Como mínimo:
 - **Precisión**: el resultado no se redondea; el redondeo de presentación maneja bien 1,005, 2,675 y 0,1 + 0,2; un total con muchos ítems no acumula errores visibles.
 - **Inmutabilidad**: la función no modifica los objetos que recibe.
 
-También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "1.234,5" se interpreta en formato argentino; "<0,5" o "0" se resuelven según una regla definida; un texto no numérico da `null`.
+También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "1.234,5" se interpreta en formato argentino; "<0,5" queda vacío y "0" da 0; un texto no numérico da `null`.
 
 ## 9. Edge Function `transcribe-label`
 
@@ -447,7 +468,7 @@ También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "
 - Se usa **Gemini vía Google AI Studio, en la capa gratuita**. Alcanza para el volumen esperado: pocas etiquetas por semana, y cada vez menos a medida que se llena el catálogo. El costo es cero.
 - El modelo se define en el secret `GEMINI_MODEL`, para cambiarlo sin tocar código. Por defecto va **`gemini-3.5-flash-lite`**, elegido en la prueba con etiquetas reales de la etapa 1b ([docs/notas/gemini-probe.md](notas/gemini-probe.md)): fue igual de exacto que Flash y respondió en 2–11 s, contra 15–143 s de Flash. Flash queda como alternativa.
 - **Los límites de la capa gratuita se aplican por proyecto de Google**, no por key. Son límites de pedidos por minuto y por día. Al superarlos, la API responde con un error (HTTP 429, `RESOURCE_EXHAUSTED`) y **no se cobra nada automáticamente**. La app trata ese caso como un error esperable (§9.4).
-- Conviene un **proyecto de Google dedicado** a esta app y **sin facturación habilitada**: si se habilita, el uso deja de ser gratuito. `dev` y `prod` pueden compartir ese proyecto; comparten cuota, pero alcanza.
+- La key sale de un **proyecto de Google dedicado** a esta app y **sin facturación habilitada** (hecho en la etapa 1b). Si se habilitara la facturación, el uso dejaría de ser gratuito. `dev` y `prod` comparten ese proyecto; comparten cuota, pero alcanza.
 - **Privacidad**: en la capa gratuita, Google puede usar lo que se le envía para mejorar sus productos (hay que verificarlo en los términos vigentes). Lo único que se envía es la foto de la etiqueta de un producto comercial, sin datos personales ni de salud. No se envía nada más.
 
 ### 9.2 Encapsulamiento del proveedor
@@ -468,7 +489,8 @@ Interfaz de `provider.ts`:
 ```ts
 export type ProviderError =
   | 'QUOTA_EXCEEDED'   // límite de la capa gratuita (429 / RESOURCE_EXHAUSTED)
-  | 'UNAVAILABLE'      // 5xx, error de red o timeout
+  | 'UNAVAILABLE'      // 5xx o error de red: se puede reintentar (§9.3)
+  | 'TIMEOUT'          // no respondió a tiempo: no se reintenta (§9.3)
   | 'BLOCKED'          // el proveedor rechazó o filtró la respuesta
   | 'BAD_RESPONSE';    // la respuesta no es JSON
 
@@ -476,21 +498,30 @@ export type ProviderResult =
   | { ok: true; json: unknown }          // index.ts la valida con zod
   | { ok: false; error: ProviderError };
 
-export function transcribe(input: {
-  image: Uint8Array;
-  mimeType: string;
-  instructions: string;
-  jsonSchema: object;
-}): Promise<ProviderResult>;
+export function transcribe(
+  input: {
+    image: Uint8Array;
+    mimeType: string;
+    instructions: string;
+    jsonSchema: object;
+  },
+  config: {
+    apiKey: string;
+    model: string;
+    fetch: typeof fetch;
+    timeoutMs: number;
+  },
+): Promise<ProviderResult>;
 ```
 
 `provider.ts` se encarga de:
 - armar el pedido (imagen inline, salida JSON con esquema), adaptando el esquema al subconjunto que acepta Gemini;
-- aplicar un timeout de unos 30 segundos;
-- traducir los errores HTTP y de la API a `ProviderError`;
-- leer `GEMINI_API_KEY` y `GEMINI_MODEL`.
+- aplicar el timeout que recibe (unos 30 segundos);
+- traducir los errores HTTP y de la API a `ProviderError`.
 
-Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. Nada más. El mapeo de errores tiene tests unitarios con un `fetch` simulado (429 → `QUOTA_EXCEEDED`, 503 → `UNAVAILABLE`, JSON roto → `BAD_RESPONSE`, timeout → `UNAVAILABLE`).
+`provider.ts` **no lee los secrets**: recibe la key, el modelo y `fetch` por parámetro. Los lee `index.ts` de `Deno.env` (`GEMINI_API_KEY`, `GEMINI_MODEL`) y se los pasa. Así `provider.ts` se puede testear con Vitest, sin Deno y sin red (CLAUDE.md).
+
+Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. Nada más. El mapeo de errores tiene tests unitarios con un `fetch` simulado (429 → `QUOTA_EXCEEDED`, 503 → `UNAVAILABLE`, JSON roto → `BAD_RESPONSE`, timeout → `TIMEOUT`).
 
 ### 9.3 Contrato HTTP
 
@@ -501,7 +532,7 @@ Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. N
 - Orden de ejecución:
   1. verificar el tope diario propio;
   2. descargar la imagen;
-  3. llamar a `provider.transcribe`. **Si falla con `UNAVAILABLE` por un 5xx o un error de red, se reintenta una sola vez, después de 1 segundo.** No se reintenta ante un timeout (duplicaría la espera), ante `QUOTA_EXCEEDED` (gastaría cuota sin resultado) ni ante `BLOCKED` o `BAD_RESPONSE`. En la prueba de la etapa 1b, el 14 % de las llamadas devolvió 503 por alta demanda y los reintentos inmediatos funcionaron. Con Flash-Lite, el peor caso queda en unos 20 s;
+  3. llamar a `provider.transcribe`. **Si falla con `UNAVAILABLE` (5xx o error de red), se reintenta una sola vez, después de 1 segundo.** No se reintenta ante `TIMEOUT` (duplicaría la espera), `QUOTA_EXCEEDED` (gastaría cuota sin resultado), `BLOCKED` ni `BAD_RESPONSE`. En la prueba de la etapa 1b, el 14 % de las llamadas devolvió 503 por alta demanda y los reintentos inmediatos funcionaron. Con Flash-Lite, el peor caso queda en unos 20 s;
   4. validar la respuesta con zod (si no cumple el esquema, es error y nunca se devuelven datos a medias);
   5. registrar el pedido en `vision_requests`;
   6. responder.
@@ -513,7 +544,7 @@ Cambiar de proveedor significa reescribir `provider.ts` y cambiar los secrets. N
 |---|---|---|---|---|
 | `VISION_QUOTA_EXCEEDED` | 429 | Se superó el límite de la capa gratuita de Gemini | sí | "Se alcanzó el límite gratuito de lecturas de etiquetas. Podés cargar los datos a mano o probar de nuevo más tarde." |
 | `DAILY_CAP_REACHED` | 429 | Se alcanzó el tope diario propio | no (hasta mañana) | "Llegaste al máximo de lecturas automáticas de hoy. Podés cargar los datos a mano." |
-| `VISION_UNAVAILABLE` | 503 | El proveedor no responde (5xx, red, timeout), también después del reintento automático | sí | "El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar." |
+| `VISION_UNAVAILABLE` | 503 | El proveedor no responde: `UNAVAILABLE` también después del reintento automático, o `TIMEOUT` | sí | "El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar." |
 | `VISION_BAD_RESPONSE` | 502 | La respuesta no es válida o fue bloqueada | sí | "No se pudo interpretar la lectura de la etiqueta. Podés cargar los datos a mano o reintentar." |
 | `INVALID_REQUEST` | 400 | La ruta es ajena, no existe o no es una imagen | no | Error técnico genérico |
 | `UNAUTHORIZED` | 401 | No hay sesión | no | Redirige al login |
@@ -578,7 +609,7 @@ Reglas de conversión (`src/domain/label/`). Ante la duda, el campo **queda vac�
 | "12,5", "12", "0", "0,0" | 12,5 · 12 · 0 · 0 | Formato argentino: coma decimal |
 | "1.234,5" | 1234,5 | Punto de miles + coma decimal |
 | "12.5", "0.25" | 12,5 · 0,25 | Un punto seguido de 1–2 dígitos solo puede ser decimal |
-| "12,5 g", "30 gr", "30 grs." | 12,5 · 30 · 30 | Se ignora la unidad en gramos |
+| "12,5 g", "30 gr", "30 grs.", "80 gramos" | 12,5 · 30 · 30 · 80 | Se ignora la unidad en gramos. "gramos" se agregó en la etapa 1b, porque aparece en etiquetas reales ("Porción: 80 gramos") |
 | "<0,5", "≤ 1", "menos de 0,5" | vacío | Es una cota, no un valor. Por porción, la diferencia puede ser grande (en una porción de 1 g, "<0,5" puede ser hasta 50 g por 100 g) |
 | "1.234" | vacío | Ambiguo: puede ser mil doscientos treinta y cuatro o uno coma dos tres cuatro |
 | "-", "no aporta cantidades significativas", "-5", "12%" | vacío | No es un número válido para una etiqueta |
@@ -588,7 +619,7 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
 ## 10. Autenticación y sesión
 
 - **Email + contraseña.** No se usa magic link: en una app agregada a la pantalla de inicio de iOS, el link se abre en Safari y no en la app instalada, que tiene su propio almacenamiento.
-- Después de crear el usuario propio, se **deshabilita el registro de nuevos usuarios** en Auth, en los dos proyectos.
+- El **registro de nuevos usuarios está deshabilitado en los dos proyectos** (desde la etapa 2). Los usuarios se crean a mano desde el panel de Supabase; el propio ya existe en `dev`, y en `prod` se crea en la etapa 7.
 - **Sesión lo más larga posible.** En Supabase, el *access token* dura poco (por defecto 1 hora) pero se renueva solo con el *refresh token*, que por defecto no vence. Configuración:
   - `persistSession: true` y `autoRefreshToken: true` en el cliente (son los valores por defecto).
   - **No** activar en Auth el "time-box" de sesiones ni el timeout por inactividad.
@@ -601,7 +632,8 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
 - **La key anon/publishable de Supabase va en el frontend y es pública por diseño.** La protección la dan RLS y el registro deshabilitado.
 - **Nunca** en el frontend ni en el repo: la `service_role` key ni `GEMINI_API_KEY`.
 - A Gemini solo se envía la foto de la etiqueta. En la capa gratuita, Google puede usar esos datos para mejorar sus productos (§9.1).
-- Las variables del frontend están en `.env.local`, que va en `.gitignore`. Se versiona un `.env.example` sin valores.
+- `.env.local` está en `.gitignore`. Tiene las variables del frontend, la key de Gemini para los scripts locales y las credenciales de los usuarios de prueba descartables de `scripts/rls-check/`. **Nunca** tiene las credenciales del usuario real: para entrar a la app, el usuario escribe su contraseña en el login. Se versiona un `.env.example` sin valores.
+- **El repo es privado por ahora**, y se va a hacer público sin fecha definida. Por eso, todo lo que se commitea se trata como si ya fuera público.
 - **La configuración personal y los registros viven solo en la base.** No hay seeds, fixtures ni ejemplos con datos reales en el repo. Los tests usan datos inventados.
 - Las fotos van a un bucket privado y se muestran con URLs firmadas.
 - No se loguean datos de salud en la consola ni en los logs de la Edge Function: solo errores técnicos.
@@ -612,34 +644,48 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
 
 | | Desarrollo | Producción |
 |---|---|---|
-| Supabase | `calculadora-hdc-dev` | `calculadora-hdc-prd` |
-| Frontend | `npm run dev` local, o *preview* de Vercel | Vercel, rama `main` |
-| Variables en Vercel | entorno *Preview* → `dev` | entorno *Production* → `prod` |
+| Supabase | `calculadora-hdc-dev` (ref `xyolhiklqqoejkapqbxt`) | `calculadora-hdc-prd` (ref `zoxlvutjqolwfjcsbtog`) |
+| Frontend | `npm run dev` local, o *preview* de Vercel | Vercel, rama `main`: https://calculadora-hdc.vercel.app/ |
+| Variables en Vercel | entorno *Preview* → `dev` | entorno *Production* → `prod`. **Hasta la etapa 7 apunta a `dev`** (plan, convenciones) |
 
+- El *ref* es el identificador del proyecto. No es secreto: forma parte de la URL de Supabase, que va en el frontend.
 - Los dos proyectos están en **São Paulo (`sa-east-1`)**, la región más cercana a Argentina, y tienen la misma configuración:
   - Data API activada;
   - **exposición automática de tablas desactivada**: cada migración da los permisos explícitamente (§7.3);
-  - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual.
+  - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual;
+  - **registro de usuarios deshabilitado** (§10).
+- Estado al cerrar la etapa 2: `dev` tiene las 7 migraciones aplicadas y el usuario propio creado; `prod` está vacío.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
-- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
+- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
+- **La configuración de Auth se maneja desde el panel.** `supabase/config.toml` solo sirve para un stack local, que no se usa. No se corre `npx supabase config push`, porque pisaría la configuración real de los proyectos con la del archivo (por ejemplo, podría reabrir el registro).
 - Los proyectos del plan gratuito se **pausan después de una semana sin actividad**. Con uso diario no le pasa a `prod`, pero sí le puede pasar a `dev`, que se reactiva desde el panel.
 
 ### 12.2 Estructura del repo
 
 ```
-docs/spec.md
+CLAUDE.md                 # reglas y convenciones para trabajar en el repo
+README.md
+docs/
+  spec.md                 # qué hace la app (este documento)
+  plan.md                 # etapas, estado y criterios de "terminada"
+  notas/                  # resultados de pruebas (gemini-probe.md)
 src/
   domain/dose/            # cálculo puro + tests
   domain/label/           # parseo de transcripción + tests
-  lib/supabase.ts         # cliente
+  lib/                    # database.types.ts (generado); supabase.ts, errors.ts… desde la etapa 3
   features/foods/ meals/ history/ settings/ auth/
   components/             # UI reutilizable
 supabase/
-  migrations/             # esquema, RLS, storage, seed USDA
+  config.toml             # solo para un stack local, que no se usa (§12.1)
+  migrations/             # esquema, RLS, storage; el seed USDA llega en la etapa 7
   functions/transcribe-label/
+scripts/
+  gemini-probe/           # prueba de transcripción con fotos reales (etapa 1b)
+  rls-check/              # prueba de aislamiento contra la API real (etapa 2)
 public/                   # manifest, íconos PWA
+.github/workflows/ci.yml
+vercel.json
 .env.example
-README.md
 ```
 
 ### 12.3 CI
@@ -693,14 +739,18 @@ Tiene que incluir:
 | 24 | Factor en `as_eaten` | Se ignora (etapa 1) |
 | 25 | Texto ambiguo en la etiqueta | Cotas ("<0,5") y separadores ambiguos ("1.234") quedan vacíos para que decida el usuario (etapa 1) |
 | 26 | Falla momentánea de Gemini | La Edge Function reintenta una vez, después de 1 s, ante 5xx o error de red; recién después muestra el error (etapa 1b) |
-| 27 | Proyectos Supabase | São Paulo (`sa-east-1`) los dos; exposición automática de tablas desactivada (permisos explícitos en cada migración) y RLS automática activada como red de seguridad (etapa 2) |
+| 27 | Proyectos Supabase | São Paulo (`sa-east-1`) los dos; exposición automática de tablas desactivada (permisos explícitos en cada migración), RLS automática activada como red de seguridad y registro de usuarios deshabilitado en los dos (etapa 2) |
+| 28 | ARGENFOODS | No se pide permiso: sus datos nunca se redistribuyen. Cada usuario los carga solo en su base |
+| 29 | Visibilidad del repo | Privado por ahora; se hace público sin fecha. Todo lo que se commitea se trata como público |
+| 30 | Lint y formato | oxlint (el que trae la plantilla de Vite) y Prettier (etapa 0) |
+| 31 | Credenciales en archivos | En `.env.local` solo van usuarios de prueba descartables, nunca el usuario real (etapa 2) |
 
 ## 15. Pendientes
 
-- Elegir los `fdc_id` concretos del seed USDA y verificar que informen la fibra.
+- Elegir los `fdc_id` concretos del seed USDA y verificar que informen la fibra (etapa 7).
 - Revisar el texto vigente de la Res. GMC 05/25 (rotulado nutricional) y ajustar las instrucciones de transcripción si cambia el formato de las etiquetas.
-- Definir el tope diario de la Edge Function y el umbral de dosis máxima, este último en la primera configuración.
-- Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).- Crear un proyecto de Google dedicado, sin facturación, y generar la API key en AI Studio.
+- Definir el tope diario de la Edge Function (etapa 6) y el umbral de dosis máxima; este último lo pide la app en la primera configuración (etapa 3).
+- Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).
 
 ## Fuentes consultadas
 

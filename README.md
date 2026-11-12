@@ -22,13 +22,14 @@ App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de 
 
 ## Estado
 
-En desarrollo. El plan por etapas está en [docs/plan.md](docs/plan.md).
+En desarrollo. Ya están el módulo de cálculo y la base de datos en Supabase; la app todavía no tiene pantallas. El avance por etapas está en [docs/plan.md](docs/plan.md). La versión publicada está en https://calculadora-hdc.vercel.app/.
 
 ## Documentación
 
 - [docs/spec.md](docs/spec.md): especificación del MVP (alcance, modelo de datos, cálculo, seguridad).
-- [docs/plan.md](docs/plan.md): plan de implementación por etapas.
-- [CLAUDE.md](CLAUDE.md): convenciones de código y reglas del proyecto.
+- [docs/plan.md](docs/plan.md): plan de implementación por etapas, con el estado actual.
+- [docs/notas/gemini-probe.md](docs/notas/gemini-probe.md): prueba de la lectura de etiquetas con fotos reales.
+- [CLAUDE.md](CLAUDE.md): convenciones de código, reglas del proyecto y comandos.
 
 ## Stack
 
@@ -48,12 +49,12 @@ npm run format       # formato
 npm run build        # build de producción
 ```
 
-La configuración de Supabase y de Gemini se agrega en las etapas siguientes del plan. Las variables del frontend van en `.env.local`, a partir de [.env.example](.env.example).
+Las variables van en `.env.local`, a partir de [.env.example](.env.example): las de Supabase para el frontend y, para los scripts de prueba, la key de Gemini y dos usuarios de prueba descartables. La base se arma con las migraciones de `supabase/migrations/`, usando la Supabase CLI. Los comandos están en [CLAUDE.md](CLAUDE.md#comandos) y los entornos, en la [spec, §12](docs/spec.md#12-entornos-repo-y-despliegue). Las instrucciones completas para levantar el proyecto desde cero se agregan en la etapa 7.
 
 ## Fuentes de datos
 
 - **USDA FoodData Central** (dominio público, CC0): https://fdc.nal.usda.gov/
-- **ARGENFOODS**, Universidad Nacional de Luján: https://www.argenfood.unlu.edu.ar/. Sus datos **no se incluyen** en este repositorio porque no tienen una licencia de redistribución publicada. Cada usuario los consulta y carga por su cuenta.
+- **ARGENFOODS**, Universidad Nacional de Luján: https://www.argenfood.unlu.edu.ar/. Sus datos **no se incluyen** en este repositorio ni se redistribuyen: no tienen una licencia de redistribución publicada. Cada usuario los consulta y los carga en su propia base.
 
 ## Licencia
 
