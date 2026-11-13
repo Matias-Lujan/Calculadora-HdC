@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 en curso en la rama `etapa-3-login` (subida, sin PR): funcionalidades 1 a 3 de 4 commiteadas y la 4 (configuración) implementada; falta la verificación en el iPhone. Ver "Estado al pausar" en la etapa 3.** Última actualización: 2026-11-13.
+**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 terminada en la rama `etapa-3-login`, con PR pendiente de merge. La próxima es la etapa 4.** Última actualización: 2026-11-13.
 
 ---
 
@@ -29,7 +29,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **En curso** (rama `etapa-3-login`; 4 de 4 funcionalidades implementadas; falta la verificación en el iPhone) |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ Rama `etapa-3-login` (PR pendiente de merge) |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
@@ -157,21 +157,19 @@ Incluye:
 - Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`. **Hecho: cargadas como tipo Config (no Secret, porque son públicas), en Production y Preview.**
 - En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad. **Verificado: apagados.**
 
-Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión" — implementada. Incluye el componente de input numérico `src/components/NumberInput.tsx`, que usa `applyTypedEdit` (no controlado, con listeners nativos: las inserciones se arman desde `beforeinput` y `paste` y se cancelan; los borrados los hace el navegador y se reconstruyen en `input` con `deletionEdit`, porque `getTargetRanges()` en un `<input>` siempre devuelve vacío; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, `formatUserNumber` y `parsePositiveUserNumber` en `src/domain/dose/`, y la verificación en el iPhone del teclado (qué separador muestra, texto predictivo, dictado y deshacer), que queda pendiente. Decidido: la cache de react-query se limpia en cada `SIGNED_OUT` (spec §14 #33) y "Cerrar sesión" usa `scope: 'local'` (spec §10, §14 #36).
+Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión" — implementada. Incluye el componente de input numérico `src/components/NumberInput.tsx`, que usa `applyTypedEdit` (no controlado, con listeners nativos: las inserciones se arman desde `beforeinput` y `paste` y se cancelan; los borrados los hace el navegador y se reconstruyen en `input` con `deletionEdit`, porque `getTargetRanges()` en un `<input>` siempre devuelve vacío; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, `formatUserNumber` y `parsePositiveUserNumber` en `src/domain/dose/`. Decidido: la cache de react-query se limpia en cada `SIGNED_OUT` (spec §14 #33) y "Cerrar sesión" usa `scope: 'local'` (spec §10, §14 #36).
 
-**Estado al pausar** (2026-11-13), para retomar en una sesión nueva:
-- Rama `etapa-3-login`, subida a GitHub y sin PR. Tiene un commit por funcionalidad (1 a 4). Se sigue en esta rama.
-- Las cuatro funcionalidades pasaron el ciclo completo de agentes (planner, implementer, tester y reviewer). La 1 se probó a mano en local (login, rutas protegidas, errores, sesión vencida, sin red) y funcionó. Lo único que falta para cerrar la etapa es la prueba en el iPhone (abajo) y el PR.
-- La protección de los *preview* de Vercel está desactivada (spec §12.1), así que la app se puede instalar en el iPhone desde el *preview* de la rama: en Vercel, Deployments, la URL `calculadora-hdc-git-etapa-3-login-…vercel.app`. Es estable entre pushes, así que la app instalada no hace falta reinstalarla.
-- **Pendiente**: la prueba en el iPhone. De la PWA: instalar, pantalla completa, safe areas, login dentro de la app, cerrar y reabrir, sesión al día siguiente. De la configuración: guardar y leer los tres valores (recién ahí se marca "La configuración se guarda y se lee desde `user_settings`"), el aviso del umbral de dosis la primera vez, "Cerrar sesión", y el teclado del input numérico (qué separador muestra, texto predictivo, dictado, deshacer, pegar y borrar con el cursor en el medio).
-- Las decisiones para la sección "Decisiones para revisar" del PR están en spec §14, filas 33 a 36.
-- Notas menores, fuera del alcance de la etapa: `parseLabelNumber('9'.repeat(400))` devuelve `Infinity` porque no chequea `Number.isFinite` (hoy no hace daño: el cálculo rechaza valores no finitos; se arregla con una línea y un test, idealmente en la etapa 6); el build avisa que el JS supera los 500 kB (no es error; se puede revisar con code-splitting en el pulido de la etapa 7).
+Verificado en el iPhone (2026-11-13), con la app instalada desde el *preview* de la rama (la protección de los *preview* de Vercel está desactivada, spec §12.1):
+- instalación, pantalla completa y safe areas;
+- login dentro de la app, y la sesión sigue activa al cerrar la app y reabrirla al día siguiente;
+- la configuración guarda y lee los tres valores, con el aviso del umbral de dosis la primera vez, y "Cerrar sesión" funciona;
+- en los campos numéricos, el teclado muestra coma.
 
 **Terminada cuando**:
-- [ ] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
-- [ ] El login funciona **dentro de la app instalada**.
-- [ ] Al cerrar la app y volver a abrirla al día siguiente, la sesión sigue activa.
-- [ ] La configuración se guarda y se lee desde `user_settings`.
+- [x] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
+- [x] El login funciona **dentro de la app instalada**.
+- [x] Al cerrar la app y volver a abrirla al día siguiente, la sesión sigue activa.
+- [x] La configuración se guarda y se lee desde `user_settings`.
 
 ## Etapa 4 — Catálogo
 
@@ -229,6 +227,7 @@ Incluye:
   - borrado de la foto si se cancela.
 - **Carga a mano si falla la lectura** (§9.4): mensajes claros, botón "Cargar a mano" (misma pantalla, con la foto a la vista) y botón "Reintentar" solo si el error es `retryable`.
 - Mostrar las fotos con URLs firmadas.
+- Arreglo menor, anotado en la etapa 3: `parseLabelNumber('9'.repeat(400))` devuelve `Infinity` porque no chequea `Number.isFinite`. Hoy no hace daño, porque el cálculo rechaza los valores no finitos. Se arregla con una línea y un test.
 
 **Terminada cuando**:
 - [ ] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
@@ -257,6 +256,7 @@ Incluye:
   - volver a loguearse en la app instalada (al cambiar de proyecto, la sesión anterior no sirve).
 - **Decisión pendiente: datos cargados en `dev`.** Lo que se use a diario desde la etapa 5 vive en `dev`. Hay dos opciones: migrar el catálogo a `prod` con un script SQL que reasigne el `user_id` y copie las fotos, o empezar de cero en `prod`. Se decide al llegar.
 - README completo (spec §12.4).
+- Revisar el tamaño del bundle: desde la etapa 3, el build avisa que el JS supera los 500 kB (666 kB). No es un error; se puede resolver con *code-splitting*.
 
 **Terminada cuando**:
 - [ ] `create_meal` está en uso y el guardado no atómico ya no existe.
