@@ -185,9 +185,9 @@ Incluye:
 
 No incluye: la búsqueda en `reference_foods`, que necesita el seed y por eso pasa a la etapa 7.
 
-Funcionalidades (ciclo de agentes): 1) factor de cocción en el dominio (`cookingFactorFromWeights` e `isCookingFactorUnusual` en `src/domain/dose/cookingFactor.ts`, spec §6.4, §14 #37) — implementada; 2) lista del catálogo con búsqueda y detalle; 3) alta y edición (manual y ARGENFOODS, factor medido o directo con advertencia, peso por unidad); 4) archivar.
+Funcionalidades (ciclo de agentes): 1) factor de cocción en el dominio (`cookingFactorFromWeights` e `isCookingFactorUnusual` en `src/domain/dose/cookingFactor.ts`, spec §6.4, §14 #37) — implementada; 2) lista del catálogo con búsqueda y detalle (búsqueda en el cliente, detalle en `/foods/:foodId`, `formatCookingFactor` en `src/domain/dose/format.ts`, spec §6.5, §14 #38) — implementada; 3) alta y edición (manual y ARGENFOODS, factor medido o directo con advertencia, peso por unidad); 4) archivar.
 
-Notas para la funcionalidad 3: el catálogo no valida un factor < 1 combinado con HC/100 g alto (lo bloquea el cálculo de la comida con `EFFECTIVE_CARBS_OVER_100`); el factor medido se muestra con un `formatCookingFactor` (2 decimales) que se agrega a `src/domain/dose/` junto con la UI, y no se copia como texto al campo del factor directo.
+Notas para la funcionalidad 3: el catálogo no valida un factor < 1 combinado con HC/100 g alto (lo bloquea el cálculo de la comida con `EFFECTIVE_CARBS_OVER_100`); el factor medido se muestra con `formatCookingFactor` (2 decimales, ya existe en `src/domain/dose/format.ts`), y no se copia como texto al campo del factor directo.
 
 **Terminada cuando**:
 - [ ] Desde el iPhone se cargaron una papa (ARGENFOODS, a mano), un arroz (crudo, con factor medido) y un alfajor (con peso por unidad).
@@ -200,7 +200,7 @@ Notas para la funcionalidad 3: el catálogo no valida un factor < 1 combinado co
 
 Incluye:
 - Pantalla de nueva comida: elegir alimentos, cargar gramos o unidades, ver el **desglose en vivo** calculado por el módulo de la etapa 1, la dosis exacta, el campo de dosis aplicada y la fecha y hora ajustables.
-- Formato para mostrar gramos (por ejemplo, 0,5 unidades × 45 g = 22,5 g), agregado a `src/domain/dose/format.ts` con tests. Hoy solo existen `formatCarbs` y `formatDose`, y `CLAUDE.md` prohíbe `toFixed` suelto en los componentes.
+- Formato para mostrar gramos (por ejemplo, 0,5 unidades × 45 g = 22,5 g), agregado a `src/domain/dose/format.ts` con tests. Hoy existen `formatCarbs`, `formatDose` y `formatCookingFactor`, y `CLAUDE.md` prohíbe `toFixed` suelto en los componentes.
 - Confirmación extra cuando hay advertencias (§8.5).
 - Si `max_dose_warning_units` es `null` (el usuario todavía no lo configuró), la pantalla de comida muestra un aviso con un link a Configuración (spec §6.8, §14 #36).
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.

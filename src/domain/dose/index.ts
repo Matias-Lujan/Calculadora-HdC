@@ -9,7 +9,7 @@ export {
   cookingFactorFromWeights,
   isCookingFactorUnusual,
 } from './cookingFactor.ts'
-export { formatCarbs, formatDose } from './format.ts'
+export { formatCarbs, formatCookingFactor, formatDose } from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
 export { parsePositiveUserNumber } from './parsePositiveUserNumber.ts'
 export type {

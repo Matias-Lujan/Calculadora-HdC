@@ -5,6 +5,7 @@ import {
 } from './components/RouteErrorBoundary.tsx'
 import { RequireAuth } from './features/auth/components/RequireAuth.tsx'
 import { LoginPage } from './features/auth/pages/LoginPage.tsx'
+import { FoodDetailPage } from './features/foods/pages/FoodDetailPage.tsx'
 import { FoodsPage } from './features/foods/pages/FoodsPage.tsx'
 import { HistoryPage } from './features/history/pages/HistoryPage.tsx'
 import { HomePage } from './features/meals/pages/HomePage.tsx'
@@ -26,6 +27,11 @@ export const router = createBrowserRouter([
       {
         path: 'foods',
         Component: FoodsPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'foods/:foodId',
+        Component: FoodDetailPage,
         ErrorBoundary: RouteErrorBoundary,
       },
       {

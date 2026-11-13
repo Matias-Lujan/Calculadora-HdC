@@ -27,8 +27,10 @@ function plainDecimal(value: number): string {
  * Decimal comma, thousands grouped with "." and nothing rounded: every digit
  * of the value stays ("12,5", "1.500", "0,30000000000000004").
  *
- * Used to fill a field with a saved value. Not for showing results: carbs
- * and doses are shown rounded, with `formatCarbs` and `formatDose`.
+ * Used to fill a field with a saved value, and to show a value the user
+ * typed that is not a result (for example, the weight per unit of a food).
+ * Not for showing results: carbs and doses are shown rounded, with
+ * `formatCarbs` and `formatDose`.
  *
  * Returns "" for values a field cannot hold (NaN, infinite or negative).
  */

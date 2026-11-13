@@ -27,3 +27,8 @@ export function formatCarbs(grams: number): string {
 export function formatDose(units: number): string {
   return formatFixed(units, 2)
 }
+
+/** Cooking factor for display: 2 decimals, decimal comma (8/3 → "2,67"). */
+export function formatCookingFactor(factor: number): string {
+  return formatFixed(factor, 2)
+}
