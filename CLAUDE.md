@@ -94,6 +94,7 @@ Scripts (leen `.env.local`; ver `.env.example`):
 node --env-file=.env.local scripts/rls-check/check.ts                 # aislamiento; crear antes los dos usuarios de prueba
 node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-flash-lite
 node scripts/gemini-probe/summarize.ts <corrida>
+node scripts/pwa/generate-icons.ts                                    # regenera los íconos desde public/icon.svg
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.

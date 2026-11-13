@@ -10,10 +10,10 @@ const sections = [
 export function AppLayout() {
   return (
     <>
-      <main className="mx-auto min-h-dvh max-w-md px-4 pt-6 pb-24 text-slate-900">
+      <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-900">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white">
+      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto flex max-w-md">
           {sections.map(({ to, label }) => (
             <li key={to} className="flex-1">

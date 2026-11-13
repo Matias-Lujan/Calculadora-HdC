@@ -94,7 +94,7 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 | Lenguaje | **TypeScript** | Es JavaScript con tipos. Cumple el mismo rol que los tipos de columna en SQL: muchos errores aparecen al compilar, antes de ejecutar. En una app que calcula dosis vale la pena. |
 | UI | **React** | Es la librería de UI más usada, con la mayor cantidad de documentación y ejemplos con Supabase. |
 | Build / dev server | **Vite** | Compila el proyecto a archivos estáticos y levanta un servidor local con recarga instantánea. Es simple y estándar. |
-| Instalación en iPhone | **PWA** (manifest + íconos) | Con esto "Agregar a pantalla de inicio" abre la app a pantalla completa, sin barra de Safari. No hace falta Mac ni App Store. |
+| Instalación en iPhone | **PWA** (manifest, íconos y metas de iOS), sin service worker | Con esto "Agregar a pantalla de inicio" abre la app a pantalla completa, sin barra de Safari. No hace falta Mac ni App Store. |
 | Hosting del frontend | **Vercel** | Es gratis para este uso y despliega solo con cada push a GitHub. Además crea una URL de *preview* por cada rama. |
 | Backend | **Supabase** | Ya lo conocés. Postgres + Auth + Storage + Edge Functions cubren todo el backend. |
 | Modelo de visión | **Gemini Flash-Lite vía Google AI Studio, capa gratuita**, llamado desde una Edge Function | La capa gratuita alcanza para pocas etiquetas por semana, sin costo y sin facturación automática. La llamada queda encapsulada en un solo archivo (§9.2), así que cambiar de proveedor no toca el resto. |
@@ -624,6 +624,7 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
   - `persistSession: true` y `autoRefreshToken: true` en el cliente (son los valores por defecto).
   - **No** activar en Auth el "time-box" de sesiones ni el timeout por inactividad.
   - Resultado: el usuario se loguea una vez en la app instalada y la sesión se mantiene mientras la use. Si iOS limpia el almacenamiento de la app (por ejemplo, después de mucho tiempo sin abrirla o si se reinstala), hay que volver a loguearse.
+  - El límite de 7 días de WebKit (que borra el almacenamiento de un sitio que no se visitó en 7 días de uso del navegador) no afecta a la app instalada mientras se use: las apps agregadas a la pantalla de inicio tienen su propio contador de días de uso, separado del de Safari ([WebKit, "Full Third-Party Cookie Blocking and More"](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)).
 - El login se hace **dentro de la app instalada**, no en Safari, porque no comparten sesión.
 - **Sesión revocada o vencida**: si el servidor responde 401 (por ejemplo, un JWT rechazado por PostgREST) o rechaza el *refresh token*, la app cierra la sesión local y vuelve al login, sin mensaje (§14, decisión 33). **Ante una falla de red**, en cambio, supabase-js conserva la sesión: un `AuthRetryableFetchError` no la borra, y la renovación se reintenta sola.
 
@@ -656,6 +657,7 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
   - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual;
   - **registro de usuarios deshabilitado** (§10).
 - Estado al cerrar la etapa 2: `dev` tiene las 7 migraciones aplicadas y el usuario propio creado; `prod` está vacío.
+- En Vercel, la **protección de los *preview* (Vercel Authentication) está desactivada**, para poder instalar la app en el iPhone desde un *preview* (§14, decisión 34). No expone nada nuevo: la URL de producción ya es pública y los datos los protegen RLS y el registro deshabilitado.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
 - Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
 - **La configuración de Auth se maneja desde el panel.** `supabase/config.toml` solo sirve para un stack local, que no se usa. No se corre `npx supabase config push`, porque pisaría la configuración real de los proyectos con la del archivo (por ejemplo, podría reabrir el registro).
@@ -686,7 +688,8 @@ supabase/
 scripts/
   gemini-probe/           # prueba de transcripción con fotos reales (etapa 1b)
   rls-check/              # prueba de aislamiento contra la API real (etapa 2)
-public/                   # manifest, íconos PWA
+  pwa/                    # genera los íconos desde icon.svg; test de los assets PWA (etapa 3)
+public/                   # manifest.webmanifest, icon.svg (fuente de los íconos) y los PNG generados
 .github/workflows/ci.yml
 vercel.json
 .env.example
@@ -750,6 +753,7 @@ Tiene que incluir:
 | 31 | Credenciales en archivos | En `.env.local` solo van usuarios de prueba descartables, nunca el usuario real (etapa 2) |
 | 32 | Flujo con agentes | Cada funcionalidad pasa por planner → implementer → tester → reviewer, con un máximo de 2 vueltas de corrección. La sesión principal coordina y es la única que commitea o aplica migraciones, con el OK del usuario. Detalle en `CLAUDE.md` |
 | 33 | Navegación y sesión en la UI | Rutas en inglés: `/login`, `/foods`, `/history` y `/settings`, con Inicio en `/`. La protección es por componente (`RequireAuth`, que escucha `onAuthStateChange`), sin loaders ni middleware del router. Después del login siempre se va a Inicio. Ante un 401 o una sesión vencida, el `onError` global de react-query llama a `signOut({ scope: 'local' })` y la app vuelve al login sin mensaje; los 401 no se reintentan (las demás lecturas, hasta 3 reintentos). Por ahora la cache de react-query no se limpia al cerrar sesión, porque todavía no hay datos cacheados; se decide en la funcionalidad 4 de la etapa (configuración y "Cerrar sesión") (etapa 3) |
+| 34 | PWA | Sin service worker: la app no funciona sin conexión, coherente con #20 (en iOS 26 todo sitio agregado a la pantalla de inicio abre como app web; en versiones anteriores alcanzan `display: standalone` y `apple-mobile-web-app-capable`). `short_name` "HdC". Barra de estado `default`: con `black-translucent` el reloj blanco no se vería sobre el fondo blanco; queda como plan B si algo quedara tapado. Íconos generados desde `public/icon.svg` (solo formas, sin texto) con `sharp`, por un script que se corre a mano (`scripts/pwa/generate-icons.ts`); los PNG se commitean, sin ícono maskable y sin canal alfa. Safe areas con `env(safe-area-inset-*)` dentro de `calc()`, solo arriba y abajo. El rewrite de `vercel.json` no cambia (Vercel sirve primero los archivos reales); un test (`scripts/pwa/pwa.test.ts`) detecta los `href` rotos, que el rewrite taparía devolviendo `index.html`. La protección de los preview de Vercel está desactivada para poder instalar la app desde un preview: la URL de producción ya es pública y los datos los protege RLS (etapa 3) |
 
 ## 15. Pendientes
 

@@ -34,7 +34,7 @@ function RouteErrorContent() {
 // Top-level routes (/login and the RequireAuth layout): full screen.
 export function RootErrorBoundary() {
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 py-8 text-slate-900">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))] text-slate-900">
       <RouteErrorContent />
     </main>
   )
