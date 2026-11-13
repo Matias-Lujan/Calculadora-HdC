@@ -382,7 +382,7 @@ Además de las políticas, cada migración da los **permisos de tabla explícito
 - Es el único lugar donde se hace la cuenta. Los componentes solo la llaman y muestran el resultado.
 - **No lanza excepciones por entradas inválidas.** Devuelve un resultado tipado con errores o advertencias, para que la UI los muestre.
 - Exporta una constante `CALC_VERSION`, que se guarda en cada registro.
-- Punto de entrada: `src/domain/dose/index.ts`, con `calculateMeal`, `formatCarbs`, `formatDose`, `CALC_VERSION` y los tipos. Las conversiones de la etiqueta (§9.7) están en `src/domain/label/index.ts`: `parseLabelNumber` y `carbsPer100gFromPortion`.
+- Punto de entrada: `src/domain/dose/index.ts`, con `calculateMeal`, `formatCarbs`, `formatDose`, `CALC_VERSION` y los tipos, más la conversión de los números que tipea el usuario (§8.7): `applyTypedEdit` (con sus tipos `TypedEdit`, `TypedEditResult` y `TypedNumberNotice`) y `parseUserNumber`. Las conversiones de la etiqueta (§9.7) están en `src/domain/label/index.ts`: `parseLabelNumber` y `carbsPer100gFromPortion`.
 
 ### 8.2 Fórmulas
 
@@ -460,6 +460,82 @@ Como mínimo:
 - **Inmutabilidad**: la función no modifica los objetos que recibe.
 
 También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "1.234,5" se interpreta en formato argentino; "<0,5" queda vacío y "0" da 0; un texto no numérico da `null`.
+
+Y los **números tipeados** (§8.7): `applyTypedEdit` agrupa los miles y deja el cursor después de lo editado; convierte en coma un "." tipeado si no hay otra coma, o lo rechaza si la hay, en los dos casos con aviso `DECIMAL_DOT`; rechaza con `REJECTED` (devuelve el texto anterior, con el cursor al final del rango) los caracteres que no corresponden, la segunda coma, los pegados con punto que no son un número válido en un campo vacío y los rangos inválidos, sin completar nada ("," queda ","). Sobre ediciones generadas al azar (con semilla fija): el campo siempre queda en forma canónica; un "." que entra nunca desaparece sin aviso; sin aviso, el campo tiene los dígitos del resto con lo insertado; y antes del cursor quedan los dígitos y comas esperados. `parseUserNumber` acepta coma decimal y miles bien agrupados, no redondea, y da `null` ante partes incompletas ("12,", ",5"), el punto como decimal, miles mal agrupados, signos, unidades, espacios internos, `Infinity`, `NaN` y números que no entran en un `number`.
+
+### 8.7 Números que tipea el usuario
+
+Los números que escribe el usuario (ratio, umbrales y, más adelante, gramos y unidades) se manejan con dos funciones puras de `src/domain/dose/`, testeadas (§8.6). No comparten código con `parseLabelNumber` (§9.7): comparten solo la coma decimal y el criterio de no redondear.
+
+**La app no adivina.** Solo pone y mueve los puntos de miles; lo que no corresponde no entra en el campo (la tecla no hace nada); lo que queda incompleto o inválido da error al salir del campo. La única conversión es la del "." tipeado, que se convierte en coma y se avisa: el campo nunca queda con un punto decimal, y un "." que entra nunca desaparece sin aviso.
+
+- El campo es `<input type="text" inputMode="decimal" autoComplete="off">`, **nunca** `type="number"`: con `type="number"`, iOS 26.2 y posteriores cambian la coma por punto, y el `value` puede quedar vacío ante una coma.
+- La función recibe **la edición exacta**, no el texto que propone el navegador: con solo el texto anterior y el propuesto no se puede saber qué entró. Por ejemplo, seleccionar todo "1.500" y pegar "1.5" propone "1.5", igual que borrar "00"; y en "92.597.366", reemplazar ".59" por "." propone lo mismo que borrar "59".
+- El componente (funcionalidad 4 de la etapa 3) arma la edición desde el evento nativo `beforeinput`: con `inputType` y `data` para lo tipeado, la selección del input (`selectionStart`, `selectionEnd`) para el rango, y `getTargetRanges()` para los borrados (backspace o suprimir pueden borrar más de un carácter). Lo pegado se toma de `paste` (`clipboardData`). Cancela el evento nativo (`preventDefault`), llama a `applyTypedEdit(anterior, edición)`, pone `value` en el campo y el cursor en `caret`, y si `notice` no es `null`, muestra un aviso. El valor del formulario es ese string. Se convierte a número con `parseUserNumber` al calcular o guardar.
+- `notice` es un código (`TypedNumberNotice`): `DECIMAL_DOT` si se tipeó un "." (se convirtió en coma, o no entró porque ya había una coma), y `REJECTED` si la edición no entró por otro motivo. Con `DECIMAL_DOT`, la UI avisa que los decimales van con coma. El texto en español va en `src/lib/errors.ts` (funcionalidad 4).
+- Convertir el "." en coma también resuelve el caso de un teclado de iPhone que muestre "." en lugar de "," (por la región o un teclado en inglés).
+- El cursor no salta al final al editar en el medio: la función devuelve dónde va (`caret`).
+- Los errores ("12," o ",5" incompletos, campo vacío) se muestran al salir del campo, como todo error de validación (CLAUDE.md), así que no molestan a mitad de tipeo.
+- El rango (> 0, etc.) **no** lo valida la conversión: lo valida quien usa el valor (el cálculo, §8.4, o el formulario).
+- Ningún valor se redondea.
+
+`applyTypedEdit(anterior, { start, end, inserted })` devuelve `{ value, caret, notice }`. `[start, end)` es el rango del anterior que se reemplaza (vacío si no había selección) e `inserted` es el texto que entra ("" en un borrado). Con `resto = anterior[0, start) + anterior[end, …)`, cuyos puntos son todos de miles, las reglas se aplican en este orden:
+
+0. Si el rango es inválido (no enteros, `start > end` o fuera del texto), se rechaza: `{ anterior, caret: anterior.length, REJECTED }`.
+1. Si `inserted` tiene algún carácter que no sea un dígito ASCII, "." o ",", se rechaza con `REJECTED`.
+2. Si `inserted` es exactamente "." (un punto tipeado, con o sin una selección reemplazada), el aviso es `DECIMAL_DOT`:
+   - si el resto tiene coma, el punto no entra: se devuelve el anterior;
+   - si no, se inserta "," en `start` y se devuelve la forma canónica. Los demás puntos eran de miles y se sacan, así que ninguno queda después de la coma ("1.500" con un "." después del "1" da "1,500").
+3. Si `inserted` tiene un "." y no es exactamente "." (un pegado):
+   - si el resto está vacío (o es solo espacios) e `inserted` es un número válido para `parseUserNumber`, se devuelve la forma canónica de `inserted`, sin aviso. Así se puede pegar "1.234,56" en un campo vacío, o sobre todo el texto seleccionado;
+   - si no, se rechaza con `REJECTED`: un punto así no se distingue de un punto de miles.
+4. Si `inserted` tiene más de una coma, o tiene una y el resto ya tiene coma, se rechaza con `REJECTED`.
+5. Si no, se inserta en `start` y se devuelve la forma canónica, sin aviso.
+
+La **forma canónica** saca todos los puntos (los de miles los pone siempre la app); la parte entera queda sin ceros a la izquierda (queda un "0" si eran todos ceros) y agrupada con "." cada 3 dígitos desde la derecha; la coma y los dígitos decimales quedan tal cual. No se agrega nada.
+
+El **cursor** (`caret`) queda de modo que antes de él estén los mismos dígitos y comas que había antes de `start`, más los insertados (o la coma, si el "." se convirtió). Los puntos de miles no cuentan, ni los ceros a la izquierda que la forma canónica saca. Si ese lugar queda justo antes de un punto de miles, el cursor va antes del punto. Si la edición se rechaza, el texto no cambia y el cursor va a `end`, como si la selección se hubiera colapsado al final.
+
+Un borrado de solo un punto de miles (backspace justo después del punto) deja el mismo texto, porque el punto se recalcula, y el cursor pasa a estar antes del punto: el backspace siguiente borra el dígito. Se acepta: borrar un punto de miles no tiene sentido.
+
+En la tabla, "aviso" es el `notice`; sin aviso es `null`. Las ediciones se escriben como `[start, end) ← "inserted"`, y el cursor como `|`.
+
+| Anterior y edición | Resultado | Por qué |
+|---|---|---|
+| "150", `[3,3) ← "0"` | "1.500\|" | Los miles se agrupan con punto, automáticamente |
+| "1.500", `[1,1) ← "2"` | "12\|.500" | Al insertar en el medio se reagrupa, y el cursor sigue al dígito |
+| "15.000", backspace al final | "1.500\|" | Al borrar también se reagrupa |
+| "1.500", backspace después del punto | "1\|.500" | Borrar un punto de miles no cambia el texto; el cursor pasa antes del punto |
+| "12", `[2,2) ← "."` | "12,\|" (aviso `DECIMAL_DOT`) | Un "." tipeado se convierte en coma, en su lugar, y se avisa que los decimales van con coma. Tipear "12.5" deja "12,5" |
+| "", `[0,0) ← "."` | ",\|" (aviso `DECIMAL_DOT`) | Ídem en un campo vacío: queda "," (no se agrega un "0") |
+| "1.234", `[0,3) ← "."` | ",\|34" (aviso `DECIMAL_DOT`) | Ídem al reemplazar una selección ("1.2") |
+| "92.597.366", `[2,5) ← "."` | "92,\|7366" (aviso `DECIMAL_DOT`) | Ídem ("59" y un punto de miles): los puntos que quedan eran de miles |
+| "12,5", `[4,4) ← "."` | "12,5" (aviso `DECIMAL_DOT`) | Ya hay una coma: el "." no entra, y se avisa igual |
+| "1.500", `[0,5) ← "1.5"` | "1.500" (aviso `REJECTED`) | Pegar algo con punto que no es un número válido se rechaza: el punto se perdería |
+| "1.234.567", `[2,9) ← "5.5"` | "1.234.567" (aviso `REJECTED`) | Ídem, pegado sobre una parte |
+| "", `[0,0) ← "1.234,56"` | "1.234,56\|" | Se puede pegar un número válido en un campo vacío |
+| "", `[0,0) ← "1500"` | "1.500\|" | Lo pegado sin puntos se agrupa |
+| "12,5", `[4,4) ← ","` | "12,5" (aviso `REJECTED`) | La segunda coma no entra |
+| "1.234", `[1,1) ← ","` | "1,\|234" | Una coma tipeada delante de un punto de miles: ese punto era de la app y se saca |
+| "12", `[2,2) ← "a"`; "", `[0,0) ← "-"` | "12" · "" (aviso `REJECTED`) | Letras, signos y espacios no entran |
+| "", `[0,0) ← ","`; ",", `[1,1) ← "5"` | ",\|" · ",5\|" | No se completa nada: no se agrega un "0" |
+| "0", `[1,1) ← "5"` | "5\|" | Sin ceros a la izquierda en la parte entera |
+| "1.500,250", `[9,9) ← "0"` | "1.500,2500\|" | La parte decimal queda tal cual: no se agrupa ni se recorta |
+| "1.234", `[0,5) ← "5"` | "5\|" | Reemplazar todo funciona |
+
+`parseUserNumber` (del campo al número). Vacío, incompleto o inválido da `null`:
+
+| Texto | Resultado | Por qué |
+|---|---|---|
+| "12,5", "0", "012" | 12,5 · 0 · 12 | Coma decimal; ceros a la izquierda permitidos |
+| "1500", "1.500", "1.234.567", "1.500,25" | 1500 · 1500 · 1234567 · 1500,25 | Miles sin separar o bien agrupados (1 a 3 dígitos y después grupos de exactamente 3) |
+| " 12,5 " | 12,5 | Se ignoran los espacios alrededor (incluido el espacio duro) |
+| "", ",", "." | `null` | No hay ningún dígito |
+| "12,", ",5" | `null` | Incompleto: tiene que haber dígitos antes de la coma y, si hay coma, también después. No se completa nada |
+| "12.5", "0.25" | `null` | El punto nunca es decimal |
+| "1.50", "15.00", "1.5000", ".500", "1." | `null` | Miles mal agrupados |
+| "-5", "+5", "12,5 g", "12%", "<0,5", "12 5", "1,2,3", "1e3", "Infinity", "NaN" | `null` | Signos, unidades, espacios internos, más de una coma, exponentes o palabras |
+| "999…9" (400 dígitos) | `null` | No entra en un `number` |
 
 ## 9. Edge Function `transcribe-label`
 
@@ -614,6 +690,8 @@ Reglas de conversión (`src/domain/label/`). Ante la duda, el campo **queda vac�
 | "1.234" | vacío | Ambiguo: puede ser mil doscientos treinta y cuatro o uno coma dos tres cuatro |
 | "-", "no aporta cantidades significativas", "-5", "12%" | vacío | No es un número válido para una etiqueta |
 
+La entrada tipeada tiene sus propias reglas (§8.7): comparte la coma decimal, pero no las unidades ni el punto como decimal.
+
 La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error si la porción es ≤ 0 o vacía, si los HC son negativos o vacíos, o si los HC superan los gramos de la porción (más de 100 g por 100 g indica un error de lectura).
 
 ## 10. Autenticación y sesión
@@ -674,7 +752,7 @@ docs/
   plan.md                 # etapas, estado y criterios de "terminada"
   notas/                  # resultados de pruebas (gemini-probe.md)
 src/
-  domain/dose/            # cálculo puro + tests
+  domain/dose/            # cálculo puro, formato y conversión de lo tipeado + tests
   domain/label/           # parseo de transcripción + tests
   lib/                    # database.types.ts (generado); supabase.ts, queryClient.ts y errors.ts (etapa 3)
   features/foods/ meals/ history/ settings/ auth/
@@ -754,6 +832,7 @@ Tiene que incluir:
 | 32 | Flujo con agentes | Cada funcionalidad pasa por planner → implementer → tester → reviewer, con un máximo de 2 vueltas de corrección. La sesión principal coordina y es la única que commitea o aplica migraciones, con el OK del usuario. Detalle en `CLAUDE.md` |
 | 33 | Navegación y sesión en la UI | Rutas en inglés: `/login`, `/foods`, `/history` y `/settings`, con Inicio en `/`. La protección es por componente (`RequireAuth`, que escucha `onAuthStateChange`), sin loaders ni middleware del router. Después del login siempre se va a Inicio. Ante un 401 o una sesión vencida, el `onError` global de react-query llama a `signOut({ scope: 'local' })` y la app vuelve al login sin mensaje; los 401 no se reintentan (las demás lecturas, hasta 3 reintentos). Por ahora la cache de react-query no se limpia al cerrar sesión, porque todavía no hay datos cacheados; se decide en la funcionalidad 4 de la etapa (configuración y "Cerrar sesión") (etapa 3) |
 | 34 | PWA | Sin service worker: la app no funciona sin conexión, coherente con #20 (en iOS 26 todo sitio agregado a la pantalla de inicio abre como app web; en versiones anteriores alcanzan `display: standalone` y `apple-mobile-web-app-capable`). `short_name` "HdC". Barra de estado `default`: con `black-translucent` el reloj blanco no se vería sobre el fondo blanco; queda como plan B si algo quedara tapado. Íconos generados desde `public/icon.svg` (solo formas, sin texto) con `sharp`, por un script que se corre a mano (`scripts/pwa/generate-icons.ts`); los PNG se commitean, sin ícono maskable y sin canal alfa. Safe areas con `env(safe-area-inset-*)` dentro de `calc()`, solo arriba y abajo. El rewrite de `vercel.json` no cambia (Vercel sirve primero los archivos reales); un test (`scripts/pwa/pwa.test.ts`) detecta los `href` rotos, que el rewrite taparía devolviendo `index.html`. La protección de los preview de Vercel está desactivada para poder instalar la app desde un preview: la URL de producción ya es pública y los datos los protege RLS (etapa 3) |
+| 35 | Números tipeados | La app no adivina: solo pone y mueve los puntos de miles. Solo coma como decimal. `applyTypedEdit(anterior, { start, end, inserted })` recibe la edición exacta (con el texto propuesto por el navegador no se puede saber qué entró: seleccionar todo "1.500" y pegar "1.5" propone lo mismo que borrar "00"). El componente la arma desde `beforeinput` (y `paste` para lo pegado), cancela el evento nativo y pone en el campo el `value` y el `caret` que devuelve la función, así que el cursor no salta al final. Un "." tipeado (`inserted` exactamente ".") se convierte en coma si el resto no tiene otra (tipear "12.5" deja "12,5"), y se avisa con `DECIMAL_DOT`; si el resto tiene coma, no entra y se avisa igual. La UI muestra un aviso de que los decimales van con coma (el texto va en `src/lib/errors.ts`, en la funcionalidad 4). Un pegado con punto se rechaza con `REJECTED`, salvo un número válido pegado sobre un campo vacío o sobre todo el texto: un "." que entra nunca desaparece sin aviso. También se rechazan los caracteres que no son dígitos ASCII, "." o ",", la segunda coma y los rangos inválidos; al rechazar, el cursor va al final del rango. Los puntos fuera de la edición son de miles y la app los recalcula: una coma tipeada delante de un punto de miles lo saca ("1.234" con "," después del "1" da "1,234"), y borrar solo un punto de miles deja el mismo texto, con el cursor antes del punto. No completa nada ("," y ",5" quedan así) y solo saca ceros a la izquierda de la parte entera. `parseUserNumber` acepta enteros con o sin miles bien agrupados y coma con dígitos de los dos lados; lo incompleto ("12,", ",5", ","), el punto como decimal, los miles mal agrupados, las unidades y los signos dan `null`, igual que el vacío; el error se muestra al salir del campo. El rango lo valida quien usa el valor y nada se redondea. No comparte código con `parseLabelNumber`. Los campos son `type="text"` con `inputMode="decimal"`. `CALC_VERSION` no cambia. Si el teclado del iPhone mostrara "." en lugar de "," (por la región o un teclado en inglés), el "." se convierte en coma; se verifica en el iPhone en la funcionalidad 4 (etapa 3, §8.7) |
 
 ## 15. Pendientes
 

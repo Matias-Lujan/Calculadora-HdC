@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 en curso (funcionalidad 2 de 4: PWA).** Última actualización: 2026-11-12.
+**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 en curso (funcionalidad 3 de 4: números tipeados).** Última actualización: 2026-11-13.
 
 ---
 
@@ -29,7 +29,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **En curso** (2 de 4: PWA) |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **En curso** (3 de 4: números tipeados) |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
@@ -153,11 +153,11 @@ Incluye:
 - PWA: manifest, íconos y pantalla completa al abrirla desde la pantalla de inicio.
 - Navegación básica entre secciones (inicio, catálogo, historial, configuración), mobile-first. Se instalan `react-router` y `@tanstack/react-query` (spec §4.2).
 - **Regla de redirección en `vercel.json`** para que todas las rutas sirvan `index.html`. Sin ella, recargar o abrir directamente una pantalla que no sea la inicial da 404 en Vercel.
-- **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec.
+- **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec. Decidido: `applyTypedEdit` y `parseUserNumber` en `src/domain/dose/`, sin código compartido con `parseLabelNumber` (spec §8.7, §14 #35).
 - Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`.
 - En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad. **Verificado: apagados.**
 
-Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/`; 4) pantalla de configuración, con el botón "Cerrar sesión". En la 4 hay que decidir si al cerrar sesión se limpia la cache de react-query (`queryClient.clear()` al recibir `SIGNED_OUT`, que cubre también el 401): si no se limpia, al entrar con otra cuenta en el mismo dispositivo se verían un instante datos de la anterior.
+Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión". Incluye el componente de input numérico que usa `applyTypedEdit` (arma la edición desde `beforeinput`, `paste` y `getTargetRanges()`, cancela el evento nativo y pone `value` y `caret`; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, y la verificación en el iPhone del teclado (qué separador muestra, texto predictivo, dictado y deshacer). En la 4 hay que decidir si al cerrar sesión se limpia la cache de react-query (`queryClient.clear()` al recibir `SIGNED_OUT`, que cubre también el 401): si no se limpia, al entrar con otra cuenta en el mismo dispositivo se verían un instante datos de la anterior.
 
 **Terminada cuando**:
 - [ ] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
