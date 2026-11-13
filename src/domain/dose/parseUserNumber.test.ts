@@ -33,7 +33,7 @@ describe('parseUserNumber', () => {
     ['0,5', 0.5],
     ['  12,5  ', 12.5],
     ['\t12,5\t', 12.5],
-    [' 12,5 ', 12.5],
+    ['\u00a012,5\u00a0', 12.5],
   ])('%j → %s', (text, expected) => {
     expect(parseUserNumber(text)).toBe(expected)
   })
@@ -51,7 +51,7 @@ describe('parseUserNumber', () => {
   it.each([
     '',
     '   ',
-    ' ',
+    '\u00a0',
     ',',
     '.',
     // Nothing is filled in: a missing integer or decimal part is incomplete.
@@ -123,7 +123,7 @@ describe('parseUserNumber: casos borde', () => {
     '١٬٥٠٠',
     // Thousands separators of other locales.
     '1 500',
-    '1 500',
+    '1\u00a0500',
     '1’500',
     '1,500.25',
     // Control characters inside or around.
@@ -203,7 +203,7 @@ function generateValidTexts(count: number, seed: number): string[] {
     const decimal =
       random() < 0.5 ? ',' + digits(1 + Math.floor(random() * 6)) : ''
     const text = grouped + decimal
-    texts.push(random() < 0.2 ? ` ${text} ` : text)
+    texts.push(random() < 0.2 ? ` ${text}\u00a0` : text)
   }
   return texts
 }

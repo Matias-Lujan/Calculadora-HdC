@@ -6,5 +6,11 @@ export type {
 } from './applyTypedEdit.ts'
 export { CALC_VERSION, calculateMeal } from './calculate.ts'
 export { formatCarbs, formatDose } from './format.ts'
+export { formatUserNumber } from './formatUserNumber.ts'
+export { parsePositiveUserNumber } from './parsePositiveUserNumber.ts'
+export type {
+  PositiveNumberError,
+  PositiveNumberResult,
+} from './parsePositiveUserNumber.ts'
 export { parseUserNumber } from './parseUserNumber.ts'
 export type * from './types.ts'

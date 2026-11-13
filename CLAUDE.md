@@ -18,7 +18,7 @@ Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dej
 
 Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día.
 
-1. **Al empezar**: leer el estado en `docs/plan.md` y crear la rama de la etapa desde `main` actualizado (`etapa-<n>-<tema>`).
+1. **Al empezar**: leer el estado en `docs/plan.md` y crear la rama de la etapa desde `main` actualizado (`etapa-<n>-<tema>`). Si la etapa ya está en curso, el plan nombra su rama: se sigue en esa rama (`git checkout <rama>` y `git pull`), sin crear otra. Una etapa puede ocupar más de una sesión.
 2. **Durante la etapa**: cada funcionalidad pasa por el [ciclo de agentes](#ciclo-por-funcionalidad-agentes). Una funcionalidad es un punto del "Incluye" de la etapa, o un grupo chico de puntos relacionados. Lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
 3. **Al terminar**:
    - pasar los chequeos de la sección Comandos;

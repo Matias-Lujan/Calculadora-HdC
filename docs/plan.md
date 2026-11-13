@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 en curso (funcionalidad 3 de 4: números tipeados).** Última actualización: 2026-11-13.
+**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 en curso en la rama `etapa-3-login` (subida, sin PR): funcionalidades 1 a 3 de 4 commiteadas y la 4 (configuración) implementada; falta la verificación en el iPhone. Ver "Estado al pausar" en la etapa 3.** Última actualización: 2026-11-13.
 
 ---
 
@@ -29,7 +29,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **En curso** (3 de 4: números tipeados) |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **En curso** (rama `etapa-3-login`; 4 de 4 funcionalidades implementadas; falta la verificación en el iPhone) |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
@@ -154,10 +154,18 @@ Incluye:
 - Navegación básica entre secciones (inicio, catálogo, historial, configuración), mobile-first. Se instalan `react-router` y `@tanstack/react-query` (spec §4.2).
 - **Regla de redirección en `vercel.json`** para que todas las rutas sirvan `index.html`. Sin ella, recargar o abrir directamente una pantalla que no sea la inicial da 404 en Vercel.
 - **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec. Decidido: `applyTypedEdit` y `parseUserNumber` en `src/domain/dose/`, sin código compartido con `parseLabelNumber` (spec §8.7, §14 #35).
-- Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`.
+- Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`. **Hecho: cargadas como tipo Config (no Secret, porque son públicas), en Production y Preview.**
 - En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad. **Verificado: apagados.**
 
-Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión". Incluye el componente de input numérico que usa `applyTypedEdit` (arma la edición desde `beforeinput`, `paste` y `getTargetRanges()`, cancela el evento nativo y pone `value` y `caret`; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, y la verificación en el iPhone del teclado (qué separador muestra, texto predictivo, dictado y deshacer). En la 4 hay que decidir si al cerrar sesión se limpia la cache de react-query (`queryClient.clear()` al recibir `SIGNED_OUT`, que cubre también el 401): si no se limpia, al entrar con otra cuenta en el mismo dispositivo se verían un instante datos de la anterior.
+Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión" — implementada. Incluye el componente de input numérico `src/components/NumberInput.tsx`, que usa `applyTypedEdit` (no controlado, con listeners nativos: las inserciones se arman desde `beforeinput` y `paste` y se cancelan; los borrados los hace el navegador y se reconstruyen en `input` con `deletionEdit`, porque `getTargetRanges()` en un `<input>` siempre devuelve vacío; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, `formatUserNumber` y `parsePositiveUserNumber` en `src/domain/dose/`, y la verificación en el iPhone del teclado (qué separador muestra, texto predictivo, dictado y deshacer), que queda pendiente. Decidido: la cache de react-query se limpia en cada `SIGNED_OUT` (spec §14 #33) y "Cerrar sesión" usa `scope: 'local'` (spec §10, §14 #36).
+
+**Estado al pausar** (2026-11-13), para retomar en una sesión nueva:
+- Rama `etapa-3-login`, subida a GitHub y sin PR. Tiene un commit por funcionalidad (1 a 4). Se sigue en esta rama.
+- Las cuatro funcionalidades pasaron el ciclo completo de agentes (planner, implementer, tester y reviewer). La 1 se probó a mano en local (login, rutas protegidas, errores, sesión vencida, sin red) y funcionó. Lo único que falta para cerrar la etapa es la prueba en el iPhone (abajo) y el PR.
+- La protección de los *preview* de Vercel está desactivada (spec §12.1), así que la app se puede instalar en el iPhone desde el *preview* de la rama: en Vercel, Deployments, la URL `calculadora-hdc-git-etapa-3-login-…vercel.app`. Es estable entre pushes, así que la app instalada no hace falta reinstalarla.
+- **Pendiente**: la prueba en el iPhone. De la PWA: instalar, pantalla completa, safe areas, login dentro de la app, cerrar y reabrir, sesión al día siguiente. De la configuración: guardar y leer los tres valores (recién ahí se marca "La configuración se guarda y se lee desde `user_settings`"), el aviso del umbral de dosis la primera vez, "Cerrar sesión", y el teclado del input numérico (qué separador muestra, texto predictivo, dictado, deshacer, pegar y borrar con el cursor en el medio).
+- Las decisiones para la sección "Decisiones para revisar" del PR están en spec §14, filas 33 a 36.
+- Notas menores, fuera del alcance de la etapa: `parseLabelNumber('9'.repeat(400))` devuelve `Infinity` porque no chequea `Number.isFinite` (hoy no hace daño: el cálculo rechaza valores no finitos; se arregla con una línea y un test, idealmente en la etapa 6); el build avisa que el JS supera los 500 kB (no es error; se puede revisar con code-splitting en el pulido de la etapa 7).
 
 **Terminada cuando**:
 - [ ] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
@@ -192,6 +200,7 @@ Incluye:
 - Pantalla de nueva comida: elegir alimentos, cargar gramos o unidades, ver el **desglose en vivo** calculado por el módulo de la etapa 1, la dosis exacta, el campo de dosis aplicada y la fecha y hora ajustables.
 - Formato para mostrar gramos (por ejemplo, 0,5 unidades × 45 g = 22,5 g), agregado a `src/domain/dose/format.ts` con tests. Hoy solo existen `formatCarbs` y `formatDose`, y `CLAUDE.md` prohíbe `toFixed` suelto en los componentes.
 - Confirmación extra cuando hay advertencias (§8.5).
+- Si `max_dose_warning_units` es `null` (el usuario todavía no lo configuró), la pantalla de comida muestra un aviso con un link a Configuración (spec §6.8, §14 #36).
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.
 - **Guardado provisorio sin `create_meal`**: el cliente inserta primero el `meal` y después sus `meal_items`. No es atómico. Si falla el segundo insert, el cliente marca el `meal` como borrado (`deleted_at`, que sí se puede actualizar), para que no quede un registro sin ítems. Los CHECK de la base siguen actuando. En la etapa 7 se reemplaza por `create_meal`.
 

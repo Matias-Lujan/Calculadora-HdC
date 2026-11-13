@@ -7,7 +7,19 @@ import {
   PostgrestError,
 } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
-import { authErrorMessage, isUnauthorized } from './errors.ts'
+import type {
+  PositiveNumberError,
+  TypedNumberNotice,
+} from '../domain/dose/index.ts'
+import {
+  LOAD_ERROR_MESSAGE,
+  SAVE_ERROR_MESSAGE,
+  SIGN_OUT_ERROR_MESSAGE,
+  authErrorMessage,
+  isUnauthorized,
+  positiveNumberErrorMessage,
+  typedNumberNoticeMessage,
+} from './errors.ts'
 
 const CREDENTIALS = 'El email o la contraseña no son correctos.'
 const RATE_LIMIT =
@@ -180,4 +192,78 @@ describe('isUnauthorized', () => {
       expect(isUnauthorized(value)).toBe(false)
     },
   )
+})
+
+describe('typedNumberNoticeMessage', () => {
+  it.each<[TypedNumberNotice, string]>([
+    ['DECIMAL_DOT', 'Los decimales van con coma.'],
+    [
+      'REJECTED',
+      'Solo se pueden ingresar números, con coma para los decimales.',
+    ],
+  ])('%s', (notice, message) => {
+    expect(typedNumberNoticeMessage(notice)).toBe(message)
+  })
+})
+
+describe('positiveNumberErrorMessage', () => {
+  it.each<[PositiveNumberError, string]>([
+    ['REQUIRED', 'Completá este campo.'],
+    [
+      'INVALID_NUMBER',
+      'Escribí un número completo, con coma para los decimales (por ejemplo, 12,5).',
+    ],
+    ['NOT_POSITIVE', 'Tiene que ser mayor que 0.'],
+  ])('%s', (code, message) => {
+    expect(positiveNumberErrorMessage(code)).toBe(message)
+  })
+})
+
+describe('messages', () => {
+  const codes: (TypedNumberNotice | PositiveNumberError)[] = [
+    'DECIMAL_DOT',
+    'REJECTED',
+    'REQUIRED',
+    'INVALID_NUMBER',
+    'NOT_POSITIVE',
+  ]
+  const messages = [
+    typedNumberNoticeMessage('DECIMAL_DOT'),
+    typedNumberNoticeMessage('REJECTED'),
+    positiveNumberErrorMessage('REQUIRED'),
+    positiveNumberErrorMessage('INVALID_NUMBER'),
+    positiveNumberErrorMessage('NOT_POSITIVE'),
+    LOAD_ERROR_MESSAGE,
+    SAVE_ERROR_MESSAGE,
+    SIGN_OUT_ERROR_MESSAGE,
+  ]
+
+  it.each(messages)('%j is not empty and is not a code', (message) => {
+    expect(message.trim()).not.toBe('')
+    expect(codes).not.toContain(message)
+  })
+
+  it('are all different', () => {
+    expect(new Set(messages).size).toBe(messages.length)
+  })
+
+  it.each(messages)(
+    '%j has no code-like word and ends with a period',
+    (message) => {
+      expect(message).not.toMatch(/[A-Z_]{4,}/)
+      expect(message.endsWith('.')).toBe(true)
+    },
+  )
+
+  it('the save error is the generic one from CLAUDE.md', () => {
+    expect(SAVE_ERROR_MESSAGE).toBe(
+      'No se pudo guardar. Revisá la conexión y reintentá.',
+    )
+  })
+
+  it('the sign-out error is the one from spec §14 #36', () => {
+    expect(SIGN_OUT_ERROR_MESSAGE).toBe(
+      'No se pudo cerrar la sesión. Reintentá.',
+    )
+  })
 })

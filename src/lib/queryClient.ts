@@ -22,3 +22,11 @@ export const queryClient = new QueryClient({
     },
   },
 })
+
+// Every sign-out (the "Cerrar sesión" button, a 401, a rejected refresh)
+// clears the cache, so another account on the same device never sees the
+// previous one's data. The callback stays synchronous and calls nothing else
+// from Supabase (supabase-js recommendation).
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') queryClient.clear()
+})

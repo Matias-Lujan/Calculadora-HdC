@@ -207,7 +207,7 @@ describe('applyTypedEdit: cambios rechazados', () => {
     ['12', typeAt(2, 'g')],
     ['12', typeAt(2, '%')],
     ['', typeAt(0, '1e3')],
-    ['', typeAt(0, ' 12')],
+    ['', typeAt(0, '\u00a012')],
     ['', typeAt(0, '１２')],
     ['', typeAt(0, '١٢')],
     ['1', typeAt(1, '\u0000')],
