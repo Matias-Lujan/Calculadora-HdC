@@ -1,0 +1,93 @@
+import {
+  isAuthApiError,
+  isAuthRetryableFetchError,
+} from '@supabase/supabase-js'
+import type {
+  PositiveNumberError,
+  TypedNumberNotice,
+} from '../domain/dose/index.ts'
+
+// Single place where error codes become Spanish messages (CLAUDE.md,
+// "Manejo de errores en la UI"). Only codes are inspected, never the raw
+// message, which is never shown to the user.
+
+// A Map (not an object literal) so codes like "toString" or "__proto__"
+// don't resolve to inherited prototype members.
+const SIGN_IN_MESSAGES = new Map<string, string>([
+  ['invalid_credentials', 'El email o la contraseña no son correctos.'],
+  [
+    'over_request_rate_limit',
+    'Hiciste demasiados intentos. Esperá unos minutos y volvé a probar.',
+  ],
+])
+
+const CONNECTION_MESSAGE =
+  'No se pudo conectar. Revisá la conexión y reintentá.'
+const SIGN_IN_FALLBACK = 'No se pudo iniciar sesión. Reintentá en un momento.'
+
+export function authErrorMessage(error: unknown): string {
+  if (isAuthRetryableFetchError(error)) return CONNECTION_MESSAGE
+  if (isAuthApiError(error) && error.code !== undefined) {
+    const message = SIGN_IN_MESSAGES.get(error.code)
+    if (message !== undefined) return message
+  }
+  return SIGN_IN_FALLBACK
+}
+
+const UNAUTHORIZED_AUTH_CODES = new Set([
+  'session_expired',
+  'session_not_found',
+  'refresh_token_not_found',
+  'refresh_token_already_used',
+  'bad_jwt',
+])
+
+// PostgREST JWT errors (missing, invalid or expired token).
+const UNAUTHORIZED_POSTGREST_CODES = new Set([
+  'PGRST301',
+  'PGRST302',
+  'PGRST303',
+])
+
+// True when the session is no longer valid and the user has to log in again.
+export function isUnauthorized(error: unknown): boolean {
+  if (isAuthApiError(error)) {
+    return error.code !== undefined && UNAUTHORIZED_AUTH_CODES.has(error.code)
+  }
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const { code } = error
+    return typeof code === 'string' && UNAUTHORIZED_POSTGREST_CODES.has(code)
+  }
+  return false
+}
+
+const TYPED_NUMBER_NOTICES: Record<TypedNumberNotice, string> = {
+  DECIMAL_DOT: 'Los decimales van con coma.',
+  REJECTED: 'Solo se pueden ingresar números, con coma para los decimales.',
+}
+
+// Notice under a number field when an edit was not taken as typed
+// (spec §8.7). It is not an error: the field keeps a valid text.
+export function typedNumberNoticeMessage(notice: TypedNumberNotice): string {
+  return TYPED_NUMBER_NOTICES[notice]
+}
+
+const POSITIVE_NUMBER_ERRORS: Record<PositiveNumberError, string> = {
+  REQUIRED: 'Completá este campo.',
+  INVALID_NUMBER:
+    'Escribí un número completo, con coma para los decimales (por ejemplo, 12,5).',
+  NOT_POSITIVE: 'Tiene que ser mayor que 0.',
+}
+
+// Validation error of a field that needs a number > 0.
+export function positiveNumberErrorMessage(code: PositiveNumberError): string {
+  return POSITIVE_NUMBER_ERRORS[code]
+}
+
+// Unexpected errors (network down, 500): the form keeps what was entered
+// and the user retries.
+export const LOAD_ERROR_MESSAGE =
+  'No se pudo cargar. Revisá la conexión y reintentá.'
+export const SAVE_ERROR_MESSAGE =
+  'No se pudo guardar. Revisá la conexión y reintentá.'
+export const SIGN_OUT_ERROR_MESSAGE = 'No se pudo cerrar la sesión. Reintentá.'

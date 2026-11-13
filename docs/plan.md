@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Próxima: etapa 3.** Última actualización: 2026-11-12.
+**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 terminada en la rama `etapa-3-login`, con PR pendiente de merge. La próxima es la etapa 4.** Última actualización: 2026-11-13.
 
 ---
 
@@ -29,7 +29,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | **Próxima** |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ Rama `etapa-3-login` (PR pendiente de merge) |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
@@ -153,15 +153,23 @@ Incluye:
 - PWA: manifest, íconos y pantalla completa al abrirla desde la pantalla de inicio.
 - Navegación básica entre secciones (inicio, catálogo, historial, configuración), mobile-first. Se instalan `react-router` y `@tanstack/react-query` (spec §4.2).
 - **Regla de redirección en `vercel.json`** para que todas las rutas sirvan `index.html`. Sin ella, recargar o abrir directamente una pantalla que no sea la inicial da 404 en Vercel.
-- **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec.
-- Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`.
-- En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad.
+- **Números que tipea el usuario**: el ratio y los umbrales se escriben con coma decimal ("12,5"), y el teclado del iPhone en español muestra coma. La conversión de texto a número va en una función pura en `src/domain/`, con tests, y no en el componente. Se decide en esta etapa si comparte reglas con `parseLabelNumber` (spec §9.7) y se anota en el spec. Decidido: `applyTypedEdit` y `parseUserNumber` en `src/domain/dose/`, sin código compartido con `parseLabelNumber` (spec §8.7, §14 #35).
+- Variables de Vercel apuntando a `dev`: `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, las mismas de `.env.local`. **Hecho: cargadas como tipo Config (no Secret, porque son públicas), en Production y Preview.**
+- En Auth de `dev`: verificar que no estén activados el *time-box* de sesión ni el timeout por inactividad. **Verificado: apagados.**
+
+Funcionalidades (ciclo de agentes): 1) base de la app y login (cliente Supabase, react-query, rutas, barra de navegación, `RequireAuth`, error boundary por ruta, rewrite de `vercel.json`) — implementada; 2) PWA (manifest, íconos, metas de iOS y safe areas, sin service worker) — implementada; 3) parseo de números tipeados en `src/domain/` (`applyTypedEdit` y `parseUserNumber`) — implementada; 4) pantalla de configuración, con el botón "Cerrar sesión" — implementada. Incluye el componente de input numérico `src/components/NumberInput.tsx`, que usa `applyTypedEdit` (no controlado, con listeners nativos: las inserciones se arman desde `beforeinput` y `paste` y se cancelan; los borrados los hace el navegador y se reconstruyen en `input` con `deletionEdit`, porque `getTargetRanges()` en un `<input>` siempre devuelve vacío; campos `type="text"` con `inputMode="decimal"`, spec §8.7), los textos en español de `DECIMAL_DOT` y `REJECTED` en `src/lib/errors.ts`, `formatUserNumber` y `parsePositiveUserNumber` en `src/domain/dose/`. Decidido: la cache de react-query se limpia en cada `SIGNED_OUT` (spec §14 #33) y "Cerrar sesión" usa `scope: 'local'` (spec §10, §14 #36).
+
+Verificado en el iPhone (2026-11-13), con la app instalada desde el *preview* de la rama (la protección de los *preview* de Vercel está desactivada, spec §12.1):
+- instalación, pantalla completa y safe areas;
+- login dentro de la app, y la sesión sigue activa al cerrar la app y reabrirla al día siguiente;
+- la configuración guarda y lee los tres valores, con el aviso del umbral de dosis la primera vez, y "Cerrar sesión" funciona;
+- en los campos numéricos, el teclado muestra coma.
 
 **Terminada cuando**:
-- [ ] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
-- [ ] El login funciona **dentro de la app instalada**.
-- [ ] Al cerrar la app y volver a abrirla al día siguiente, la sesión sigue activa.
-- [ ] La configuración se guarda y se lee desde `user_settings`.
+- [x] Desde Safari en el iPhone, la app se agrega a la pantalla de inicio y abre a pantalla completa.
+- [x] El login funciona **dentro de la app instalada**.
+- [x] Al cerrar la app y volver a abrirla al día siguiente, la sesión sigue activa.
+- [x] La configuración se guarda y se lee desde `user_settings`.
 
 ## Etapa 4 — Catálogo
 
@@ -190,6 +198,7 @@ Incluye:
 - Pantalla de nueva comida: elegir alimentos, cargar gramos o unidades, ver el **desglose en vivo** calculado por el módulo de la etapa 1, la dosis exacta, el campo de dosis aplicada y la fecha y hora ajustables.
 - Formato para mostrar gramos (por ejemplo, 0,5 unidades × 45 g = 22,5 g), agregado a `src/domain/dose/format.ts` con tests. Hoy solo existen `formatCarbs` y `formatDose`, y `CLAUDE.md` prohíbe `toFixed` suelto en los componentes.
 - Confirmación extra cuando hay advertencias (§8.5).
+- Si `max_dose_warning_units` es `null` (el usuario todavía no lo configuró), la pantalla de comida muestra un aviso con un link a Configuración (spec §6.8, §14 #36).
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.
 - **Guardado provisorio sin `create_meal`**: el cliente inserta primero el `meal` y después sus `meal_items`. No es atómico. Si falla el segundo insert, el cliente marca el `meal` como borrado (`deleted_at`, que sí se puede actualizar), para que no quede un registro sin ítems. Los CHECK de la base siguen actuando. En la etapa 7 se reemplaza por `create_meal`.
 
@@ -218,6 +227,7 @@ Incluye:
   - borrado de la foto si se cancela.
 - **Carga a mano si falla la lectura** (§9.4): mensajes claros, botón "Cargar a mano" (misma pantalla, con la foto a la vista) y botón "Reintentar" solo si el error es `retryable`.
 - Mostrar las fotos con URLs firmadas.
+- Arreglo menor, anotado en la etapa 3: `parseLabelNumber('9'.repeat(400))` devuelve `Infinity` porque no chequea `Number.isFinite`. Hoy no hace daño, porque el cálculo rechaza los valores no finitos. Se arregla con una línea y un test.
 
 **Terminada cuando**:
 - [ ] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
@@ -246,6 +256,7 @@ Incluye:
   - volver a loguearse en la app instalada (al cambiar de proyecto, la sesión anterior no sirve).
 - **Decisión pendiente: datos cargados en `dev`.** Lo que se use a diario desde la etapa 5 vive en `dev`. Hay dos opciones: migrar el catálogo a `prod` con un script SQL que reasigne el `user_id` y copie las fotos, o empezar de cero en `prod`. Se decide al llegar.
 - README completo (spec §12.4).
+- Revisar el tamaño del bundle: desde la etapa 3, el build avisa que el JS supera los 500 kB (666 kB). No es un error; se puede resolver con *code-splitting*.
 
 **Terminada cuando**:
 - [ ] `create_meal` está en uso y el guardado no atómico ya no existe.

@@ -94,7 +94,7 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 | Lenguaje | **TypeScript** | Es JavaScript con tipos. Cumple el mismo rol que los tipos de columna en SQL: muchos errores aparecen al compilar, antes de ejecutar. En una app que calcula dosis vale la pena. |
 | UI | **React** | Es la librería de UI más usada, con la mayor cantidad de documentación y ejemplos con Supabase. |
 | Build / dev server | **Vite** | Compila el proyecto a archivos estáticos y levanta un servidor local con recarga instantánea. Es simple y estándar. |
-| Instalación en iPhone | **PWA** (manifest + íconos) | Con esto "Agregar a pantalla de inicio" abre la app a pantalla completa, sin barra de Safari. No hace falta Mac ni App Store. |
+| Instalación en iPhone | **PWA** (manifest, íconos y metas de iOS), sin service worker | Con esto "Agregar a pantalla de inicio" abre la app a pantalla completa, sin barra de Safari. No hace falta Mac ni App Store. |
 | Hosting del frontend | **Vercel** | Es gratis para este uso y despliega solo con cada push a GitHub. Además crea una URL de *preview* por cada rama. |
 | Backend | **Supabase** | Ya lo conocés. Postgres + Auth + Storage + Edge Functions cubren todo el backend. |
 | Modelo de visión | **Gemini Flash-Lite vía Google AI Studio, capa gratuita**, llamado desde una Edge Function | La capa gratuita alcanza para pocas etiquetas por semana, sin costo y sin facturación automática. La llamada queda encapsulada en un solo archivo (§9.2), así que cambiar de proveedor no toca el resto. |
@@ -105,7 +105,7 @@ No hay un servidor propio. El frontend es un conjunto de archivos estáticos (HT
 Librerías puntuales:
 - `@supabase/supabase-js`: cliente oficial. Instalado en la etapa 2.
 - `zod`: validación de datos en runtime. Instalado en la etapa 1b; lo usan los scripts y lo van a usar la Edge Function y el cliente.
-- `react-router` (navegación entre pantallas) y `@tanstack/react-query` (lectura y caché de datos del servidor): se suman en la etapa 3.
+- `react-router` v8, en *Data mode* (navegación entre pantallas; todo se importa de `react-router`, salvo `RouterProvider`, que viene de `react-router/dom`), y `@tanstack/react-query` v5 (lectura y caché de datos del servidor): instalados en la etapa 3.
 
 ## 5. Fuentes de datos de referencia
 
@@ -218,6 +218,12 @@ Formulario con nombre, marca opcional, HC/100 g, estado, factor si corresponde, 
 | Umbral de alerta: gramos máximos por ítem | 500 g | > 0 |
 
 La configuración vive **solo en la base** (`user_settings`), nunca en archivos del repo. Cambiarla no altera registros anteriores, porque cada registro guarda el ratio que usó.
+
+La pantalla (etapa 3):
+- Los tres campos son obligatorios y tienen que ser > 0, sin tope superior. Se escriben con coma decimal (§8.7) y se validan con `parsePositiveUserNumber`; el error que muestra cada campo es el que se encontró en su último *blur* o en el último intento de guardar, y no cambia mientras se escribe ("Guardar" valida siempre con el valor actual). Se guardan sin redondear.
+- **Umbral de dosis sin valor** (`max_dose_warning_units` es `null`, como queda al crear el usuario): arriba del formulario aparece el aviso "Para empezar, completá la alerta de dosis máxima. Si una dosis la supera, la app te va a pedir que la confirmes.", y el campo está vacío. El aviso desaparece apenas el servidor confirma el guardado (se usa la fila que devuelve), sin esperar la relectura. Como el campo es obligatorio, no se puede guardar el resto sin completarlo, y una vez guardado no se puede volver a dejar vacío. La app no redirige a Configuración: en la etapa 5, si el umbral es `null`, la pantalla de comida muestra un aviso con un link a Configuración.
+- "Guardar" se deshabilita mientras se guarda ("Guardando…"). "Guardado." aparece recién cuando el servidor devuelve la fila actualizada, y se oculta en cuanto el usuario vuelve a editar. No hay aviso de cambios sin guardar. Si falla, se muestra "No se pudo guardar. Revisá la conexión y reintentá." y el formulario conserva lo cargado: reintentar es volver a tocar "Guardar".
+- Debajo, separado del formulario, está el botón **"Cerrar sesión"** (§10).
 
 ## 7. Modelo de datos
 
@@ -382,7 +388,7 @@ Además de las políticas, cada migración da los **permisos de tabla explícito
 - Es el único lugar donde se hace la cuenta. Los componentes solo la llaman y muestran el resultado.
 - **No lanza excepciones por entradas inválidas.** Devuelve un resultado tipado con errores o advertencias, para que la UI los muestre.
 - Exporta una constante `CALC_VERSION`, que se guarda en cada registro.
-- Punto de entrada: `src/domain/dose/index.ts`, con `calculateMeal`, `formatCarbs`, `formatDose`, `CALC_VERSION` y los tipos. Las conversiones de la etiqueta (§9.7) están en `src/domain/label/index.ts`: `parseLabelNumber` y `carbsPer100gFromPortion`.
+- Punto de entrada: `src/domain/dose/index.ts`, con `calculateMeal`, `formatCarbs`, `formatDose`, `CALC_VERSION` y los tipos, más la conversión de los números que tipea el usuario (§8.7): `applyTypedEdit` (con sus tipos `TypedEdit`, `TypedEditResult` y `TypedNumberNotice`), `parseUserNumber`, `parsePositiveUserNumber` (con sus tipos `PositiveNumberError` y `PositiveNumberResult`) y `formatUserNumber`. Las conversiones de la etiqueta (§9.7) están en `src/domain/label/index.ts`: `parseLabelNumber` y `carbsPer100gFromPortion`.
 
 ### 8.2 Fórmulas
 
@@ -460,6 +466,98 @@ Como mínimo:
 - **Inmutabilidad**: la función no modifica los objetos que recibe.
 
 También se testea el **parseo de la transcripción** (§9.7): "12,5" da 12.5; "1.234,5" se interpreta en formato argentino; "<0,5" queda vacío y "0" da 0; un texto no numérico da `null`.
+
+Y los **números tipeados** (§8.7): `applyTypedEdit` agrupa los miles y deja el cursor después de lo editado; convierte en coma un "." tipeado si no hay otra coma, o lo rechaza si la hay, en los dos casos con aviso `DECIMAL_DOT`; rechaza con `REJECTED` (devuelve el texto anterior, con el cursor al final del rango) los caracteres que no corresponden, la segunda coma, los pegados con punto que no son un número válido en un campo vacío y los rangos inválidos, sin completar nada ("," queda ","). Sobre ediciones generadas al azar (con semilla fija): el campo siempre queda en forma canónica; un "." que entra nunca desaparece sin aviso; sin aviso, el campo tiene los dígitos del resto con lo insertado; y antes del cursor quedan los dígitos y comas esperados. `parseUserNumber` acepta coma decimal y miles bien agrupados, no redondea, y da `null` ante partes incompletas ("12,", ",5"), el punto como decimal, miles mal agrupados, signos, unidades, espacios internos, `Infinity`, `NaN` y números que no entran en un `number`. `parsePositiveUserNumber` da `REQUIRED` ante el vacío (o solo espacios, incluido el espacio duro), `INVALID_NUMBER` ante lo que `parseUserNumber` rechaza (incluidos 400 dígitos) y `NOT_POSITIVE` ante el 0 ("0", "0,0", "000"); un valor chico como "0,0001" es válido. `formatUserNumber` escribe "12,5", "1.500" y "1.234.567,25", expande los exponentes (1e-7 da "0,0000001" y 1e21 da "1.000.000.000.000.000.000.000"), da "" ante `NaN`, infinito o negativos, y cumple `parseUserNumber(formatUserNumber(x)) === x` sobre valores generados con semilla fija (incluido 0,1 + 0,2).
+
+Fuera de `src/domain/`, `src/components/numberInputEdit.ts` (las funciones puras detrás del input numérico) se testea sin navegador: la acción de cada `inputType` de `beforeinput`, el pegado y la reconstrucción de los borrados.
+
+### 8.7 Números que tipea el usuario
+
+Los números que escribe el usuario (ratio, umbrales y, más adelante, gramos y unidades) se manejan con dos funciones puras de `src/domain/dose/`, testeadas (§8.6). No comparten código con `parseLabelNumber` (§9.7): comparten solo la coma decimal y el criterio de no redondear.
+
+**La app no adivina.** Solo pone y mueve los puntos de miles; lo que no corresponde no entra en el campo (la tecla no hace nada); lo que queda incompleto o inválido da error al salir del campo. La única conversión es la del "." tipeado, que se convierte en coma y se avisa: el campo nunca queda con un punto decimal, y un "." que entra nunca desaparece sin aviso.
+
+- El campo es `<input type="text" inputMode="decimal" autoComplete="off">`, **nunca** `type="number"`: con `type="number"`, iOS 26.2 y posteriores cambian la coma por punto, y el `value` puede quedar vacío ante una coma.
+- La función recibe **la edición exacta**, no el texto que propone el navegador: con solo el texto anterior y el propuesto no se puede saber qué entró. Por ejemplo, seleccionar todo "1.500" y pegar "1.5" propone "1.5", igual que borrar "00"; y en "92.597.366", reemplazar ".59" por "." propone lo mismo que borrar "59".
+- El componente es `src/components/NumberInput.tsx` (etapa 3). El `<input>` **no es controlado** (`defaultValue`, y un efecto que escribe en el DOM un valor que llega de afuera): la app escribe `value` y el cursor a mano, y con un `value` controlado React pelearía con ese valor y movería el cursor. Escucha los eventos **nativos** `beforeinput`, `paste` e `input` con `addEventListener`: el `onBeforeInput` de React no es el `beforeinput` nativo y no trae `inputType` (React issue #11211). La lógica está en funciones puras de `src/components/numberInputEdit.ts`, testeadas sin navegador.
+- En `beforeinput`, la acción depende del `inputType`:
+
+  | `inputType` | Acción |
+  |---|---|
+  | `insertText`, `insertFromDictation`, `insertFromPaste`, con `data` y la selección conocidas | Se cancela el evento y se aplica `applyTypedEdit(anterior, { start: selectionStart, end: selectionEnd, inserted: data })` |
+  | Los mismos, sin `data` o sin selección | Se cancela, con aviso `REJECTED` |
+  | `insertReplacementText`, `insertFromDrop`, `insertFromYank`, `insertTranspose` | Se cancela, con aviso `REJECTED`: en un `<input>` no se sabe qué rango reemplazan |
+  | Los que empiezan con `delete` (backspace, suprimir, cortar…) | Los hace el navegador, y se reconstruyen en `input` |
+  | `historyUndo`, `historyRedo`, `insertLineBreak`, `insertParagraph`, `format*` y cualquier otro | Se cancela, sin aviso |
+
+- **Los borrados los hace el navegador** y se reconstruyen en el evento `input`: con `L` = largo del anterior − largo del nuevo, el rango borrado es `[cursor, cursor + L)`, porque un borrado deja el cursor al principio de lo borrado. Si con ese rango el anterior da exactamente el nuevo texto, se aplica `applyTypedEdit(anterior, { start, end, inserted: "" })` (`deletionEdit`). `getTargetRanges()` no sirve para esto: en un `<input>` siempre devuelve una lista vacía (Input Events, MDN).
+- Lo pegado se toma de `paste` (`clipboardData`, `text/plain`), tal cual, sin `trim`; el evento se cancela siempre.
+- Red de seguridad: si llega un `input` que no es un borrado reconstruible (texto predictivo con composición, autocompletado), el campo vuelve al texto anterior, con aviso `REJECTED`.
+- Después de cada edición aceptada, el componente pone `value` en el campo y el cursor en `caret`, y muestra el aviso si `notice` no es `null`. El aviso va debajo del campo, en gris (no es un error), y se borra con la siguiente edición aceptada sin aviso o al salir del campo. El valor del formulario es ese string. Se convierte a número con `parseUserNumber` (o `parsePositiveUserNumber`) al calcular o guardar. Para cargar un valor guardado en el campo se usa `formatUserNumber`, la inversa de `parseUserNumber`, que no redondea.
+- `notice` es un código (`TypedNumberNotice`): `DECIMAL_DOT` si se tipeó un "." (se convirtió en coma, o no entró porque ya había una coma), y `REJECTED` si la edición no entró por otro motivo. Los textos están en `src/lib/errors.ts`: `DECIMAL_DOT` → "Los decimales van con coma."; `REJECTED` → "Solo se pueden ingresar números, con coma para los decimales."
+- En el iPhone del usuario, el teclado de `inputMode="decimal"` muestra coma (verificado en la etapa 3). Convertir el "." en coma también cubre un teclado que muestre "." en lugar de "," (por la región o un teclado en inglés).
+- El cursor no salta al final al editar en el medio: la función devuelve dónde va (`caret`).
+- Los errores ("12," o ",5" incompletos, campo vacío) se muestran al salir del campo, como todo error de validación (CLAUDE.md), así que no molestan a mitad de tipeo.
+- El rango (> 0, etc.) **no** lo valida la conversión: lo valida quien usa el valor (el cálculo, §8.4, o el formulario).
+- Ningún valor se redondea.
+
+`applyTypedEdit(anterior, { start, end, inserted })` devuelve `{ value, caret, notice }`. `[start, end)` es el rango del anterior que se reemplaza (vacío si no había selección) e `inserted` es el texto que entra ("" en un borrado). Con `resto = anterior[0, start) + anterior[end, …)`, cuyos puntos son todos de miles, las reglas se aplican en este orden:
+
+0. Si el rango es inválido (no enteros, `start > end` o fuera del texto), se rechaza: `{ anterior, caret: anterior.length, REJECTED }`.
+1. Si `inserted` tiene algún carácter que no sea un dígito ASCII, "." o ",", se rechaza con `REJECTED`.
+2. Si `inserted` es exactamente "." (un punto tipeado, con o sin una selección reemplazada), el aviso es `DECIMAL_DOT`:
+   - si el resto tiene coma, el punto no entra: se devuelve el anterior;
+   - si no, se inserta "," en `start` y se devuelve la forma canónica. Los demás puntos eran de miles y se sacan, así que ninguno queda después de la coma ("1.500" con un "." después del "1" da "1,500").
+3. Si `inserted` tiene un "." y no es exactamente "." (un pegado):
+   - si el resto está vacío (o es solo espacios) e `inserted` es un número válido para `parseUserNumber`, se devuelve la forma canónica de `inserted`, sin aviso. Así se puede pegar "1.234,56" en un campo vacío, o sobre todo el texto seleccionado;
+   - si no, se rechaza con `REJECTED`: un punto así no se distingue de un punto de miles.
+4. Si `inserted` tiene más de una coma, o tiene una y el resto ya tiene coma, se rechaza con `REJECTED`.
+5. Si no, se inserta en `start` y se devuelve la forma canónica, sin aviso.
+
+La **forma canónica** saca todos los puntos (los de miles los pone siempre la app); la parte entera queda sin ceros a la izquierda (queda un "0" si eran todos ceros) y agrupada con "." cada 3 dígitos desde la derecha; la coma y los dígitos decimales quedan tal cual. No se agrega nada.
+
+El **cursor** (`caret`) queda de modo que antes de él estén los mismos dígitos y comas que había antes de `start`, más los insertados (o la coma, si el "." se convirtió). Los puntos de miles no cuentan, ni los ceros a la izquierda que la forma canónica saca. Si ese lugar queda justo antes de un punto de miles, el cursor va antes del punto. Si la edición se rechaza, el texto no cambia y el cursor va a `end`, como si la selección se hubiera colapsado al final.
+
+Un borrado de solo un punto de miles (backspace justo después del punto) deja el mismo texto, porque el punto se recalcula, y el cursor pasa a estar antes del punto: el backspace siguiente borra el dígito. Se acepta: borrar un punto de miles no tiene sentido.
+
+En la tabla, "aviso" es el `notice`; sin aviso es `null`. Las ediciones se escriben como `[start, end) ← "inserted"`, y el cursor como `|`.
+
+| Anterior y edición | Resultado | Por qué |
+|---|---|---|
+| "150", `[3,3) ← "0"` | "1.500\|" | Los miles se agrupan con punto, automáticamente |
+| "1.500", `[1,1) ← "2"` | "12\|.500" | Al insertar en el medio se reagrupa, y el cursor sigue al dígito |
+| "15.000", backspace al final | "1.500\|" | Al borrar también se reagrupa |
+| "1.500", backspace después del punto | "1\|.500" | Borrar un punto de miles no cambia el texto; el cursor pasa antes del punto |
+| "12", `[2,2) ← "."` | "12,\|" (aviso `DECIMAL_DOT`) | Un "." tipeado se convierte en coma, en su lugar, y se avisa que los decimales van con coma. Tipear "12.5" deja "12,5" |
+| "", `[0,0) ← "."` | ",\|" (aviso `DECIMAL_DOT`) | Ídem en un campo vacío: queda "," (no se agrega un "0") |
+| "1.234", `[0,3) ← "."` | ",\|34" (aviso `DECIMAL_DOT`) | Ídem al reemplazar una selección ("1.2") |
+| "92.597.366", `[2,5) ← "."` | "92,\|7366" (aviso `DECIMAL_DOT`) | Ídem ("59" y un punto de miles): los puntos que quedan eran de miles |
+| "12,5", `[4,4) ← "."` | "12,5" (aviso `DECIMAL_DOT`) | Ya hay una coma: el "." no entra, y se avisa igual |
+| "1.500", `[0,5) ← "1.5"` | "1.500" (aviso `REJECTED`) | Pegar algo con punto que no es un número válido se rechaza: el punto se perdería |
+| "1.234.567", `[2,9) ← "5.5"` | "1.234.567" (aviso `REJECTED`) | Ídem, pegado sobre una parte |
+| "", `[0,0) ← "1.234,56"` | "1.234,56\|" | Se puede pegar un número válido en un campo vacío |
+| "", `[0,0) ← "1500"` | "1.500\|" | Lo pegado sin puntos se agrupa |
+| "12,5", `[4,4) ← ","` | "12,5" (aviso `REJECTED`) | La segunda coma no entra |
+| "1.234", `[1,1) ← ","` | "1,\|234" | Una coma tipeada delante de un punto de miles: ese punto era de la app y se saca |
+| "12", `[2,2) ← "a"`; "", `[0,0) ← "-"` | "12" · "" (aviso `REJECTED`) | Letras, signos y espacios no entran |
+| "", `[0,0) ← ","`; ",", `[1,1) ← "5"` | ",\|" · ",5\|" | No se completa nada: no se agrega un "0" |
+| "0", `[1,1) ← "5"` | "5\|" | Sin ceros a la izquierda en la parte entera |
+| "1.500,250", `[9,9) ← "0"` | "1.500,2500\|" | La parte decimal queda tal cual: no se agrupa ni se recorta |
+| "1.234", `[0,5) ← "5"` | "5\|" | Reemplazar todo funciona |
+
+`parseUserNumber` (del campo al número). Vacío, incompleto o inválido da `null`:
+
+| Texto | Resultado | Por qué |
+|---|---|---|
+| "12,5", "0", "012" | 12,5 · 0 · 12 | Coma decimal; ceros a la izquierda permitidos |
+| "1500", "1.500", "1.234.567", "1.500,25" | 1500 · 1500 · 1234567 · 1500,25 | Miles sin separar o bien agrupados (1 a 3 dígitos y después grupos de exactamente 3) |
+| " 12,5 " | 12,5 | Se ignoran los espacios alrededor (incluido el espacio duro) |
+| "", ",", "." | `null` | No hay ningún dígito |
+| "12,", ",5" | `null` | Incompleto: tiene que haber dígitos antes de la coma y, si hay coma, también después. No se completa nada |
+| "12.5", "0.25" | `null` | El punto nunca es decimal |
+| "1.50", "15.00", "1.5000", ".500", "1." | `null` | Miles mal agrupados |
+| "-5", "+5", "12,5 g", "12%", "<0,5", "12 5", "1,2,3", "1e3", "Infinity", "NaN" | `null` | Signos, unidades, espacios internos, más de una coma, exponentes o palabras |
+| "999…9" (400 dígitos) | `null` | No entra en un `number` |
 
 ## 9. Edge Function `transcribe-label`
 
@@ -614,6 +712,8 @@ Reglas de conversión (`src/domain/label/`). Ante la duda, el campo **queda vac�
 | "1.234" | vacío | Ambiguo: puede ser mil doscientos treinta y cuatro o uno coma dos tres cuatro |
 | "-", "no aporta cantidades significativas", "-5", "12%" | vacío | No es un número válido para una etiqueta |
 
+La entrada tipeada tiene sus propias reglas (§8.7): comparte la coma decimal, pero no las unidades ni el punto como decimal.
+
 La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error si la porción es ≤ 0 o vacía, si los HC son negativos o vacíos, o si los HC superan los gramos de la porción (más de 100 g por 100 g indica un error de lectura).
 
 ## 10. Autenticación y sesión
@@ -624,7 +724,11 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
   - `persistSession: true` y `autoRefreshToken: true` en el cliente (son los valores por defecto).
   - **No** activar en Auth el "time-box" de sesiones ni el timeout por inactividad.
   - Resultado: el usuario se loguea una vez en la app instalada y la sesión se mantiene mientras la use. Si iOS limpia el almacenamiento de la app (por ejemplo, después de mucho tiempo sin abrirla o si se reinstala), hay que volver a loguearse.
+  - El límite de 7 días de WebKit (que borra el almacenamiento de un sitio que no se visitó en 7 días de uso del navegador) no afecta a la app instalada mientras se use: las apps agregadas a la pantalla de inicio tienen su propio contador de días de uso, separado del de Safari ([WebKit, "Full Third-Party Cookie Blocking and More"](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)).
 - El login se hace **dentro de la app instalada**, no en Safari, porque no comparten sesión.
+- **Sesión revocada o vencida**: si el servidor responde 401 (por ejemplo, un JWT rechazado por PostgREST) o rechaza el *refresh token*, la app cierra la sesión local y vuelve al login, sin mensaje (§14, decisión 33). **Ante una falla de red**, en cambio, supabase-js conserva la sesión: un `AuthRetryableFetchError` no la borra, y la renovación se reintenta sola.
+- **"Cerrar sesión"** está en Configuración (§6.8) y llama a `signOut({ scope: 'local' })`, que cierra solo la sesión de este dispositivo. El valor por defecto, `'global'`, revocaría todas las sesiones del usuario, incluida la de la app instalada en el iPhone. supabase-js borra la sesión local antes de avisar al servidor, así que cerrar sesión no depende de la red.
+- **La cache de react-query se limpia en cada `SIGNED_OUT`** (`queryClient.clear()`, en `src/lib/queryClient.ts`). Cubre el botón, el 401 y el *refresh token* rechazado: otra cuenta en el mismo dispositivo nunca ve, ni por un instante, datos de la anterior.
 
 ## 11. Seguridad y datos personales
 
@@ -655,6 +759,7 @@ La cuenta por porción (`HC por porción ÷ gramos de porción × 100`) da error
   - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual;
   - **registro de usuarios deshabilitado** (§10).
 - Estado al cerrar la etapa 2: `dev` tiene las 7 migraciones aplicadas y el usuario propio creado; `prod` está vacío.
+- En Vercel, la **protección de los *preview* (Vercel Authentication) está desactivada**, para poder instalar la app en el iPhone desde un *preview* (§14, decisión 34). No expone nada nuevo: la URL de producción ya es pública y los datos los protegen RLS y el registro deshabilitado.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
 - Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
 - **La configuración de Auth se maneja desde el panel.** `supabase/config.toml` solo sirve para un stack local, que no se usa. No se corre `npx supabase config push`, porque pisaría la configuración real de los proyectos con la del archivo (por ejemplo, podría reabrir el registro).
@@ -671,11 +776,13 @@ docs/
   plan.md                 # etapas, estado y criterios de "terminada"
   notas/                  # resultados de pruebas (gemini-probe.md)
 src/
-  domain/dose/            # cálculo puro + tests
+  domain/dose/            # cálculo puro, formato y conversión de lo tipeado + tests
   domain/label/           # parseo de transcripción + tests
-  lib/                    # database.types.ts (generado); supabase.ts, errors.ts… desde la etapa 3
+  lib/                    # database.types.ts (generado); supabase.ts, queryClient.ts y errors.ts (etapa 3)
   features/foods/ meals/ history/ settings/ auth/
-  components/             # UI reutilizable
+  components/             # UI reutilizable (AppLayout, LoadingScreen, RouteErrorBoundary, NumberInput) y numberInputEdit.ts (lógica pura del input numérico) + tests
+  router.tsx              # rutas de la app; es el armado, así que puede importar páginas de los features
+  vite-env.d.ts           # tipos de las variables VITE_ (import.meta.env)
 supabase/
   config.toml             # solo para un stack local, que no se usa (§12.1)
   migrations/             # esquema, RLS, storage; el seed USDA llega en la etapa 7
@@ -683,7 +790,8 @@ supabase/
 scripts/
   gemini-probe/           # prueba de transcripción con fotos reales (etapa 1b)
   rls-check/              # prueba de aislamiento contra la API real (etapa 2)
-public/                   # manifest, íconos PWA
+  pwa/                    # genera los íconos desde icon.svg; test de los assets PWA (etapa 3)
+public/                   # manifest.webmanifest, icon.svg (fuente de los íconos) y los PNG generados
 .github/workflows/ci.yml
 vercel.json
 .env.example
@@ -746,12 +854,16 @@ Tiene que incluir:
 | 30 | Lint y formato | oxlint (el que trae la plantilla de Vite) y Prettier (etapa 0) |
 | 31 | Credenciales en archivos | En `.env.local` solo van usuarios de prueba descartables, nunca el usuario real (etapa 2) |
 | 32 | Flujo con agentes | Cada funcionalidad pasa por planner → implementer → tester → reviewer, con un máximo de 2 vueltas de corrección. La sesión principal coordina y es la única que commitea o aplica migraciones, con el OK del usuario. Detalle en `CLAUDE.md` |
+| 33 | Navegación y sesión en la UI | Rutas en inglés: `/login`, `/foods`, `/history` y `/settings`, con Inicio en `/`. La protección es por componente (`RequireAuth`, que escucha `onAuthStateChange`), sin loaders ni middleware del router. Después del login siempre se va a Inicio. Ante un 401 o una sesión vencida, el `onError` global de react-query llama a `signOut({ scope: 'local' })` y la app vuelve al login sin mensaje; los 401 no se reintentan (las demás lecturas, hasta 3 reintentos). La cache de react-query se limpia (`queryClient.clear()`) en cada `SIGNED_OUT`, sea por el botón "Cerrar sesión", un 401 o un *refresh token* rechazado, para que otra cuenta en el mismo dispositivo no vea datos de la anterior (etapa 3) |
+| 34 | PWA | Sin service worker: la app no funciona sin conexión, coherente con #20 (en iOS 26 todo sitio agregado a la pantalla de inicio abre como app web; en versiones anteriores alcanzan `display: standalone` y `apple-mobile-web-app-capable`). `short_name` "HdC". Barra de estado `default`: con `black-translucent` el reloj blanco no se vería sobre el fondo blanco; queda como plan B si algo quedara tapado. Íconos generados desde `public/icon.svg` (solo formas, sin texto) con `sharp`, por un script que se corre a mano (`scripts/pwa/generate-icons.ts`); los PNG se commitean, sin ícono maskable y sin canal alfa. Safe areas con `env(safe-area-inset-*)` dentro de `calc()`, solo arriba y abajo. El rewrite de `vercel.json` no cambia (Vercel sirve primero los archivos reales); un test (`scripts/pwa/pwa.test.ts`) detecta los `href` rotos, que el rewrite taparía devolviendo `index.html`. La protección de los preview de Vercel está desactivada para poder instalar la app desde un preview: la URL de producción ya es pública y los datos los protege RLS (etapa 3) |
+| 35 | Números tipeados | La app no adivina: solo pone y mueve los puntos de miles. Solo coma como decimal. `applyTypedEdit(anterior, { start, end, inserted })` recibe la edición exacta (con el texto propuesto por el navegador no se puede saber qué entró: seleccionar todo "1.500" y pegar "1.5" propone lo mismo que borrar "00"). El componente (`src/components/NumberInput.tsx`, no controlado y con listeners nativos) la arma desde `beforeinput` (y `paste` para lo pegado), cancela el evento nativo y pone en el campo el `value` y el `caret` que devuelve la función, así que el cursor no salta al final. Los borrados no se cancelan: los hace el navegador y se reconstruyen en el evento `input` comparando el texto anterior con el nuevo y la posición del cursor (`deletionEdit`), porque `getTargetRanges()` en un `<input>` siempre devuelve vacío. Las inserciones con rango desconocido (`insertReplacementText`, `insertFromDrop`…) se rechazan, y lo que no se puede cancelar y no es un borrado reconstruible vuelve al texto anterior con `REJECTED`. Un "." tipeado (`inserted` exactamente ".") se convierte en coma si el resto no tiene otra (tipear "12.5" deja "12,5"), y se avisa con `DECIMAL_DOT`; si el resto tiene coma, no entra y se avisa igual. La UI muestra un aviso de que los decimales van con coma (los textos están en `src/lib/errors.ts`). Un pegado con punto se rechaza con `REJECTED`, salvo un número válido pegado sobre un campo vacío o sobre todo el texto: un "." que entra nunca desaparece sin aviso. También se rechazan los caracteres que no son dígitos ASCII, "." o ",", la segunda coma y los rangos inválidos; al rechazar, el cursor va al final del rango. Los puntos fuera de la edición son de miles y la app los recalcula: una coma tipeada delante de un punto de miles lo saca ("1.234" con "," después del "1" da "1,234"), y borrar solo un punto de miles deja el mismo texto, con el cursor antes del punto. No completa nada ("," y ",5" quedan así) y solo saca ceros a la izquierda de la parte entera. `parseUserNumber` acepta enteros con o sin miles bien agrupados y coma con dígitos de los dos lados; lo incompleto ("12,", ",5", ","), el punto como decimal, los miles mal agrupados, las unidades y los signos dan `null`, igual que el vacío; el error se muestra al salir del campo. El rango lo valida quien usa el valor y nada se redondea. No comparte código con `parseLabelNumber`. Los campos son `type="text"` con `inputMode="decimal"`. `CALC_VERSION` no cambia. Verificado en el iPhone: con `inputMode="decimal"` el teclado muestra coma. Si con otra región o un teclado en inglés mostrara ".", el "." se convierte en coma (etapa 3, §8.7) |
+| 36 | Configuración | El umbral de dosis máxima se pide solo en Configuración: si es `null`, un aviso arriba del formulario y el campo vacío y obligatorio. No hay redirección a Configuración (Inicio está en `features/meals` y todavía es un placeholder); en la etapa 5, si el umbral es `null`, la pantalla de comida avisa con un link a Configuración. Los tres campos son obligatorios también después de la primera vez (el umbral de dosis no se puede volver a dejar vacío) y tienen que ser > 0, sin tope superior (`parsePositiveUserNumber`). El error visible de cada campo es un estado propio (`shownErrors`) que se actualiza solo en el *blur* de ese campo y en cada intento de guardar (los tres), así que no aparece ni cambia a mitad de tipeo; "Guardar" valida con el valor actual. El aviso del umbral sin valor usa la fila que devolvió el último guardado exitoso, si la hay, y si no la inicial: se va apenas el servidor confirma, aunque la relectura falle. Los valores guardados se cargan en los campos con `formatUserNumber`, que no redondea. "Guardado." aparece cuando el servidor devuelve la fila y se oculta al editar; no hay aviso de cambios sin guardar; reintentar es volver a tocar "Guardar". En el input numérico, deshacer y rehacer se cancelan sin aviso, y el texto pegado no se recorta (un espacio da `REJECTED`). "Cerrar sesión" usa `signOut({ scope: 'local' })`: el default `'global'` cerraría también la sesión del iPhone; si `signOut` devuelve un error y la pantalla sigue a la vista, se muestra "No se pudo cerrar la sesión. Reintentá.". La cache de react-query se limpia en `SIGNED_OUT` (#33) (etapa 3) |
 
 ## 15. Pendientes
 
 - Elegir los `fdc_id` concretos del seed USDA y verificar que informen la fibra (etapa 7).
 - Revisar el texto vigente de la Res. GMC 05/25 (rotulado nutricional) y ajustar las instrucciones de transcripción si cambia el formato de las etiquetas.
-- Definir el tope diario de la Edge Function (etapa 6) y el umbral de dosis máxima; este último lo pide la app en la primera configuración (etapa 3).
+- Definir el tope diario de la Edge Function (etapa 6).
 - Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).
 
 ## Fuentes consultadas
