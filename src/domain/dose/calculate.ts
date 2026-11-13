@@ -1,3 +1,4 @@
+import { isCookingFactorUnusual } from './cookingFactor.ts'
 import type {
   DoseSettings,
   ItemErrorCode,
@@ -17,8 +18,6 @@ import type {
 export const CALC_VERSION = '1'
 
 const MAX_CARBS_PER_100G = 100
-const USUAL_COOKING_FACTOR_MIN = 1
-const USUAL_COOKING_FACTOR_MAX = 4
 
 function positiveOrNull(value: number | null): number | null {
   return value !== null && Number.isFinite(value) && value > 0 ? value : null
@@ -104,11 +103,7 @@ function calculateItem(
   if (grams > maxItemGramsWarning) {
     warnings.push('ITEM_GRAMS_ABOVE_THRESHOLD')
   }
-  if (
-    cookingFactor !== null &&
-    (cookingFactor < USUAL_COOKING_FACTOR_MIN ||
-      cookingFactor > USUAL_COOKING_FACTOR_MAX)
-  ) {
+  if (cookingFactor !== null && isCookingFactorUnusual(cookingFactor)) {
     warnings.push('COOKING_FACTOR_UNUSUAL')
   }
 

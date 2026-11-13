@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0, 1, 1b y 2 terminadas (PR #1 a #4, mergeados). Etapa 3 terminada en la rama `etapa-3-login`, con PR pendiente de merge. La próxima es la etapa 4.** Última actualización: 2026-11-13.
+**Estado: etapas 0 a 3 terminadas (PR #1 a #4 y #7, mergeados). Etapa 4 en curso en la rama `etapa-4-catalogo`.** Última actualización: 2026-11-13.
 
 ---
 
@@ -29,8 +29,8 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1 | Módulo de cálculo | Pasan todos los tests de spec §8.6, sin UI ni base | ✅ PR #2 |
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
-| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ Rama `etapa-3-login` (PR pendiente de merge) |
-| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | |
+| 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
+| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | En curso (rama `etapa-4-catalogo`) |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
 | 7 | `create_meal`, seed USDA, pulido y paso a producción | Uso real sobre `prod` | |
@@ -184,6 +184,10 @@ Incluye:
 - Editar y archivar alimentos.
 
 No incluye: la búsqueda en `reference_foods`, que necesita el seed y por eso pasa a la etapa 7.
+
+Funcionalidades (ciclo de agentes): 1) factor de cocción en el dominio (`cookingFactorFromWeights` e `isCookingFactorUnusual` en `src/domain/dose/cookingFactor.ts`, spec §6.4, §14 #37) — implementada; 2) lista del catálogo con búsqueda y detalle; 3) alta y edición (manual y ARGENFOODS, factor medido o directo con advertencia, peso por unidad); 4) archivar.
+
+Notas para la funcionalidad 3: el catálogo no valida un factor < 1 combinado con HC/100 g alto (lo bloquea el cálculo de la comida con `EFFECTIVE_CARBS_OVER_100`); el factor medido se muestra con un `formatCookingFactor` (2 decimales) que se agrega a `src/domain/dose/` junto con la UI, y no se copia como texto al campo del factor directo.
 
 **Terminada cuando**:
 - [ ] Desde el iPhone se cargaron una papa (ARGENFOODS, a mano), un arroz (crudo, con factor medido) y un alfajor (con peso por unidad).
