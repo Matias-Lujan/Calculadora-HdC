@@ -16,7 +16,10 @@ import {
   SAVE_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
   authErrorMessage,
+  cookingFactorUnusualMessage,
+  foodFieldErrorMessage,
   isUnauthorized,
+  type FoodFieldError,
   positiveNumberErrorMessage,
   typedNumberNoticeMessage,
 } from './errors.ts'
@@ -264,6 +267,63 @@ describe('messages', () => {
   it('the sign-out error is the one from spec §14 #36', () => {
     expect(SIGN_OUT_ERROR_MESSAGE).toBe(
       'No se pudo cerrar la sesión. Reintentá.',
+    )
+  })
+})
+
+describe('foodFieldErrorMessage', () => {
+  const codes: FoodFieldError[] = [
+    'REQUIRED',
+    'INVALID_NUMBER',
+    'NOT_POSITIVE',
+    'ABOVE_100',
+    'STATE_REQUIRED',
+    'UNIT_WEIGHT_REQUIRED',
+    'FACTOR_NOT_COMPUTABLE',
+  ]
+
+  it.each(codes)('%s has a message that is not a code', (code) => {
+    const message = foodFieldErrorMessage(code)
+    expect(message.trim()).not.toBe('')
+    expect(message).not.toMatch(/[A-Z_]{4,}/)
+    expect(message.endsWith('.')).toBe(true)
+  })
+
+  it('all messages are different', () => {
+    const messages = codes.map(foodFieldErrorMessage)
+    expect(new Set(messages).size).toBe(messages.length)
+  })
+
+  it.each<[FoodFieldError, string]>([
+    ['REQUIRED', 'Completá este campo.'],
+    ['ABOVE_100', 'No puede ser más de 100 g cada 100 g.'],
+    ['STATE_REQUIRED', 'Elegí una opción.'],
+    [
+      'UNIT_WEIGHT_REQUIRED',
+      'Completá el peso de la unidad, o borrá el nombre.',
+    ],
+    [
+      'FACTOR_NOT_COMPUTABLE',
+      'Con estos pesos no se puede calcular el factor. Revisalos.',
+    ],
+  ])('%s', (code, message) => {
+    expect(foodFieldErrorMessage(code)).toBe(message)
+  })
+
+  it.each<PositiveNumberError>(['REQUIRED', 'INVALID_NUMBER', 'NOT_POSITIVE'])(
+    '%s says the same as positiveNumberErrorMessage',
+    (code) => {
+      expect(foodFieldErrorMessage(code)).toBe(positiveNumberErrorMessage(code))
+    },
+  )
+})
+
+describe('cookingFactorUnusualMessage', () => {
+  it('includes the formatted factor', () => {
+    const message = cookingFactorUnusualMessage('0,90')
+    expect(message).toContain('0,90')
+    expect(message).toBe(
+      'El factor de cocción da 0,90, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
   })
 })

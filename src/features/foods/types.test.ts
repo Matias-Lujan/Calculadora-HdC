@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { foodSchema, needsCookingFactor } from './types.ts'
+import { foodSchema, needsCookingFactor, REFERENCE_DB_LABELS } from './types.ts'
 
 const asEaten = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -226,5 +226,14 @@ describe('needsCookingFactor: bordes', () => {
       ),
     ).toBe(true)
     expect(needsCookingFactor(foodSchema.parse(asEaten))).toBe(false)
+  })
+})
+
+describe('REFERENCE_DB_LABELS', () => {
+  it('nombra cada base de referencia', () => {
+    expect(REFERENCE_DB_LABELS).toEqual({
+      argenfoods: 'ARGENFOODS',
+      usda_fdc: 'USDA FoodData Central',
+    })
   })
 })

@@ -1,9 +1,10 @@
+import { Link } from 'react-router'
 import {
   formatCarbs,
   formatCookingFactor,
   formatUserNumber,
 } from '../../../domain/dose/index.ts'
-import type { Food } from '../types.ts'
+import { REFERENCE_DB_LABELS, type Food } from '../types.ts'
 import { MissingFactorBadge } from './MissingFactorBadge.tsx'
 
 const SOURCE_LABELS: Record<Food['source'], string> = {
@@ -15,11 +16,6 @@ const SOURCE_LABELS: Record<Food['source'], string> = {
 const STATE_LABELS: Record<Food['state'], string> = {
   as_eaten: 'Tal como se come',
   raw_cooked: 'Crudo, se come cocido',
-}
-
-const REFERENCE_DB_LABELS: Record<NonNullable<Food['reference_db']>, string> = {
-  argenfoods: 'ARGENFOODS',
-  usda_fdc: 'USDA FoodData Central',
 }
 
 type Props = {
@@ -107,7 +103,14 @@ export function FoodDetail({ food }: Props) {
         )}
       </dl>
 
-      {/* "Editar" (feature 3) and "Archivar" (feature 4) go here. */}
+      <Link
+        to={`/foods/${food.id}/edit`}
+        className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base font-medium"
+      >
+        Editar
+      </Link>
+
+      {/* "Archivar" (feature 4) goes here. */}
     </article>
   )
 }

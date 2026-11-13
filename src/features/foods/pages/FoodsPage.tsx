@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { FoodListItem } from '../components/FoodListItem.tsx'
 import { useFoods } from '../queries.ts'
@@ -16,7 +17,12 @@ export function FoodsPage() {
     <section className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">Catálogo</h1>
 
-      {/* "Agregar alimento" (feature 3) goes here. */}
+      <Link
+        to="/foods/new"
+        className="flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+      >
+        Agregar alimento
+      </Link>
 
       {/* With data, the list stays even if a later refetch fails. */}
       {foods.data !== undefined ? (
