@@ -122,4 +122,6 @@ export const LOAD_ERROR_MESSAGE =
   'No se pudo cargar. Revisá la conexión y reintentá.'
 export const SAVE_ERROR_MESSAGE =
   'No se pudo guardar. Revisá la conexión y reintentá.'
+export const ARCHIVE_ERROR_MESSAGE =
+  'No se pudo archivar. Revisá la conexión y reintentá.'
 export const SIGN_OUT_ERROR_MESSAGE = 'No se pudo cerrar la sesión. Reintentá.'

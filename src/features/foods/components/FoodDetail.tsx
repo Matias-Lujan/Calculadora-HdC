@@ -5,6 +5,7 @@ import {
   formatUserNumber,
 } from '../../../domain/dose/index.ts'
 import { REFERENCE_DB_LABELS, type Food } from '../types.ts'
+import { ArchiveFoodSection } from './ArchiveFoodSection.tsx'
 import { MissingFactorBadge } from './MissingFactorBadge.tsx'
 
 const SOURCE_LABELS: Record<Food['source'], string> = {
@@ -110,7 +111,7 @@ export function FoodDetail({ food }: Props) {
         Editar
       </Link>
 
-      {/* "Archivar" (feature 4) goes here. */}
+      {food.archived_at === null && <ArchiveFoodSection food={food} />}
     </article>
   )
 }

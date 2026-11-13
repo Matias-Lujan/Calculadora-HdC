@@ -87,3 +87,20 @@ export async function updateFood({
   if (error) throw error
   return foodSchema.parse(data as unknown)
 }
+
+/**
+ * Archives a food (spec §6.5): it leaves the catalog and cannot be used
+ * again; past meals keep pointing to it. The client sets the date because
+ * the column has no default or trigger. Not filtered by archived_at is null:
+ * archiving again only overwrites the date, instead of failing for nothing.
+ */
+export async function archiveFood(id: string): Promise<Food> {
+  const { data, error } = await supabase
+    .from('foods')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', id)
+    .select(FOOD_COLUMNS)
+    .single()
+  if (error) throw error
+  return foodSchema.parse(data as unknown)
+}

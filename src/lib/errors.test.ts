@@ -12,6 +12,7 @@ import type {
   TypedNumberNotice,
 } from '../domain/dose/index.ts'
 import {
+  ARCHIVE_ERROR_MESSAGE,
   LOAD_ERROR_MESSAGE,
   SAVE_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
@@ -238,6 +239,7 @@ describe('messages', () => {
     positiveNumberErrorMessage('NOT_POSITIVE'),
     LOAD_ERROR_MESSAGE,
     SAVE_ERROR_MESSAGE,
+    ARCHIVE_ERROR_MESSAGE,
     SIGN_OUT_ERROR_MESSAGE,
   ]
 
@@ -261,6 +263,12 @@ describe('messages', () => {
   it('the save error is the generic one from CLAUDE.md', () => {
     expect(SAVE_ERROR_MESSAGE).toBe(
       'No se pudo guardar. Revisá la conexión y reintentá.',
+    )
+  })
+
+  it('the archive error is the one from spec §14 #40', () => {
+    expect(ARCHIVE_ERROR_MESSAGE).toBe(
+      'No se pudo archivar. Revisá la conexión y reintentá.',
     )
   })
 

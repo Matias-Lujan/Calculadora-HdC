@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createFood, fetchFood, fetchFoods, updateFood } from './api.ts'
+import {
+  archiveFood,
+  createFood,
+  fetchFood,
+  fetchFoods,
+  updateFood,
+} from './api.ts'
 import type { Food } from './types.ts'
 
 // The search is not part of the key: it filters the cached list in the client.
@@ -38,4 +44,21 @@ export function useCreateFood() {
 export function useUpdateFood() {
   const onSuccess = useSaveFoodSuccess()
   return useMutation({ mutationFn: updateFood, onSuccess })
+}
+
+// Runs after the server confirmed (not optimistic). The list is inactive
+// while the detail is shown, so the archived food is removed from the cache
+// too: otherwise, going back would show it until the list is read again.
+export function useArchiveFood() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: archiveFood,
+    onSuccess: (food: Food) => {
+      queryClient.setQueryData(foodsKeys.detail(food.id), food)
+      queryClient.setQueryData<Food[]>(foodsKeys.list, (old) =>
+        old?.filter((f) => f.id !== food.id),
+      )
+      return queryClient.invalidateQueries({ queryKey: foodsKeys.list })
+    },
+  })
 }
