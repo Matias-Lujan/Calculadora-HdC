@@ -19,6 +19,11 @@ export {
   formatGrams,
 } from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
+export { parseNonNegativeUserNumber } from './parseNonNegativeUserNumber.ts'
+export type {
+  NonNegativeNumberError,
+  NonNegativeNumberResult,
+} from './parseNonNegativeUserNumber.ts'
 export { parsePositiveUserNumber } from './parsePositiveUserNumber.ts'
 export type {
   PositiveNumberError,

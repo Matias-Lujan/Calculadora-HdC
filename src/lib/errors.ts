@@ -143,6 +143,40 @@ export function mealItemErrorMessage(code: MealItemFoodError): string {
   return MEAL_ITEM_ERRORS[code]
 }
 
+/**
+ * A warning that asks for confirmation before saving a meal (spec §8.5),
+ * with its values already formatted (src/features/meals/mealDraft.ts,
+ * saveWarnings). Declared here, and not in the feature, because lib does
+ * not import features.
+ */
+export type MealSaveWarning =
+  | {
+      code: 'ITEM_GRAMS_ABOVE_THRESHOLD'
+      foodName: string
+      grams: string
+      threshold: string
+    }
+  | { code: 'COOKING_FACTOR_UNUSUAL'; foodName: string; factor: string }
+  | { code: 'DOSE_ABOVE_THRESHOLD'; dose: string; threshold: string }
+
+export function mealSaveWarningMessage(warning: MealSaveWarning): string {
+  switch (warning.code) {
+    case 'ITEM_GRAMS_ABOVE_THRESHOLD':
+      return `${warning.foodName}: ${warning.grams} g, más que tu alerta de ${warning.threshold} g por alimento.`
+    case 'COOKING_FACTOR_UNUSUAL':
+      return `${warning.foodName}: el factor de cocción es ${warning.factor}, fuera de lo habitual (entre 1 y 4).`
+    case 'DOSE_ABOVE_THRESHOLD':
+      return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
+  }
+}
+
+// The date and time field of a meal, when it is empty or not a real date.
+export const EATEN_AT_ERROR_MESSAGE = 'Elegí la fecha y la hora.'
+
+// "Guardar" on a meal with errors (an item, the applied dose or the date).
+export const MEAL_BLOCKED_MESSAGE =
+  'Corregí los datos marcados para poder guardar.'
+
 // The meal total when the ratio is not valid (INVALID_RATIO, spec §8.4).
 export const INVALID_RATIO_MESSAGE =
   'El ratio de Configuración no es válido. Revisalo en Configuración.'

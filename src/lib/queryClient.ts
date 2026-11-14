@@ -20,6 +20,13 @@ export const queryClient = new QueryClient({
       retry: (failureCount, error) =>
         !isUnauthorized(error) && failureCount < 3,
     },
+    mutations: {
+      // Offline, a mutation fails right away (and the UI shows "No se pudo
+      // guardar…" with a retry) instead of staying paused and being sent on
+      // its own when the connection comes back, which could duplicate a meal
+      // the user loaded again.
+      networkMode: 'always',
+    },
   },
 })
 

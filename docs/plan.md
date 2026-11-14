@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). Etapa 5 en curso, rama `etapa-5-comidas` (funcionalidad 1 implementada). Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-14.
+**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). Etapa 5 en curso, rama `etapa-5-comidas` (funcionalidades 1 y 2 implementadas). Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-14.
 
 ---
 
@@ -216,7 +216,7 @@ Decidido: sin atajo de tandas. Al registrar una comida no se ofrece actualizar e
 
 Nota del catálogo (etapa 4): el selector de alimentos de la comida usa la misma query de la lista (`useFoods`, `foodsKeys.list`, ahora en `src/lib/foods.ts`), que excluye los archivados. Decidido: si un alimento se archiva mientras está en una comida sin guardar, la pantalla no saca el ítem (guarda una copia del alimento) y se guarda igual; la FK no lo impide (spec §14 #44).
 
-Funcionalidades (ciclo de agentes): 1) pantalla de nueva comida, sin guardar (Inicio `/`, buscador, ítems en gramos o unidades, desglose en vivo con `calculateMeal`, aviso del umbral sin configurar, `formatGrams` y `needsCookingFactor` en `src/domain/dose/`, lo compartido movido a `src/lib/` y `src/components/`, spec §6.6 y §14 #44) — implementada; al revisarla, un resultado no finito (desborde) pasó a dar `INVALID_QUANTITY` y `CALC_VERSION` subió a "2" (spec §14 #45); 2) guardado provisorio (dosis aplicada, fecha y hora, confirmación de advertencias, insert de `meal` y `meal_items`); 3) historial (lista, detalle y borrado lógico).
+Funcionalidades (ciclo de agentes): 1) pantalla de nueva comida, sin guardar (Inicio `/`, buscador, ítems en gramos o unidades, desglose en vivo con `calculateMeal`, aviso del umbral sin configurar, `formatGrams` y `needsCookingFactor` en `src/domain/dose/`, lo compartido movido a `src/lib/` y `src/components/`, spec §6.6 y §14 #44) — implementada; al revisarla, un resultado no finito (desborde) pasó a dar `INVALID_QUANTITY` y `CALC_VERSION` subió a "2" (spec §14 #45); 2) guardado provisorio (dosis aplicada, que sigue a la calculada hasta que se la toca y admite 0; fecha y hora, "Ahora" por defecto, en hora de Buenos Aires; confirmación de advertencias; insert del `meal` y después de todos sus `meal_items` en un solo pedido, con `deleted_at` en el `meal` si fallan los ítems; después de guardar, el formulario se vacía y aparece "Comida guardada."; spec §6.6, §7.2 y §14 #46) — implementada; 3) historial (lista, detalle y borrado lógico; decidir si la lista filtra los `meal` que quedaron sin ítems, con `meal_items!inner`, o lo acepta, spec §7.2 y §14 #46).
 
 **Terminada cuando**:
 - [ ] Una comida mixta (arroz + banana + alfajor) muestra el mismo desglose que la cuenta a mano.

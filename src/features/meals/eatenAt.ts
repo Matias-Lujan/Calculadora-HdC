@@ -1,0 +1,98 @@
+// The date and time of a meal (spec §6.6), between the value of an
+// <input type="datetime-local"> ("2026-11-14T13:05", a wall-clock time in
+// Buenos Aires) and the instant saved in `eaten_at` (an ISO string). Only
+// UTC methods of Date and Intl.DateTimeFormat with the time zone are used:
+// never the device's local time, which may not be Buenos Aires.
+
+const TIME_ZONE = 'America/Argentina/Buenos_Aires'
+
+const wallClock = new Intl.DateTimeFormat('en-US', {
+  timeZone: TIME_ZONE,
+  calendar: 'gregory',
+  numberingSystem: 'latn',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+type WallClock = {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
+
+/** The date and time a Buenos Aires clock shows at an instant. */
+function wallClockAt(time: number): WallClock {
+  const parts: Record<string, number> = {}
+  for (const part of wallClock.formatToParts(time)) {
+    if (part.type !== 'literal') parts[part.type] = Number(part.value)
+  }
+  return {
+    year: parts.year ?? NaN,
+    month: parts.month ?? NaN,
+    day: parts.day ?? NaN,
+    hour: parts.hour ?? NaN,
+    minute: parts.minute ?? NaN,
+    second: parts.second ?? NaN,
+  }
+}
+
+function pad(value: number, length: number): string {
+  return String(value).padStart(length, '0')
+}
+
+/**
+ * The value of a datetime-local field for an instant: "YYYY-MM-DDTHH:mm",
+ * in Buenos Aires time, 24 h (midnight is "00"). The seconds are dropped,
+ * not rounded.
+ */
+export function dateTimeInputValue(date: Date): string {
+  const c = wallClockAt(date.getTime())
+  return `${pad(c.year, 4)}-${pad(c.month, 2)}-${pad(c.day, 2)}T${pad(c.hour, 2)}:${pad(c.minute, 2)}`
+}
+
+const INPUT_VALUE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/
+
+/**
+ * The instant (ISO string) of a datetime-local value read as Buenos Aires
+ * time, or null if it is not a complete, existing date and time (empty,
+ * February 30, 24:00, minute 60, a year below 100, another format).
+ */
+export function eatenAtFromInput(text: string): string | null {
+  const match = INPUT_VALUE.exec(text)
+  if (match === null) return null
+  const [year, month, day, hour, minute, second] = match
+    .slice(1)
+    .map((part) => (part === undefined ? 0 : Number(part)))
+  if (
+    year === undefined ||
+    month === undefined ||
+    day === undefined ||
+    hour === undefined ||
+    minute === undefined ||
+    second === undefined
+  ) {
+    return null
+  }
+
+  // The typed clock reading taken as if it were UTC, and the offset of
+  // Buenos Aires at that moment: the clock there shows guess + offset.
+  const guess = Date.UTC(year, month - 1, day, hour, minute, second)
+  const c = wallClockAt(guess)
+  const offset =
+    Date.UTC(c.year, c.month - 1, c.day, c.hour, c.minute, c.second) - guess
+  const instant = guess - offset
+
+  // Date.UTC rolls over invalid values (February 30 becomes March 2) and
+  // reads years 0–99 as 1900–1999: if the instant does not show the same
+  // date and time, the text was not a real one.
+  if (dateTimeInputValue(new Date(instant)) !== text.slice(0, 16)) return null
+  return new Date(instant).toISOString()
+}

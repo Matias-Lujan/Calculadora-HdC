@@ -1,15 +1,25 @@
 import {
+  CALC_VERSION,
+  formatCookingFactor,
+  formatDose,
+  formatGrams,
+  formatUserNumber,
+  parseNonNegativeUserNumber,
   parsePositiveUserNumber,
   parseUserNumber,
   type DoseSettings,
   type ItemResult,
+  type ItemSuccess,
   type MealItemInput,
+  type MealResult,
+  type MealSuccess,
+  type NonNegativeNumberResult,
   type PositiveNumberError,
 } from '../../domain/dose/index.ts'
-import type { MealItemFoodError } from '../../lib/errors.ts'
+import type { MealItemFoodError, MealSaveWarning } from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
-import type { MealItemDraft } from './types.ts'
+import type { MealItemDraft, NewMealItem, NewMealRecord } from './types.ts'
 
 // Pure logic of the meal form (spec §6.6). It does no math of its own: the
 // numbers go through src/domain/dose.
@@ -94,4 +104,154 @@ export function foodErrors(result: ItemResult): MealItemFoodError[] {
   return result.errors.filter(
     (code): code is MealItemFoodError => code !== 'INVALID_QUANTITY',
   )
+}
+
+/**
+ * The applied dose that is saved (spec §6.6). While the user has not edited
+ * the field (`text` is null), it follows the calculated dose, exactly (not
+ * the rounded value the field shows). Once edited, it is the typed text,
+ * which has to be a number >= 0.
+ */
+export function appliedDose(
+  text: string | null,
+  calculatedDose: number,
+): NonNegativeNumberResult {
+  if (text === null) return { value: calculatedDose }
+  return parseNonNegativeUserNumber(text)
+}
+
+/**
+ * What the applied dose field shows: the typed text once edited; while it
+ * follows the calculated dose, that dose formatted for display ("8,55"),
+ * or "" if there is no valid dose.
+ */
+export function appliedDoseFieldText(
+  text: string | null,
+  result: MealResult,
+): string {
+  if (text !== null) return text
+  return result.ok ? formatDose(result.doseUnits) : ''
+}
+
+/**
+ * Each item with its calculation. calculateMeal returns one result per item,
+ * in the same order: a missing one is a programming error.
+ */
+function withResults(
+  items: readonly MealItemDraft[],
+  result: MealSuccess,
+): { item: MealItemDraft; calc: ItemSuccess }[] {
+  if (result.items.length !== items.length) {
+    throw new Error('The meal result does not match its items')
+  }
+  return items.map((item, index) => {
+    const calc = result.items[index]
+    if (calc === undefined) {
+      throw new Error('The meal result does not match its items')
+    }
+    return { item, calc }
+  })
+}
+
+/**
+ * The warnings to confirm before saving (spec §8.5), with their values
+ * formatted: the items' ones in the order of the items (and, in each, in
+ * the order calculateMeal gives them), then the dose one. The dose warning
+ * is about the calculated dose, as calculateMeal evaluates it; the applied
+ * dose does not warn.
+ */
+export function saveWarnings(
+  items: readonly MealItemDraft[],
+  result: MealSuccess,
+  settings: Settings,
+): MealSaveWarning[] {
+  const warnings: MealSaveWarning[] = []
+  for (const { item, calc } of withResults(items, result)) {
+    for (const code of calc.warnings) {
+      if (code === 'ITEM_GRAMS_ABOVE_THRESHOLD') {
+        warnings.push({
+          code,
+          foodName: item.food.name,
+          grams: formatGrams(calc.grams),
+          threshold: formatUserNumber(settings.max_item_grams_warning),
+        })
+      } else if (item.food.cooking_factor !== null) {
+        // COOKING_FACTOR_UNUSUAL only comes with a factor.
+        warnings.push({
+          code,
+          foodName: item.food.name,
+          factor: formatCookingFactor(item.food.cooking_factor),
+        })
+      }
+    }
+  }
+  // DOSE_ABOVE_THRESHOLD only comes with a threshold.
+  if (
+    result.warnings.includes('DOSE_ABOVE_THRESHOLD') &&
+    settings.max_dose_warning_units !== null
+  ) {
+    warnings.push({
+      code: 'DOSE_ABOVE_THRESHOLD',
+      dose: formatDose(result.doseUnits),
+      threshold: formatUserNumber(settings.max_dose_warning_units),
+    })
+  }
+  return warnings
+}
+
+function toNewMealItem(
+  item: MealItemDraft,
+  calc: ItemSuccess,
+  position: number,
+): NewMealItem {
+  const { food } = item
+  const inUnits = item.quantityMode === 'units'
+  const units = inUnits ? toMealItemInput(item).quantity : null
+  if (inUnits && units === null) {
+    throw new Error('A calculated item in units has no quantity')
+  }
+  return {
+    food_id: food.id,
+    position,
+    food_name: food.name,
+    food_brand: food.brand,
+    food_source: food.source,
+    food_state: food.state,
+    quantity_mode: item.quantityMode,
+    units,
+    unit_weight_g: inUnits ? food.unit_weight_g : null,
+    grams: calc.grams,
+    carbs_per_100g: food.carbs_per_100g,
+    cooking_factor: food.state === 'raw_cooked' ? food.cooking_factor : null,
+    effective_carbs_per_100g: calc.effectiveCarbsPer100g,
+    carbs_g: calc.carbsG,
+  }
+}
+
+/**
+ * The meal to save (spec §6.7, §7.1): a copy of the values used and of the
+ * calculation result, without math of its own and without rounding. The
+ * ratio comes from the same settings that produced `result`. Each item goes
+ * at the position of its index, from 0.
+ */
+export function toNewMealRecord(
+  items: readonly MealItemDraft[],
+  result: MealSuccess,
+  settings: Settings,
+  appliedDoseUnits: number,
+  eatenAt: string,
+): NewMealRecord {
+  return {
+    meal: {
+      eaten_at: eatenAt,
+      carb_ratio_g_per_unit: settings.carb_ratio_g_per_unit,
+      total_carbs_g: result.totalCarbsG,
+      calculated_dose_units: result.doseUnits,
+      applied_dose_units: appliedDoseUnits,
+      calc_version: CALC_VERSION,
+    },
+    items: withResults(items, result).map(({ item, calc }, index) =>
+      toNewMealItem(item, calc, index),
+    ),
+  }
 }

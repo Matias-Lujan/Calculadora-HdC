@@ -1,24 +1,38 @@
 import { useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link } from 'react-router'
+import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
   calculateMeal,
+  parseNonNegativeUserNumber,
+  type NonNegativeNumberError,
   type PositiveNumberError,
   type QuantityMode,
 } from '../../../domain/dose/index.ts'
 import {
+  EATEN_AT_ERROR_MESSAGE,
   INVALID_RATIO_MESSAGE,
+  MEAL_BLOCKED_MESSAGE,
   MEAL_OUT_OF_RANGE_MESSAGE,
+  SAVE_ERROR_MESSAGE,
+  mealSaveWarningMessage,
+  positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import type { Settings } from '../../../lib/settings.ts'
 import { doseLine, totalCarbsLine } from '../breakdown.ts'
+import { dateTimeInputValue, eatenAtFromInput } from '../eatenAt.ts'
 import {
+  appliedDose,
+  appliedDoseFieldText,
   newItemDraft,
   quantityError,
+  saveWarnings,
   toDoseSettings,
   toMealItemInput,
+  toNewMealRecord,
 } from '../mealDraft.ts'
+import { useCreateMeal } from '../queries.ts'
 import type { MealItemDraft } from '../types.ts'
 import { FoodPicker } from './FoodPicker.tsx'
 import { MealItemCard } from './MealItemCard.tsx'
@@ -28,20 +42,46 @@ type Props = {
   settings: Settings
 }
 
+const APPLIED_DOSE_ID = 'meal-applied-dose'
+const EATEN_AT_ID = 'meal-eaten-at'
+
+function errorOf<E>(result: { value: number } | { error: E }): E | null {
+  return 'error' in result ? result.error : null
+}
+
 /**
- * The meal being entered (spec §6.6), still without saving: the items, the
- * live breakdown (§8.3) and the exact dose. The calculation is derived in
- * the render from the form state, with calculateMeal (CLAUDE.md: no
- * react-query for the dose).
+ * The meal being entered (spec §6.6): the items, the live breakdown (§8.3),
+ * the exact dose, the applied dose, the date and time, and saving. The
+ * calculation is derived in the render from the form state, with
+ * calculateMeal (CLAUDE.md: no react-query for the dose).
  */
 export function MealForm({ foods, settings }: Props) {
   const [items, setItems] = useState<MealItemDraft[]>([])
-  // The quantity error each item shows: the one found on its last blur. It
-  // does not change while the user types (CLAUDE.md).
+  // The quantity error each item shows: the one found on its last blur or
+  // on the last "Guardar". It does not change while the user types
+  // (CLAUDE.md).
   const [shownErrors, setShownErrors] = useState<
     Record<number, PositiveNumberError | null>
   >({})
   const nextKey = useRef(0)
+
+  // null: the field follows the calculated dose (spec §14 #46).
+  const [appliedDoseText, setAppliedDoseText] = useState<string | null>(null)
+  const [appliedDoseShownError, setAppliedDoseShownError] =
+    useState<NonNegativeNumberError | null>(null)
+  // null: "Ahora", the moment "Guardar" is tapped.
+  const [eatenAtText, setEatenAtText] = useState<string | null>(null)
+  const [eatenAtShownError, setEatenAtShownError] = useState(false)
+  // The warnings confirmation is open (spec §8.5).
+  const [confirming, setConfirming] = useState(false)
+  // The last "Guardar" found errors.
+  const [blocked, setBlocked] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+  const createMeal = useCreateMeal()
+  // A save is in progress. isPending disables the fieldset only after the
+  // next render, so a second tap in the same tick ("Guardar" or "Guardar
+  // igual") would create a second meal without this (spec §14 #46).
+  const savingRef = useRef(false)
 
   const inputs = useMemo(() => items.map(toMealItemInput), [items])
   const result = useMemo(
@@ -49,7 +89,16 @@ export function MealForm({ foods, settings }: Props) {
     [inputs, settings],
   )
 
+  // Any change to the meal closes the confirmation and the notices of the
+  // last "Guardar". The error of a failed save stays until the next one.
+  function touch() {
+    setConfirming(false)
+    setBlocked(false)
+    setJustSaved(false)
+  }
+
   function handlePick(food: Food) {
+    touch()
     const key = nextKey.current
     nextKey.current += 1
     // The new field has to be in the DOM before focusing it, and the focus
@@ -61,6 +110,7 @@ export function MealForm({ foods, settings }: Props) {
   }
 
   function updateItem(key: number, change: Partial<MealItemDraft>) {
+    touch()
     setItems((current) =>
       current.map((item) => (item.key === key ? { ...item, ...change } : item)),
     )
@@ -76,6 +126,7 @@ export function MealForm({ foods, settings }: Props) {
   }
 
   function handleRemove(key: number) {
+    touch()
     setItems((current) => current.filter((item) => item.key !== key))
     setShownErrors((current) => {
       const next = { ...current }
@@ -84,8 +135,88 @@ export function MealForm({ foods, settings }: Props) {
     })
   }
 
+  function reset() {
+    setItems([])
+    setShownErrors({})
+    setAppliedDoseText(null)
+    setAppliedDoseShownError(null)
+    setEatenAtText(null)
+    setEatenAtShownError(false)
+    setJustSaved(true)
+  }
+
+  function save() {
+    if (savingRef.current) return
+    if (!result.ok) return
+    const applied = appliedDose(appliedDoseText, result.doseUnits)
+    if ('error' in applied) return
+    const eatenAt =
+      eatenAtText === null
+        ? new Date().toISOString()
+        : eatenAtFromInput(eatenAtText)
+    if (eatenAt === null) return
+    setConfirming(false)
+    // Built before taking the lock: if one of its invariants throws, the lock
+    // must not stay on (mutate would not run and onSettled would never clear it).
+    const record = toNewMealRecord(
+      items,
+      result,
+      settings,
+      applied.value,
+      eatenAt,
+    )
+    savingRef.current = true
+    createMeal.mutate(record, {
+      onSuccess: reset,
+      onSettled: () => {
+        savingRef.current = false
+      },
+    })
+  }
+
+  function handleSave() {
+    // A tap on "Guardar" right after "Guardar igual" must not reopen the
+    // confirmation while the meal is being saved.
+    if (savingRef.current) return
+    touch()
+    // Every pending error is shown, even in fields the user did not visit.
+    setShownErrors(
+      Object.fromEntries(
+        items.map((item, index) => [
+          item.key,
+          quantityError(item.quantityText, result.items[index]),
+        ]),
+      ),
+    )
+    const doseError =
+      appliedDoseText === null
+        ? null
+        : errorOf(parseNonNegativeUserNumber(appliedDoseText))
+    setAppliedDoseShownError(doseError)
+    const eatenAtInvalid =
+      eatenAtText !== null && eatenAtFromInput(eatenAtText) === null
+    setEatenAtShownError(eatenAtInvalid)
+
+    if (!result.ok || doseError !== null || eatenAtInvalid) {
+      setBlocked(true)
+      return
+    }
+    if (saveWarnings(items, result, settings).length > 0) {
+      setConfirming(true)
+      return
+    }
+    save()
+  }
+
+  const warnings =
+    confirming && result.ok ? saveWarnings(items, result, settings) : []
+  const appliedDoseInvalid = appliedDoseShownError !== null
+
   return (
-    <div className="flex flex-col gap-4">
+    <fieldset
+      className="flex min-w-0 flex-col gap-4"
+      disabled={createMeal.isPending}
+    >
       {settings.max_dose_warning_units === null && (
         <div className="flex flex-col gap-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           <p>
@@ -99,6 +230,15 @@ export function MealForm({ foods, settings }: Props) {
             Ir a Configuración
           </Link>
         </div>
+      )}
+
+      {justSaved && (
+        <p
+          role="status"
+          className="rounded-lg bg-green-50 p-3 text-sm text-green-800"
+        >
+          Comida guardada.
+        </p>
       )}
 
       {items.length > 0 && (
@@ -157,6 +297,184 @@ export function MealForm({ foods, settings }: Props) {
       </div>
 
       <FoodPicker foods={foods} onPick={handlePick} />
-    </div>
+
+      {items.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor={APPLIED_DOSE_ID}
+              className="text-sm font-medium text-slate-700"
+            >
+              Dosis aplicada (U)
+            </label>
+            {/* NumberInput writes a value that changes from outside to the
+                field, so while it follows the calculated dose it updates
+                with each change of the meal. */}
+            <NumberInput
+              id={APPLIED_DOSE_ID}
+              name={APPLIED_DOSE_ID}
+              value={appliedDoseFieldText(appliedDoseText, result)}
+              onValueChange={(text) => {
+                touch()
+                setAppliedDoseText(text)
+              }}
+              onBlur={() =>
+                setAppliedDoseShownError(
+                  appliedDoseText === null
+                    ? null
+                    : errorOf(parseNonNegativeUserNumber(appliedDoseText)),
+                )
+              }
+              invalid={appliedDoseInvalid}
+              describedBy={
+                appliedDoseInvalid ? `${APPLIED_DOSE_ID}-error` : undefined
+              }
+            />
+            {appliedDoseShownError !== null && (
+              <p
+                id={`${APPLIED_DOSE_ID}-error`}
+                className="text-sm text-red-700"
+              >
+                {positiveNumberErrorMessage(appliedDoseShownError)}
+              </p>
+            )}
+            {appliedDoseText !== null && (
+              <button
+                type="button"
+                className="min-h-11 self-start rounded-lg border border-slate-300 px-3 text-base"
+                onClick={() => {
+                  touch()
+                  setAppliedDoseText(null)
+                  setAppliedDoseShownError(null)
+                }}
+              >
+                Usar la dosis calculada
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {eatenAtText === null ? (
+              <>
+                <span className="text-sm font-medium text-slate-700">
+                  Fecha y hora
+                </span>
+                <div className="flex items-center justify-between gap-2">
+                  <span>Ahora</span>
+                  <button
+                    type="button"
+                    className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
+                    onClick={() => {
+                      touch()
+                      setEatenAtText(dateTimeInputValue(new Date()))
+                      setEatenAtShownError(false)
+                    }}
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <label
+                  htmlFor={EATEN_AT_ID}
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Fecha y hora
+                </label>
+                <input
+                  id={EATEN_AT_ID}
+                  name={EATEN_AT_ID}
+                  type="datetime-local"
+                  className="min-h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 text-base focus:border-slate-500 focus:outline-none aria-invalid:border-red-600"
+                  value={eatenAtText}
+                  onChange={(event) => {
+                    touch()
+                    setEatenAtText(event.target.value)
+                  }}
+                  onBlur={() =>
+                    setEatenAtShownError(eatenAtFromInput(eatenAtText) === null)
+                  }
+                  aria-invalid={eatenAtShownError}
+                  aria-describedby={
+                    eatenAtShownError ? `${EATEN_AT_ID}-error` : undefined
+                  }
+                />
+                {eatenAtShownError && (
+                  <p
+                    id={`${EATEN_AT_ID}-error`}
+                    className="text-sm text-red-700"
+                  >
+                    {EATEN_AT_ERROR_MESSAGE}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="min-h-11 self-start rounded-lg border border-slate-300 px-3 text-base"
+                  onClick={() => {
+                    touch()
+                    setEatenAtText(null)
+                    setEatenAtShownError(false)
+                  }}
+                >
+                  Usar ahora
+                </button>
+              </>
+            )}
+          </div>
+
+          {confirming && warnings.length > 0 ? (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900"
+            >
+              <p>Revisá antes de guardar:</p>
+              <ul className="flex list-disc flex-col gap-1 pl-5">
+                {warnings.map((warning, index) => (
+                  <li key={index}>{mealSaveWarningMessage(warning)}</li>
+                ))}
+              </ul>
+              <p>¿La guardás igual?</p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  className="min-h-11 rounded-lg bg-amber-900 px-4 text-base font-medium text-white disabled:opacity-60"
+                  onClick={save}
+                >
+                  Guardar igual
+                </button>
+                <button
+                  type="button"
+                  className="min-h-11 rounded-lg border border-amber-300 px-4 text-base"
+                  onClick={() => setConfirming(false)}
+                >
+                  Revisar
+                </button>
+              </div>
+            </div>
+          ) : blocked ? (
+            <p role="alert" className="text-sm text-red-700">
+              {MEAL_BLOCKED_MESSAGE}
+            </p>
+          ) : (
+            createMeal.isError && (
+              <p role="alert" className="text-sm text-red-700">
+                {SAVE_ERROR_MESSAGE}
+              </p>
+            )
+          )}
+
+          {/* type="button" and outside a <form>: the "Ir" key of the
+              search keyboard never saves. */}
+          <button
+            type="button"
+            className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
+            onClick={handleSave}
+          >
+            {createMeal.isPending ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      )}
+    </fieldset>
   )
 }
