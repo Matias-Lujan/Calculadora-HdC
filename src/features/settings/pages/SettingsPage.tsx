@@ -2,8 +2,9 @@ import {
   LOAD_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
 } from '../../../lib/errors.ts'
+import { useSettings } from '../../../lib/settings.ts'
 import { SettingsForm } from '../components/SettingsForm.tsx'
-import { useSettings, useSignOut } from '../queries.ts'
+import { useSignOut } from '../queries.ts'
 
 export function SettingsPage() {
   const settings = useSettings()

@@ -4,6 +4,7 @@ import {
 } from '@supabase/supabase-js'
 import type {
   CarbsPer100gError,
+  ItemErrorCode,
   PositiveNumberError,
   TypedNumberNotice,
 } from '../domain/dose/index.ts'
@@ -116,6 +117,75 @@ export function cookingFactorUnusualMessage(formattedFactor: string): string {
   return `El factor de cocción da ${formattedFactor}, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?`
 }
 
+/**
+ * Errors of a meal item that come from its food, not from the quantity
+ * (spec §8.4). They are shown in the item right away; INVALID_QUANTITY is
+ * the quantity field error, shown on blur with positiveNumberErrorMessage.
+ */
+export type MealItemFoodError = Exclude<ItemErrorCode, 'INVALID_QUANTITY'>
+
+const MEAL_ITEM_ERRORS: Record<MealItemFoodError, string> = {
+  INVALID_CARBS:
+    'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+  MISSING_COOKING_FACTOR:
+    'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
+  INVALID_COOKING_FACTOR:
+    'El factor de cocción de este alimento no es válido. Revisalo en el catálogo.',
+  MISSING_UNIT_WEIGHT:
+    'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
+  UNITS_NOT_ALLOWED_FOR_RAW_COOKED:
+    'Este alimento se carga en gramos cocidos, no en unidades.',
+  EFFECTIVE_CARBS_OVER_100:
+    'Con su factor de cocción, este alimento da más de 100 g de HC cada 100 g. Revisá el factor en el catálogo.',
+}
+
+export function mealItemErrorMessage(code: MealItemFoodError): string {
+  return MEAL_ITEM_ERRORS[code]
+}
+
+/**
+ * A warning that asks for confirmation before saving a meal (spec §8.5),
+ * with its values already formatted (src/features/meals/mealDraft.ts,
+ * saveWarnings). Declared here, and not in the feature, because lib does
+ * not import features.
+ */
+export type MealSaveWarning =
+  | {
+      code: 'ITEM_GRAMS_ABOVE_THRESHOLD'
+      foodName: string
+      grams: string
+      threshold: string
+    }
+  | { code: 'COOKING_FACTOR_UNUSUAL'; foodName: string; factor: string }
+  | { code: 'DOSE_ABOVE_THRESHOLD'; dose: string; threshold: string }
+
+export function mealSaveWarningMessage(warning: MealSaveWarning): string {
+  switch (warning.code) {
+    case 'ITEM_GRAMS_ABOVE_THRESHOLD':
+      return `${warning.foodName}: ${warning.grams} g, más que tu alerta de ${warning.threshold} g por alimento.`
+    case 'COOKING_FACTOR_UNUSUAL':
+      return `${warning.foodName}: el factor de cocción es ${warning.factor}, fuera de lo habitual (entre 1 y 4).`
+    case 'DOSE_ABOVE_THRESHOLD':
+      return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
+  }
+}
+
+// The date and time field of a meal, when it is empty or not a real date.
+export const EATEN_AT_ERROR_MESSAGE = 'Elegí la fecha y la hora.'
+
+// "Guardar" on a meal with errors (an item, the applied dose or the date).
+export const MEAL_BLOCKED_MESSAGE =
+  'Corregí los datos marcados para poder guardar.'
+
+// The meal total when the ratio is not valid (INVALID_RATIO, spec §8.4).
+export const INVALID_RATIO_MESSAGE =
+  'El ratio de Configuración no es válido. Revisalo en Configuración.'
+
+// The meal total when every item is valid but the total carbs or the dose
+// overflow (meal-level INVALID_QUANTITY, spec §8.4).
+export const MEAL_OUT_OF_RANGE_MESSAGE =
+  'El total o la dosis dan un número demasiado grande. Revisá las cantidades y el ratio de Configuración.'
+
 // Unexpected errors (network down, 500): the form keeps what was entered
 // and the user retries.
 export const LOAD_ERROR_MESSAGE =
@@ -124,4 +194,6 @@ export const SAVE_ERROR_MESSAGE =
   'No se pudo guardar. Revisá la conexión y reintentá.'
 export const ARCHIVE_ERROR_MESSAGE =
   'No se pudo archivar. Revisá la conexión y reintentá.'
+export const DELETE_ERROR_MESSAGE =
+  'No se pudo borrar. Revisá la conexión y reintentá.'
 export const SIGN_OUT_ERROR_MESSAGE = 'No se pudo cerrar la sesión. Reintentá.'

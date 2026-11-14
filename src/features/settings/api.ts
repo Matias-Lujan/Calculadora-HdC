@@ -1,18 +1,13 @@
+import {
+  SETTINGS_COLUMNS,
+  settingsSchema,
+  type Settings,
+} from '../../lib/settings.ts'
 import { supabase } from '../../lib/supabase.ts'
-import { settingsSchema, type Settings, type SettingsValues } from './types.ts'
+import type { SettingsValues } from './types.ts'
 
-const SETTINGS_COLUMNS =
-  'user_id, carb_ratio_g_per_unit, max_dose_warning_units, max_item_grams_warning'
-
-// RLS returns only the user's own row (spec §7.3).
-export async function fetchSettings(): Promise<Settings> {
-  const { data, error } = await supabase
-    .from('user_settings')
-    .select(SETTINGS_COLUMNS)
-    .single()
-  if (error) throw error
-  return settingsSchema.parse(data as unknown)
-}
+// RLS returns only the user's own row (spec §7.3). Reading it
+// (fetchSettings) lives in lib/settings.ts, shared with the meal screen.
 
 export type UpdateSettingsInput = {
   userId: string

@@ -1,23 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  archiveFood,
-  createFood,
-  fetchFood,
-  fetchFoods,
-  updateFood,
-} from './api.ts'
-import type { Food } from './types.ts'
+import { foodsKeys, type Food } from '../../lib/foods.ts'
+import { archiveFood, createFood, fetchFood, updateFood } from './api.ts'
 
-// The search is not part of the key: it filters the cached list in the client.
-export const foodsKeys = {
-  all: ['foods'] as const,
-  list: ['foods', 'list'] as const,
-  detail: (id: string) => ['foods', 'detail', id] as const,
-}
-
-export function useFoods() {
-  return useQuery({ queryKey: foodsKeys.list, queryFn: fetchFoods })
-}
+// foodsKeys and useFoods (the list) live in lib/foods.ts, shared with the
+// meal screen.
 
 export function useFood(id: string) {
   return useQuery({

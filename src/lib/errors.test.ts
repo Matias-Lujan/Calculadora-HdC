@@ -13,6 +13,11 @@ import type {
 } from '../domain/dose/index.ts'
 import {
   ARCHIVE_ERROR_MESSAGE,
+  DELETE_ERROR_MESSAGE,
+  EATEN_AT_ERROR_MESSAGE,
+  INVALID_RATIO_MESSAGE,
+  MEAL_BLOCKED_MESSAGE,
+  MEAL_OUT_OF_RANGE_MESSAGE,
   LOAD_ERROR_MESSAGE,
   SAVE_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
@@ -20,7 +25,11 @@ import {
   cookingFactorUnusualMessage,
   foodFieldErrorMessage,
   isUnauthorized,
+  mealItemErrorMessage,
+  mealSaveWarningMessage,
   type FoodFieldError,
+  type MealSaveWarning,
+  type MealItemFoodError,
   positiveNumberErrorMessage,
   typedNumberNoticeMessage,
 } from './errors.ts'
@@ -240,7 +249,10 @@ describe('messages', () => {
     LOAD_ERROR_MESSAGE,
     SAVE_ERROR_MESSAGE,
     ARCHIVE_ERROR_MESSAGE,
+    DELETE_ERROR_MESSAGE,
     SIGN_OUT_ERROR_MESSAGE,
+    INVALID_RATIO_MESSAGE,
+    MEAL_OUT_OF_RANGE_MESSAGE,
   ]
 
   it.each(messages)('%j is not empty and is not a code', (message) => {
@@ -269,6 +281,12 @@ describe('messages', () => {
   it('the archive error is the one from spec §14 #40', () => {
     expect(ARCHIVE_ERROR_MESSAGE).toBe(
       'No se pudo archivar. Revisá la conexión y reintentá.',
+    )
+  })
+
+  it('the delete error is the one from spec §14 #47', () => {
+    expect(DELETE_ERROR_MESSAGE).toBe(
+      'No se pudo borrar. Revisá la conexión y reintentá.',
     )
   })
 
@@ -332,6 +350,107 @@ describe('cookingFactorUnusualMessage', () => {
     expect(message).toContain('0,90')
     expect(message).toBe(
       'El factor de cocción da 0,90, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?',
+    )
+  })
+})
+
+describe('mealItemErrorMessage', () => {
+  const codes: MealItemFoodError[] = [
+    'INVALID_CARBS',
+    'MISSING_COOKING_FACTOR',
+    'INVALID_COOKING_FACTOR',
+    'MISSING_UNIT_WEIGHT',
+    'UNITS_NOT_ALLOWED_FOR_RAW_COOKED',
+    'EFFECTIVE_CARBS_OVER_100',
+  ]
+
+  it.each(codes)('%s has a message that is not a code', (code) => {
+    const message = mealItemErrorMessage(code)
+    expect(message.trim()).not.toBe('')
+    expect(message).not.toContain(code)
+    expect(message).not.toMatch(/[A-Z_]{4,}/)
+    expect(message.endsWith('.')).toBe(true)
+  })
+
+  it('all messages are different', () => {
+    const messages = codes.map(mealItemErrorMessage)
+    expect(new Set(messages).size).toBe(messages.length)
+  })
+
+  it('MISSING_COOKING_FACTOR asks to load the factor in the catalog', () => {
+    expect(mealItemErrorMessage('MISSING_COOKING_FACTOR')).toBe(
+      'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
+    )
+  })
+})
+
+describe('INVALID_RATIO_MESSAGE', () => {
+  it('is not a code and points to Configuración', () => {
+    expect(INVALID_RATIO_MESSAGE).not.toMatch(/[A-Z_]{4,}/)
+    expect(INVALID_RATIO_MESSAGE).toContain('Configuración')
+    expect(INVALID_RATIO_MESSAGE.endsWith('.')).toBe(true)
+  })
+})
+
+describe('mealSaveWarningMessage', () => {
+  it('a food above the grams threshold', () => {
+    expect(
+      mealSaveWarningMessage({
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Alfajor de prueba',
+        grams: '550',
+        threshold: '500',
+      }),
+    ).toBe('Alfajor de prueba: 550 g, más que tu alerta de 500 g por alimento.')
+  })
+
+  it('an unusual cooking factor', () => {
+    expect(
+      mealSaveWarningMessage({
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        factor: '4,50',
+      }),
+    ).toBe(
+      'Arroz de prueba: el factor de cocción es 4,50, fuera de lo habitual (entre 1 y 4).',
+    )
+  })
+
+  it('a dose above the threshold', () => {
+    expect(
+      mealSaveWarningMessage({
+        code: 'DOSE_ABOVE_THRESHOLD',
+        dose: '8,55',
+        threshold: '8',
+      }),
+    ).toBe('La dosis calculada da 8,55 U, más que tu alerta de 8 U.')
+  })
+
+  it('never shows a code', () => {
+    const warnings: MealSaveWarning[] = [
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'A',
+        grams: '1',
+        threshold: '1',
+      },
+      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', factor: '1' },
+      { code: 'DOSE_ABOVE_THRESHOLD', dose: '1', threshold: '1' },
+    ]
+    for (const warning of warnings) {
+      expect(mealSaveWarningMessage(warning)).not.toMatch(/[A-Z_]{4,}/)
+    }
+  })
+})
+
+describe('meal save messages', () => {
+  it('EATEN_AT_ERROR_MESSAGE', () => {
+    expect(EATEN_AT_ERROR_MESSAGE).toBe('Elegí la fecha y la hora.')
+  })
+
+  it('MEAL_BLOCKED_MESSAGE', () => {
+    expect(MEAL_BLOCKED_MESSAGE).toBe(
+      'Corregí los datos marcados para poder guardar.',
     )
   })
 })

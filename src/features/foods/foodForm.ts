@@ -7,9 +7,9 @@ import {
   parsePositiveUserNumber,
 } from '../../domain/dose/index.ts'
 import type { FoodFieldError } from '../../lib/errors.ts'
+import type { Food } from '../../lib/foods.ts'
 import {
   REFERENCE_DB_LABELS,
-  type Food,
   type FoodFormValues,
   type FormSource,
   type NewFood,

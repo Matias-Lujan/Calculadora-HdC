@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { settingsSchema } from './types.ts'
+import { describe, expect, it, vi } from 'vitest'
+import { settingsSchema } from './settings.ts'
+
+// settings.ts imports the Supabase client, which needs the VITE_ variables
+// (missing in the CI). These tests only use the schema.
+vi.mock('./supabase.ts', () => ({ supabase: {} }))
 
 const row = {
   user_id: '00000000-0000-4000-8000-000000000001',

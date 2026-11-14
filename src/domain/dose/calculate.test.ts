@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateMeal } from './calculate.ts'
+import { CALC_VERSION, calculateMeal } from './calculate.ts'
 import { formatCarbs, formatDose } from './format.ts'
 import type {
   DoseSettings,
@@ -473,6 +473,342 @@ describe('precisión', () => {
     expect(result.totalCarbsG).toBeCloseTo(10, 10)
     expect(formatCarbs(result.totalCarbsG)).toBe('10,0')
     expect(formatDose(result.doseUnits)).toBe('0,67')
+  })
+})
+
+describe('desborde (overflow)', () => {
+  // 1 seguido de 308 ceros: un número finito que se puede tipear.
+  const huge = 1e308
+
+  function expectAllFinite(result: MealSuccess) {
+    const numbers = [
+      result.totalCarbsG,
+      result.doseUnits,
+      ...result.items.flatMap((item) => [
+        item.grams,
+        item.effectiveCarbsPer100g,
+        item.carbsG,
+      ]),
+    ]
+    for (const value of numbers) expect(Number.isFinite(value)).toBe(true)
+  }
+
+  it('unidades × peso por unidad que desborda da INVALID_QUANTITY', () => {
+    expect(Number.isFinite(huge * 50)).toBe(false)
+    expect(
+      itemErrors(calculateMeal([byUnits(58, 50, huge)], settings)),
+    ).toEqual(['INVALID_QUANTITY'])
+    expect(
+      itemErrors(calculateMeal([byUnits(58, huge, 50)], settings)),
+    ).toEqual(['INVALID_QUANTITY'])
+  })
+
+  it('gramos × HC que desborda da INVALID_QUANTITY', () => {
+    expect(Number.isFinite(huge * 50)).toBe(false)
+    expect(itemErrors(calculateMeal([asEaten(50, huge)], settings))).toEqual([
+      'INVALID_QUANTITY',
+    ])
+  })
+
+  it('gramos enormes con HC chico, sin desborde, se calculan', () => {
+    // 1e308 × 1 no desborda: el ítem es válido aunque sea absurdo.
+    const item = onlyItem(
+      calculateMeal([asEaten(1, huge)], { ...settings, carbRatioGPerUnit: 1 }),
+    )
+    expect(item.carbsG).toBe(huge / 100)
+  })
+
+  it('gramos enormes con HC 0 no desbordan', () => {
+    const result = expectSuccess(calculateMeal([asEaten(0, huge)], settings))
+    expect(result.totalCarbsG).toBe(0)
+    expectAllFinite(result)
+  })
+
+  it('una suma que desborda da INVALID_QUANTITY de la comida, sin dosis', () => {
+    // Cada ítem da 1,7e306 × 100 ÷ 100 = 1,7e306 g de HC (finito: el
+    // producto 1,7e308 todavía entra en un number); la suma de 200, no.
+    const items = Array.from({ length: 200 }, () => asEaten(100, 1.7e306))
+    const result = expectFailure(calculateMeal(items, settings))
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    expect(result.items.every((item) => item.ok)).toBe(true)
+    expect(result).not.toHaveProperty('totalCarbsG')
+    expect(result).not.toHaveProperty('doseUnits')
+  })
+
+  it('una dosis que desborda (ratio chico) da INVALID_QUANTITY de la comida', () => {
+    // 1e306 g de HC ÷ 0,001 = 1e309: infinito.
+    const result = expectFailure(
+      calculateMeal([asEaten(100, 1e306)], {
+        ...settings,
+        carbRatioGPerUnit: 0.001,
+      }),
+    )
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    expect(result.items[0]?.ok).toBe(true)
+    expect(result).not.toHaveProperty('doseUnits')
+  })
+
+  it('un ratio muy chico con HC normales también desborda', () => {
+    const result = expectFailure(
+      calculateMeal([asEaten(50, 100)], {
+        ...settings,
+        carbRatioGPerUnit: Number.MIN_VALUE,
+      }),
+    )
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+  })
+
+  it('el umbral de dosis no tapa el desborde', () => {
+    const result = calculateMeal([asEaten(100, 1e306)], {
+      ...settings,
+      carbRatioGPerUnit: 0.001,
+      maxDoseWarningUnits: 10,
+    })
+    expect(result.ok).toBe(false)
+  })
+
+  it('un resultado ok siempre tiene todos sus números finitos', () => {
+    const quantities = [0.1, 1, 250, 1e100, 1e200, 1e306, 1.7e306, 1e307, huge]
+    const unitWeights = [0.5, 50, 1e10, 1e300]
+    const ratios = [Number.MIN_VALUE, 1e-300, 0.001, 1, 15, 1e300]
+    const carbs = [0, 1, 50, 100]
+    for (const ratio of ratios) {
+      for (const carbsPer100g of carbs) {
+        for (const quantity of quantities) {
+          const cases: MealItemInput[][] = [
+            [asEaten(carbsPer100g, quantity)],
+            [rawCooked(carbsPer100g, 1, quantity)],
+            Array.from({ length: 200 }, () => asEaten(carbsPer100g, quantity)),
+            ...unitWeights.map((weight) => [
+              byUnits(carbsPer100g, weight, quantity),
+            ]),
+          ]
+          for (const items of cases) {
+            const result = calculateMeal(items, {
+              ...settings,
+              carbRatioGPerUnit: ratio,
+            })
+            if (result.ok) expectAllFinite(result)
+          }
+        }
+      }
+    }
+  })
+})
+
+describe('desborde: bordes', () => {
+  // The next double above / below a finite positive number.
+  const bits = new Float64Array(1)
+  const raw = new BigInt64Array(bits.buffer)
+  function nextUp(value: number): number {
+    bits[0] = value
+    raw[0] = (raw[0] ?? 0n) + 1n
+    return bits[0] ?? NaN
+  }
+  function nextDown(value: number): number {
+    bits[0] = value
+    raw[0] = (raw[0] ?? 0n) - 1n
+    return bits[0] ?? NaN
+  }
+
+  it('gramos × HC 100: el mayor que no desborda se calcula, el siguiente no', () => {
+    // 1,7976931348623156e306 × 100 todavía es finito; el double siguiente, no.
+    const largest = 1.7976931348623156e306
+    const item = onlyItem(
+      calculateMeal([asEaten(100, largest)], {
+        ...settings,
+        carbRatioGPerUnit: 1,
+      }),
+    )
+    expect(Number.isFinite(item.carbsG)).toBe(true)
+    expect(
+      itemErrors(calculateMeal([asEaten(100, nextUp(largest))], settings)),
+    ).toEqual(['INVALID_QUANTITY'])
+  })
+
+  it('unidades × peso: el mayor que no desborda se calcula, el siguiente no', () => {
+    // HC 0, para que solo cuente el producto unidades × peso.
+    const largest = 3.595386269724631e306
+    const item = onlyItem(calculateMeal([byUnits(0, 50, largest)], settings))
+    expect(item.grams).toBe(largest * 50)
+    expect(Number.isFinite(item.grams)).toBe(true)
+    expect(item.carbsG).toBe(0)
+    expect(
+      itemErrors(calculateMeal([byUnits(0, 50, nextUp(largest))], settings)),
+    ).toEqual(['INVALID_QUANTITY'])
+  })
+
+  it('la suma: 179 ítems de 1e306 g de HC se calculan, 180 no', () => {
+    const big = asEaten(100, 1e306)
+    const ratio = { ...settings, carbRatioGPerUnit: 1e300 }
+    const fits = expectSuccess(
+      calculateMeal(
+        Array.from({ length: 179 }, () => big),
+        ratio,
+      ),
+    )
+    expect(Number.isFinite(fits.totalCarbsG)).toBe(true)
+    const overflow = expectFailure(
+      calculateMeal(
+        Array.from({ length: 180 }, () => big),
+        ratio,
+      ),
+    )
+    expect(overflow.errors).toEqual(['INVALID_QUANTITY'])
+    expect(overflow.items).toHaveLength(180)
+    expect(overflow.items.every((item) => item.ok)).toBe(true)
+  })
+
+  it('la dosis: el menor ratio que no desborda se calcula, el anterior no', () => {
+    // 1e306 g de HC ÷ 0,005562684646268004 todavía es finito.
+    const smallest = 0.005562684646268004
+    const fits = expectSuccess(
+      calculateMeal([asEaten(100, 1e306)], {
+        ...settings,
+        carbRatioGPerUnit: smallest,
+      }),
+    )
+    expect(Number.isFinite(fits.doseUnits)).toBe(true)
+    const overflow = expectFailure(
+      calculateMeal([asEaten(100, 1e306)], {
+        ...settings,
+        carbRatioGPerUnit: nextDown(smallest),
+      }),
+    )
+    expect(overflow.errors).toEqual(['INVALID_QUANTITY'])
+    expect(overflow.items[0]?.ok).toBe(true)
+  })
+
+  it('-0 como cantidad da INVALID_QUANTITY, no desborde', () => {
+    expect(itemErrors(calculateMeal([asEaten(50, -0)], settings))).toEqual([
+      'INVALID_QUANTITY',
+    ])
+    expect(itemErrors(calculateMeal([byUnits(58, 50, -0)], settings))).toEqual([
+      'INVALID_QUANTITY',
+    ])
+  })
+
+  it('-0 como HC con una cantidad enorme se calcula: 0 g de HC, finito', () => {
+    const result = expectSuccess(calculateMeal([asEaten(-0, 1e308)], settings))
+    expect(result.totalCarbsG).toBe(0)
+    expect(result.doseUnits).toBe(0)
+    expect(Number.isFinite(result.items[0]?.carbsG ?? NaN)).toBe(true)
+  })
+
+  it('-0 como ratio da INVALID_RATIO, no INVALID_QUANTITY', () => {
+    const result = expectFailure(
+      calculateMeal([asEaten(50, 100)], { ...settings, carbRatioGPerUnit: -0 }),
+    )
+    expect(result.errors).toEqual(['INVALID_RATIO'])
+  })
+
+  it('-0 como peso por unidad da MISSING_UNIT_WEIGHT', () => {
+    expect(
+      itemErrors(calculateMeal([byUnits(58, -0, 1e308)], settings)),
+    ).toEqual(['MISSING_UNIT_WEIGHT'])
+  })
+
+  it('con desborde en el total, cada ítem sigue ok con sus números finitos', () => {
+    const items = Array.from({ length: 200 }, () => asEaten(100, 1.7e306))
+    const result = expectFailure(calculateMeal(items, settings))
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    for (const item of result.items) {
+      expect(item.ok).toBe(true)
+      if (!item.ok) continue
+      expect(Number.isFinite(item.grams)).toBe(true)
+      expect(Number.isFinite(item.carbsG)).toBe(true)
+    }
+  })
+
+  it('el umbral de gramos del ítem no tapa el desborde del ítem', () => {
+    // 1e308 g supera el umbral, pero el ítem da error y no advertencias.
+    const result = expectFailure(
+      calculateMeal([asEaten(50, 1e308)], {
+        ...settings,
+        maxItemGramsWarning: 1,
+      }),
+    )
+    expect(result.items[0]).toEqual({ ok: false, errors: ['INVALID_QUANTITY'] })
+  })
+
+  it('el umbral de gramos no tapa el desborde del total', () => {
+    const items = Array.from({ length: 200 }, () => asEaten(100, 1.7e306))
+    const result = expectFailure(
+      calculateMeal(items, { ...settings, maxItemGramsWarning: 1 }),
+    )
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    // Los ítems conservan su advertencia: son válidos.
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        ok: true,
+        warnings: ['ITEM_GRAMS_ABOVE_THRESHOLD'],
+      }),
+    )
+  })
+
+  it('un umbral de dosis 0 no tapa el desborde de la dosis', () => {
+    const result = calculateMeal([asEaten(100, 1e306)], {
+      ...settings,
+      carbRatioGPerUnit: 0.001,
+      maxDoseWarningUnits: 0,
+    })
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, errors: ['INVALID_QUANTITY'] }),
+    )
+    expect(result).not.toHaveProperty('warnings')
+  })
+
+  it('un ítem inválido junto a ítems que sumados desbordan: solo el error del ítem', () => {
+    // Con un ítem inválido no se calcula el total, así que no hay
+    // INVALID_QUANTITY de la comida.
+    const items = [
+      ...Array.from({ length: 200 }, () => asEaten(100, 1.7e306)),
+      asEaten(50, null),
+    ]
+    const result = expectFailure(calculateMeal(items, settings))
+    expect(result.errors).toEqual([])
+    expect(result.items[200]).toEqual({
+      ok: false,
+      errors: ['INVALID_QUANTITY'],
+    })
+    expect(result.items.slice(0, 200).every((item) => item.ok)).toBe(true)
+  })
+
+  it('un ítem que desborda junto a uno con error del alimento', () => {
+    const result = expectFailure(
+      calculateMeal([asEaten(50, 1e308), rawCooked(78, null, 250)], settings),
+    )
+    expect(result.errors).toEqual([])
+    expect(result.items).toEqual([
+      { ok: false, errors: ['INVALID_QUANTITY'] },
+      { ok: false, errors: ['MISSING_COOKING_FACTOR'] },
+    ])
+  })
+
+  it('un ratio inválido con ítems que sumados desbordan: solo INVALID_RATIO', () => {
+    const items = Array.from({ length: 200 }, () => asEaten(100, 1.7e306))
+    const result = expectFailure(
+      calculateMeal(items, { ...settings, carbRatioGPerUnit: 0 }),
+    )
+    expect(result.errors).toEqual(['INVALID_RATIO'])
+  })
+
+  it('el desborde de un ítem es solo INVALID_QUANTITY, sin otros códigos', () => {
+    const result = expectFailure(
+      calculateMeal([rawCooked(78, 2.6, 1e308)], {
+        ...settings,
+        maxItemGramsWarning: 1,
+      }),
+    )
+    expect(result.items[0]).toEqual({ ok: false, errors: ['INVALID_QUANTITY'] })
+  })
+})
+
+describe('CALC_VERSION', () => {
+  // Detector de cambios: si cambia el comportamiento del cálculo, se sube la
+  // versión y se actualiza este test (CLAUDE.md, spec §14 #45).
+  it('es "2" desde el chequeo de desborde', () => {
+    expect(CALC_VERSION).toBe('2')
   })
 })
 

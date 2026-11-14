@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, ScrollRestoration } from 'react-router'
 
 const sections = [
   { to: '/', label: 'Inicio' },
@@ -10,6 +10,10 @@ const sections = [
 export function AppLayout() {
   return (
     <>
+      {/* A new screen opens at the top, and going back restores the scroll
+          (for example, a meal opened from far down the history). Rendered
+          once; in data mode it renders nothing. */}
+      <ScrollRestoration />
       <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-900">
         <Outlet />
       </main>

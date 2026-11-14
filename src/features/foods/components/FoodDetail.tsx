@@ -1,12 +1,14 @@
 import { Link } from 'react-router'
+import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import {
   formatCarbs,
   formatCookingFactor,
   formatUserNumber,
+  needsCookingFactor,
 } from '../../../domain/dose/index.ts'
-import { REFERENCE_DB_LABELS, type Food } from '../types.ts'
+import type { Food } from '../../../lib/foods.ts'
+import { REFERENCE_DB_LABELS } from '../types.ts'
 import { ArchiveFoodSection } from './ArchiveFoodSection.tsx'
-import { MissingFactorBadge } from './MissingFactorBadge.tsx'
 
 const SOURCE_LABELS: Record<Food['source'], string> = {
   label: 'Etiqueta',
@@ -81,15 +83,18 @@ export function FoodDetail({ food }: Props) {
         {isRawCooked && (
           <div>
             <dt className="text-sm text-slate-500">Factor de cocción</dt>
-            {food.cooking_factor !== null ? (
-              <dd>{formatCookingFactor(food.cooking_factor)}</dd>
-            ) : (
+            {needsCookingFactor(food.state, food.cooking_factor) ? (
               <dd className="flex flex-col items-start gap-1">
                 <MissingFactorBadge />
                 <span className="text-sm text-slate-700">
                   Cargalo antes de usar este alimento en una comida.
                 </span>
               </dd>
+            ) : (
+              // Not missing here means not null: the check only narrows.
+              food.cooking_factor !== null && (
+                <dd>{formatCookingFactor(food.cooking_factor)}</dd>
+              )
             )}
           </div>
         )}

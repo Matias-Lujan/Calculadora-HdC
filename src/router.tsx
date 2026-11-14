@@ -9,8 +9,9 @@ import { FoodDetailPage } from './features/foods/pages/FoodDetailPage.tsx'
 import { EditFoodPage } from './features/foods/pages/EditFoodPage.tsx'
 import { FoodsPage } from './features/foods/pages/FoodsPage.tsx'
 import { NewFoodPage } from './features/foods/pages/NewFoodPage.tsx'
-import { HistoryPage } from './features/history/pages/HistoryPage.tsx'
-import { HomePage } from './features/meals/pages/HomePage.tsx'
+import { HistoryPage } from './features/meals/pages/HistoryPage.tsx'
+import { MealDetailPage } from './features/meals/pages/MealDetailPage.tsx'
+import { NewMealPage } from './features/meals/pages/NewMealPage.tsx'
 import { SettingsPage } from './features/settings/pages/SettingsPage.tsx'
 
 // App wiring: the only file outside the features that imports their pages.
@@ -25,7 +26,11 @@ export const router = createBrowserRouter([
     Component: RequireAuth,
     ErrorBoundary: RootErrorBoundary,
     children: [
-      { index: true, Component: HomePage, ErrorBoundary: RouteErrorBoundary },
+      {
+        index: true,
+        Component: NewMealPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
       {
         path: 'foods',
         Component: FoodsPage,
@@ -49,6 +54,11 @@ export const router = createBrowserRouter([
       {
         path: 'history',
         Component: HistoryPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'history/:mealId',
+        Component: MealDetailPage,
         ErrorBoundary: RouteErrorBoundary,
       },
       {

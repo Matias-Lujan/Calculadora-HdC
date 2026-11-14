@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). La próxima es la etapa 5. Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-13.
+**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7 y #8 mergeados; la etapa 5, rama `etapa-5-comidas`, con su PR por mergear). La próxima es la etapa 6b. Orden de lo que falta: 6b, 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-14.
 
 ---
 
@@ -32,9 +32,9 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
 | 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
-| 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
-| 6b | Tabla de referencia (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla y se usa en una comida desde el iPhone | |
-| 6 | Alta por foto y formulario simple | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
+| 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR por mergear |
+| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | |
+| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
 ---
@@ -212,23 +212,27 @@ Incluye:
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.
 - **Guardado provisorio sin `create_meal`**: el cliente inserta primero el `meal` y después sus `meal_items`. No es atómico. Si falla el segundo insert, el cliente marca el `meal` como borrado (`deleted_at`, que sí se puede actualizar), para que no quede un registro sin ítems. Los CHECK de la base siguen actuando. En la etapa 7 se reemplaza por `create_meal`.
 
-Decisión pendiente para esta etapa (propuesta, spec §15): al registrar una comida con un alimento `raw_cooked`, permitir actualizar el factor del alimento si el usuario pesó esa tanda (crudo y olla terminada). El spec hoy dice que no hay tandas (§6.4, §14 #11); se decide acá si se suma como atajo opcional o se deja como está.
+Decidido: sin atajo de tandas. Al registrar una comida no se ofrece actualizar el factor del alimento; se edita solo desde el catálogo (spec §6.4, §14 #43).
 
-Nota del catálogo (etapa 4): el selector de alimentos de la comida usa `fetchFoods` o la misma query de la lista (`foodsKeys.list`), que excluye los archivados. Queda para esta etapa decidir qué pasa si un alimento se archiva mientras está en una comida sin guardar; la opción simple es que se pueda guardar igual (la FK no lo impide).
+Nota del catálogo (etapa 4): el selector de alimentos de la comida usa la misma query de la lista (`useFoods`, `foodsKeys.list`, ahora en `src/lib/foods.ts`), que excluye los archivados. Decidido: si un alimento se archiva mientras está en una comida sin guardar, la pantalla no saca el ítem (guarda una copia del alimento) y se guarda igual; la FK no lo impide (spec §14 #44).
+
+Funcionalidades (ciclo de agentes): 1) pantalla de nueva comida, sin guardar (Inicio `/`, buscador, ítems en gramos o unidades, desglose en vivo con `calculateMeal`, aviso del umbral sin configurar, `formatGrams` y `needsCookingFactor` en `src/domain/dose/`, lo compartido movido a `src/lib/` y `src/components/`, spec §6.6 y §14 #44) — implementada; al revisarla, un resultado no finito (desborde) pasó a dar `INVALID_QUANTITY` y `CALC_VERSION` subió a "2" (spec §14 #45); 2) guardado provisorio (dosis aplicada, que sigue a la calculada hasta que se la toca y admite 0; fecha y hora, "Ahora" por defecto, en hora de Buenos Aires; confirmación de advertencias; insert del `meal` y después de todos sus `meal_items` en un solo pedido, con `deleted_at` en el `meal` si fallan los ítems; después de guardar, el formulario se vacía y aparece "Comida guardada."; spec §6.6, §7.2 y §14 #46) — implementada; 3) historial (lista, detalle y borrado lógico) — implementada: lista en `/history` y detalle en `/history/:mealId`, en `features/meals` (se borró `features/history`); las comidas borradas o sin ítems no aparecen (`meal_items!inner`, en la lista y en el detalle); páginas de 50 con "Ver más" (`useInfiniteQuery`, por el tope de 1000 filas de Supabase); el detalle arma el desglose con `savedItemLines` desde los valores guardados, sin recalcular ni leer el catálogo; "Borrar" con recuadro de confirmación y vuelta a la lista con `replace`; "Ver en el historial" debajo de "Comida guardada."; `ScrollRestoration` en `AppLayout` para toda la app, y "← Historial" vuelve atrás en el historial del navegador (recuperando el scroll de la lista) cuando el detalle se abrió desde una fila de la lista (una sola vez aunque se toque dos veces; con modificadores o el botón del medio actúa como link normal), con la lista 30 minutos en la cache (`gcTime`); sin migración (spec §6.7 y §14 #47).
+
+Probado en el iPhone (2026-11-14), en Safari con el *preview* de la rama: comida mixta, guardado con advertencia, historial (detalle, editar un alimento ya usado, "← Historial", borrar) y modo avión. Funciona.
 
 **Terminada cuando**:
-- [ ] Una comida mixta (arroz + banana + alfajor) muestra el mismo desglose que la cuenta a mano.
-- [ ] Al editar un alimento del catálogo, los registros anteriores siguen mostrando los valores originales.
-- [ ] Una cantidad fuera de umbral pide confirmación.
-- [ ] Si se simula una falla del segundo insert, no queda un registro visible sin ítems.
-- [ ] Varios días de uso real, en `dev`, sin problemas.
+- [x] Una comida mixta (arroz + banana + alfajor) muestra el mismo desglose que la cuenta a mano.
+- [x] Al editar un alimento del catálogo, los registros anteriores siguen mostrando los valores originales.
+- [x] Una cantidad fuera de umbral pide confirmación.
+- [x] Si se simula una falla del segundo insert, no queda un registro visible sin ítems. Cubierto por los tests de `src/features/meals/api.test.ts` (falla del insert de los ítems, y también del update de `deleted_at`) y por el filtro `meal_items!inner` del historial; no se probó a mano con DevTools.
+- Se quitó "Varios días de uso real, en `dev`, sin problemas": el usuario decidió cerrar la etapa con la prueba en el iPhone (spec §14 #48).
 
-## Etapa 6 — Alta por foto y formulario simple
+## Etapa 6 — Alta por foto
 
 **Objetivo**: cargar alimentos desde la foto de la etiqueta (spec §6.1 y §9). Es la forma principal de cargar un producto con paquete (criterio 5).
 
 Incluye:
-- **Formulario más simple** (spec §14 #41). La pantalla de confirmación de la foto y el alta manual usan el mismo formulario (`FoodForm`, etapa 4): a la vista quedan el nombre, los HC cada 100 g y "¿Se cocina antes de comer?"; la fuente, la marca, el peso por unidad y la nota pasan a "Más opciones". El estado sigue siendo obligatorio: un crudo guardado como "tal como se come" triplica los HC. Se revisa si la nota del alta manual sigue siendo obligatoria (hoy la exige el CHECK `foods_manual_requires_note`, así que cambiarlo necesita una migración).
+- La pantalla de confirmación de la foto usa el formulario simple de la etapa 6b (spec §14 #41 y #48).
 - **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta el factor". Se decide en la etapa si además sugiere la entrada cocida de la tabla.
 - Edge Function `transcribe-label`: `index.ts`, `prompt.ts`, `schema.ts` y `provider.ts` (§9.2). Las instrucciones y el esquema parten de los de la etapa 1b.
 - Secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev`.
@@ -255,22 +259,28 @@ Incluye:
 - [ ] La key de Gemini no aparece en el bundle del frontend ni en el repo.
 - [ ] Cargar un producto con paquete desde la foto lleva, en el caso normal, la foto y un toque para confirmar.
 
-## Etapa 6b — Tabla de referencia
+## Etapa 6b — Tabla de referencia y formulario simple
 
-**Objetivo**: los alimentos sin paquete (fruta, papa, pan, verduras) y lo que se cocina (arroz, fideos) se eligen de una tabla ya cargada, sin tipear sus HC (spec §5.2, §6.2, §14 #41 y #42).
+**Objetivo**: los alimentos sin paquete (fruta, papa, pan, verduras) y lo que se cocina (arroz, fideos) se eligen de una tabla ya cargada, sin tipear sus HC y sin darlos de alta antes; y lo que haya que cargar a mano se carga con un formulario mínimo (spec §5.2, §6.2, §14 #41, #42 y #48). La app no tiene que parecer "un trámite": elegir qué como, poner cuánto pesa y ver la dosis.
 
-**Se hace antes que la etapa 6**, aunque conserva su nombre para no cambiar las referencias del spec: resuelve lo que se come todos los días, no depende de Gemini y deja usar la app antes. Por eso no depende de nada de la etapa 6. Si necesita el formulario simple para el alta desde la tabla, lo adelanta.
+**Se hace antes que la etapa 6**, aunque conserva su nombre para no cambiar las referencias del spec: resuelve lo que se come todos los días, no depende de Gemini y deja usar la app antes. Por eso no depende de nada de la etapa 6.
 
 Incluye:
+- **Formulario simple** (adelantado de la etapa 6, spec §14 #41 y #48). El alta y la edición a mano (`FoodForm`) muestran solo el nombre, "HC cada 100 g" y "¿Se cocina antes de comer?" (Sí / No, con palabras claras en lugar de "Estado"). El factor de cocción (opcional), la marca y el peso por unidad pasan a "Más opciones". El estado sigue siendo obligatorio: un crudo guardado como "tal como se come" triplica los HC.
+- **Sin ARGENFOODS en la pantalla**: se saca la opción "Tabla ARGENFOODS", su código, su descripción y el rótulo "HC asimilables". Los alimentos ya cargados así se siguen mostrando y usando. Se decide en la etapa qué hacer con `reference_db = 'argenfoods'` en el esquema (mantenerlo o sacarlo con una migración).
+- **La nota deja de ser obligatoria** en el alta manual: migración que saca o cambia el CHECK `foods_manual_requires_note`.
+- **Elegir de la tabla directo desde la comida**: el buscador de Inicio muestra también los alimentos de la tabla (no solo el catálogo propio); al tocar uno, se usa en la comida sin pasar por el catálogo (si hace falta, se copia al catálogo en el momento, como dice §6.2). Para lo que se cocina, aparece la variante cocida.
+- Revisar la pantalla de comida con el mismo criterio: que no pida nada de más.
+- **Palabras claras en toda la app** (spec §14 #48): ningún término técnico a la vista. "Factor de cocción" no se usa: se habla de cuánto rinde al cocinarse, por ejemplo "100 g crudo rinden 260 g cocido", y en el desglose la cuenta se explica con esas palabras. Lo mismo con "Estado", "HC asimilables" y similares. Donde haga falta una explicación, un ícono de información (ⓘ) que la muestre en una o dos frases simples.
 - **Seed curado de USDA FoodData Central** (dominio público, CC0), cargado por migración en `reference_foods`: entre 150 y 300 alimentos comunes sin etiqueta, con nombres en español rioplatense y HC/100 g **sin fibra** (`carbohydrate − fiber`; si no informa la fibra, no se carga). Incluye las variantes cocidas, que son la forma por defecto de cargar lo que se cocina (spec §14 #42): arroz blanco, integral y parboil hervidos; fideos comunes e integrales hervidos; legumbres; polenta; papa hervida y puré. La app avisa que el valor cocido de una tabla depende de cómo se coció, y que se puede medir el factor para más precisión (spec §5.1).
 - Un script en `scripts/` que arma la migración del seed desde los archivos de USDA (sin API en la app), con la lista de `fdc_id` elegidos y sus nombres en español versionados en el repo.
 - **Búsqueda en `reference_foods`** (§6.2), con las mismas reglas que la búsqueda del catálogo (sin mayúsculas ni tildes, por palabras).
-- **Usarlo sin vueltas**: se decide en la etapa si al elegir un alimento de la tabla desde la comida se copia al catálogo en el momento (§6.2 dice que el valor se copia), para que no haya que darlo de alta antes.
 - Atribución a USDA FoodData Central en la app y en el README.
 
 **Terminada cuando**:
-- [ ] El seed está cargado y la búsqueda funciona desde el iPhone.
-- [ ] Una banana y un arroz hervido elegidos de la tabla se usan en una comida desde el iPhone.
+- [ ] El seed está cargado: el usuario no tiene que cargar a mano la fruta, la verdura, el pan ni lo que se cocina.
+- [ ] Desde Inicio, una banana y un arroz hervido se buscan, se eligen de la tabla y se usan en una comida, sin darlos de alta antes, desde el iPhone.
+- [ ] El alta a mano muestra solo nombre, HC cada 100 g y "¿Se cocina antes de comer?", sin ARGENFOODS, código ni nota obligatoria.
 - [ ] La atribución a USDA está visible.
 
 ## Etapa 7 — `create_meal`, pulido y paso a producción

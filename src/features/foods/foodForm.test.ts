@@ -12,7 +12,8 @@ import {
   validateFoodForm,
   type FoodFormTexts,
 } from './foodForm.ts'
-import type { Food, FoodFormValues } from './types.ts'
+import type { Food } from '../../lib/foods.ts'
+import type { FoodFormValues } from './types.ts'
 
 // Invented data, not real foods.
 

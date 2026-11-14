@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { archiveFood, fetchFoods } from './api.ts'
-import type { Food } from './types.ts'
+import type { Food } from '../../lib/foods.ts'
+import { archiveFood } from './api.ts'
 
 // A fake Supabase client that records the query each function builds.
-// Only checks the parts of the query that matter for the catalog (spec §6.5):
-// the list excludes archived foods, and archiving only sends archived_at.
+// Only checks the part of the query that matters for archiving (spec §6.5):
+// it only sends archived_at. fetchFoods is tested in lib/foods.test.ts.
 const fake = vi.hoisted(() => {
   type Call = { method: string; args: unknown[] }
   const state = {
@@ -55,24 +55,6 @@ beforeEach(() => {
   fake.state.table = ''
   fake.state.calls = []
   fake.state.result = { data: null, error: null }
-})
-
-describe('fetchFoods', () => {
-  it('excludes archived foods', async () => {
-    fake.state.result = { data: [food], error: null }
-    await expect(fetchFoods()).resolves.toEqual([food])
-    expect(fake.state.table).toBe('foods')
-    expect(fake.state.calls).toContainEqual({
-      method: 'is',
-      args: ['archived_at', null],
-    })
-  })
-
-  it('throws the Supabase error', async () => {
-    const error = new Error('boom')
-    fake.state.result = { data: null, error }
-    await expect(fetchFoods()).rejects.toBe(error)
-  })
 })
 
 describe('archiveFood', () => {
