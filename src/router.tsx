@@ -5,7 +5,10 @@ import {
 } from './components/RouteErrorBoundary.tsx'
 import { RequireAuth } from './features/auth/components/RequireAuth.tsx'
 import { LoginPage } from './features/auth/pages/LoginPage.tsx'
+import { FoodDetailPage } from './features/foods/pages/FoodDetailPage.tsx'
+import { EditFoodPage } from './features/foods/pages/EditFoodPage.tsx'
 import { FoodsPage } from './features/foods/pages/FoodsPage.tsx'
+import { NewFoodPage } from './features/foods/pages/NewFoodPage.tsx'
 import { HistoryPage } from './features/history/pages/HistoryPage.tsx'
 import { HomePage } from './features/meals/pages/HomePage.tsx'
 import { SettingsPage } from './features/settings/pages/SettingsPage.tsx'
@@ -26,6 +29,21 @@ export const router = createBrowserRouter([
       {
         path: 'foods',
         Component: FoodsPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'foods/new',
+        Component: NewFoodPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'foods/:foodId',
+        Component: FoodDetailPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'foods/:foodId/edit',
+        Component: EditFoodPage,
         ErrorBoundary: RouteErrorBoundary,
       },
       {

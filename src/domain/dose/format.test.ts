@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatCarbs, formatDose } from './format.ts'
+import { formatCarbs, formatCookingFactor, formatDose } from './format.ts'
 
 describe('formatDose (2 decimales)', () => {
   it.each([
@@ -39,5 +39,37 @@ describe('formatCarbs (1 decimal)', () => {
     [1e-7, '0,0'],
   ])('%s → %s', (value, expected) => {
     expect(formatCarbs(value)).toBe(expected)
+  })
+})
+
+describe('formatCookingFactor (2 decimales)', () => {
+  it.each([
+    [1.005, '1,01'],
+    [2.675, '2,68'],
+    [8 / 3, '2,67'],
+    [3, '3,00'],
+    [0.1 + 0.2, '0,30'],
+    [0.004, '0,00'],
+  ])('%s → %s', (value, expected) => {
+    expect(formatCookingFactor(value)).toBe(expected)
+  })
+
+  it('nunca muestra "-0"', () => {
+    expect(formatCookingFactor(-0)).toBe('0,00')
+  })
+})
+
+describe('formatCookingFactor: bordes', () => {
+  it.each([
+    [1, '1,00'],
+    [4, '4,00'],
+    [0.995, '1,00'],
+    [1.234, '1,23'],
+    [2.6, '2,60'],
+    [10.005, '10,01'],
+    [12345.678, '12345,68'],
+    [1e-7, '0,00'],
+  ])('%s → %s', (value, expected) => {
+    expect(formatCookingFactor(value)).toBe(expected)
   })
 })

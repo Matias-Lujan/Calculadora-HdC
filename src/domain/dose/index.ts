@@ -5,7 +5,13 @@ export type {
   TypedNumberNotice,
 } from './applyTypedEdit.ts'
 export { CALC_VERSION, calculateMeal } from './calculate.ts'
-export { formatCarbs, formatDose } from './format.ts'
+export { isValidCarbsPer100g, parseCarbsPer100g } from './carbsPer100g.ts'
+export type { CarbsPer100gError, CarbsPer100gResult } from './carbsPer100g.ts'
+export {
+  cookingFactorFromWeights,
+  isCookingFactorUnusual,
+} from './cookingFactor.ts'
+export { formatCarbs, formatCookingFactor, formatDose } from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
 export { parsePositiveUserNumber } from './parsePositiveUserNumber.ts'
 export type {

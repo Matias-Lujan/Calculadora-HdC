@@ -3,6 +3,7 @@ import {
   isAuthRetryableFetchError,
 } from '@supabase/supabase-js'
 import type {
+  CarbsPer100gError,
   PositiveNumberError,
   TypedNumberNotice,
 } from '../domain/dose/index.ts'
@@ -84,10 +85,43 @@ export function positiveNumberErrorMessage(code: PositiveNumberError): string {
   return POSITIVE_NUMBER_ERRORS[code]
 }
 
+/**
+ * Validation errors of the food form fields (src/features/foods/foodForm.ts).
+ * Declared here, and not in the feature, because lib does not import
+ * features.
+ */
+export type FoodFieldError =
+  | PositiveNumberError
+  | CarbsPer100gError
+  | 'STATE_REQUIRED'
+  | 'UNIT_WEIGHT_REQUIRED'
+  | 'FACTOR_NOT_COMPUTABLE'
+
+const FOOD_FIELD_ERRORS: Record<FoodFieldError, string> = {
+  ...POSITIVE_NUMBER_ERRORS,
+  ABOVE_100: 'No puede ser más de 100 g cada 100 g.',
+  STATE_REQUIRED: 'Elegí una opción.',
+  UNIT_WEIGHT_REQUIRED: 'Completá el peso de la unidad, o borrá el nombre.',
+  FACTOR_NOT_COMPUTABLE:
+    'Con estos pesos no se puede calcular el factor. Revisalos.',
+}
+
+export function foodFieldErrorMessage(code: FoodFieldError): string {
+  return FOOD_FIELD_ERRORS[code]
+}
+
+// Confirmation asked before saving a cooking factor outside 1–4 (spec §6.4).
+// Receives the factor already formatted with formatCookingFactor.
+export function cookingFactorUnusualMessage(formattedFactor: string): string {
+  return `El factor de cocción da ${formattedFactor}, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?`
+}
+
 // Unexpected errors (network down, 500): the form keeps what was entered
 // and the user retries.
 export const LOAD_ERROR_MESSAGE =
   'No se pudo cargar. Revisá la conexión y reintentá.'
 export const SAVE_ERROR_MESSAGE =
   'No se pudo guardar. Revisá la conexión y reintentá.'
+export const ARCHIVE_ERROR_MESSAGE =
+  'No se pudo archivar. Revisá la conexión y reintentá.'
 export const SIGN_OUT_ERROR_MESSAGE = 'No se pudo cerrar la sesión. Reintentá.'
