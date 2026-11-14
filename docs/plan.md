@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 3 terminadas (PR #1 a #4 y #7, mergeados). Etapa 4 terminada en la rama `etapa-4-catalogo`, con PR pendiente de merge. La próxima es la etapa 5.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-13.
+**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). La próxima es la etapa 5. Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-13.
 
 ---
 
@@ -12,7 +12,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 2. **Validar temprano lo incierto.** La calidad de transcripción de Gemini se prueba con un script en la etapa 1b, antes de invertir en la integración completa (etapa 6).
 3. **Probar en el iPhone desde el principio.** No hay Mac, así que las rarezas de Safari y de la app instalada en la pantalla de inicio se tienen que detectar en la etapa 3, no al final.
 4. **Que la app sirva lo antes posible.** Al terminar la etapa 5, con carga manual y registro de comidas, ya reemplaza la cuenta a mano. La foto suma comodidad, pero no es imprescindible.
-5. **Simple de usar.** El uso diario tiene que ser "qué como, cuánto pesa en el plato, y listo". Cargar un alimento tiene que costar lo menos posible: la foto de la etiqueta (etapa 6) es la forma principal para los productos con paquete, y la tabla de referencia (etapa 6b), para los que no tienen. El formulario manual queda como último recurso. Para lo que se cocina (arroz, fideos), el factor se mide **una vez por producto** (spec §14 #41).
+5. **Simple de usar.** El uso diario tiene que ser "qué como, cuánto pesa en el plato, y listo". Cargar un alimento tiene que costar lo menos posible: la foto de la etiqueta (etapa 6) es la forma principal para los productos con paquete, y la tabla de referencia (etapa 6b), para los que no tienen. El formulario manual queda como último recurso. Lo que se cocina (arroz, fideos) se elige por defecto de la tabla con su valor cocido; medir el factor es **opcional**, para el producto en que se quiera más precisión (spec §14 #42).
 
 ## Convenciones de trabajo
 
@@ -31,10 +31,10 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 1b | Prueba de Gemini con un script | Cinco etiquetas reales transcriptas y evaluadas; modelo elegido | ✅ PR #3 |
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
 | 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
-| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ Rama `etapa-4-catalogo` (PR pendiente de merge) |
+| 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | |
+| 6b | Tabla de referencia (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla y se usa en una comida desde el iPhone | |
 | 6 | Alta por foto y formulario simple | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
-| 6b | Tabla de referencia | Un alimento sin paquete se elige de la tabla y se usa en una comida desde el iPhone | |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
 ---
@@ -229,7 +229,7 @@ Nota del catálogo (etapa 4): el selector de alimentos de la comida usa `fetchFo
 
 Incluye:
 - **Formulario más simple** (spec §14 #41). La pantalla de confirmación de la foto y el alta manual usan el mismo formulario (`FoodForm`, etapa 4): a la vista quedan el nombre, los HC cada 100 g y "¿Se cocina antes de comer?"; la fuente, la marca, el peso por unidad y la nota pasan a "Más opciones". El estado sigue siendo obligatorio: un crudo guardado como "tal como se come" triplica los HC. Se revisa si la nota del alta manual sigue siendo obligatoria (hoy la exige el CHECK `foods_manual_requires_note`, así que cambiarlo necesita una migración).
-- **Lo que se cocina, una sola vez**: si el producto se cocina, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta el factor". No se vuelve a pedir en cada comida.
+- **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta el factor". Se decide en la etapa si además sugiere la entrada cocida de la tabla.
 - Edge Function `transcribe-label`: `index.ts`, `prompt.ts`, `schema.ts` y `provider.ts` (§9.2). Las instrucciones y el esquema parten de los de la etapa 1b.
 - Secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev`.
 - Tope diario propio en `vision_requests`.
@@ -257,10 +257,12 @@ Incluye:
 
 ## Etapa 6b — Tabla de referencia
 
-**Objetivo**: los alimentos sin paquete (fruta, papa, pan, verduras) se eligen de una tabla ya cargada, sin tipear sus HC (spec §5.2, §6.2 y §14 #41).
+**Objetivo**: los alimentos sin paquete (fruta, papa, pan, verduras) y lo que se cocina (arroz, fideos) se eligen de una tabla ya cargada, sin tipear sus HC (spec §5.2, §6.2, §14 #41 y #42).
+
+**Se hace antes que la etapa 6**, aunque conserva su nombre para no cambiar las referencias del spec: resuelve lo que se come todos los días, no depende de Gemini y deja usar la app antes. Por eso no depende de nada de la etapa 6. Si necesita el formulario simple para el alta desde la tabla, lo adelanta.
 
 Incluye:
-- **Seed curado de USDA FoodData Central** (dominio público, CC0), cargado por migración en `reference_foods`: entre 150 y 300 alimentos comunes sin etiqueta, con nombres en español rioplatense y HC/100 g **sin fibra** (`carbohydrate − fiber`; si no informa la fibra, no se carga). Incluye variantes cocidas (arroz blanco e integral hervidos, fideos hervidos, legumbres, papa hervida) como respaldo para quien no mida el factor, con un aviso en la app de que el valor cocido de una tabla depende de cómo se coció (spec §5.1).
+- **Seed curado de USDA FoodData Central** (dominio público, CC0), cargado por migración en `reference_foods`: entre 150 y 300 alimentos comunes sin etiqueta, con nombres en español rioplatense y HC/100 g **sin fibra** (`carbohydrate − fiber`; si no informa la fibra, no se carga). Incluye las variantes cocidas, que son la forma por defecto de cargar lo que se cocina (spec §14 #42): arroz blanco, integral y parboil hervidos; fideos comunes e integrales hervidos; legumbres; polenta; papa hervida y puré. La app avisa que el valor cocido de una tabla depende de cómo se coció, y que se puede medir el factor para más precisión (spec §5.1).
 - Un script en `scripts/` que arma la migración del seed desde los archivos de USDA (sin API en la app), con la lista de `fdc_id` elegidos y sus nombres en español versionados en el repo.
 - **Búsqueda en `reference_foods`** (§6.2), con las mismas reglas que la búsqueda del catálogo (sin mayúsculas ni tildes, por palabras).
 - **Usarlo sin vueltas**: se decide en la etapa si al elegir un alimento de la tabla desde la comida se copia al catálogo en el momento (§6.2 dice que el valor se copia), para que no haya que darlo de alta antes.
