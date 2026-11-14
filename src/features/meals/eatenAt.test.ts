@@ -1,5 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { dateTimeInputValue, eatenAtFromInput } from './eatenAt.ts'
+import {
+  dateTimeInputValue,
+  eatenAtFromInput,
+  formatEatenAt,
+} from './eatenAt.ts'
+
+// The time zone of the process when the file loads. vi.unstubAllEnvs()
+// deletes TZ, but Node does not go back to the system zone after that: the
+// tests that change TZ assign this one back, so the rest of the file runs
+// in it and not in the last zone they tried. vi.stubEnv writes process.env
+// (the app tsconfig has no Node types, so `process` is not used directly).
+const initialTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+function restoreTimeZone() {
+  vi.unstubAllEnvs()
+  vi.stubEnv('TZ', initialTimeZone)
+}
 
 describe('dateTimeInputValue', () => {
   it.each([
@@ -233,9 +249,7 @@ describe('eatenAtFromInput, edge cases', () => {
 // local time of Date in Node; that is checked first, so the test cannot pass
 // by not switching.
 describe('does not depend on the time zone of the device', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs()
-  })
+  afterEach(restoreTimeZone)
 
   const zones = [
     'UTC',
@@ -289,5 +303,117 @@ describe('does not depend on the time zone of the device', () => {
       }
     }
     expect(eatenAtFromInput('2026-02-29T10:00')).toBeNull()
+  })
+})
+
+describe('formatEatenAt', () => {
+  it.each([
+    // As PostgREST returns it, with and without milliseconds.
+    ['2026-11-14T16:05:00+00:00', '14/11/2026 13:05'],
+    ['2026-11-14T16:05:00.123+00:00', '14/11/2026 13:05'],
+    // The seconds are dropped, not rounded.
+    ['2026-11-14T16:05:59.999Z', '14/11/2026 13:05'],
+    // Midnight is "00", not "24".
+    ['2026-11-15T03:00:00+00:00', '15/11/2026 00:00'],
+    // Another day, month and year in Buenos Aires.
+    ['2026-11-15T02:59:00Z', '14/11/2026 23:59'],
+    ['2026-12-01T01:00:00Z', '30/11/2026 22:00'],
+    ['2027-01-01T02:30:00Z', '31/12/2026 23:30'],
+    ['2028-02-29T15:00:00Z', '29/02/2028 12:00'],
+    // Another offset, same instant.
+    ['2026-11-14T13:05:00-03:00', '14/11/2026 13:05'],
+    // Every part padded.
+    ['2026-01-02T06:04:00Z', '02/01/2026 03:04'],
+  ])('%s → %s', (iso, text) => {
+    expect(formatEatenAt(iso)).toBe(text)
+  })
+
+  it('shows the same clock as the date field, for the same instant', () => {
+    const start = Date.UTC(2026, 10, 14, 3, 0)
+    for (let minute = 0; minute < 3 * 24 * 60; minute += 37) {
+      const date = new Date(start + minute * 60_000 + 59_999)
+      const [day, time] = dateTimeInputValue(date).split('T')
+      const [year, month, dayOfMonth] = (day ?? '').split('-')
+      expect(formatEatenAt(date.toISOString())).toBe(
+        `${dayOfMonth}/${month}/${year} ${time}`,
+      )
+    }
+  })
+})
+
+describe('formatEatenAt: bordes', () => {
+  it.each([
+    // Microseconds, as Postgres can return them (Node truncates to ms).
+    ['2026-11-14T16:05:59.999999+00:00', '14/11/2026 13:05'],
+    // The last instant of a day in Buenos Aires stays on that day.
+    ['2026-11-15T02:59:59.999Z', '14/11/2026 23:59'],
+    // Buenos Aires was at UTC−2 in January 2008: the offset comes from the
+    // time zone data, not a fixed −3.
+    ['2008-01-15T15:00:00Z', '15/01/2008 13:00'],
+    // The night the clocks went back (2008-03-16, 00:00 → 23:00).
+    ['2008-03-16T01:59:00Z', '15/03/2008 23:59'],
+    ['2008-03-16T02:00:00Z', '15/03/2008 23:00'],
+    // The night the clocks went forward (2007-12-30, 00:00 → 01:00).
+    ['2007-12-30T02:59:00Z', '29/12/2007 23:59'],
+    ['2007-12-30T03:00:00Z', '30/12/2007 01:00'],
+    // An offset with half hours, same instant.
+    ['2026-11-14T21:35:00+05:30', '14/11/2026 13:05'],
+  ])('%s → %s', (iso, text) => {
+    expect(formatEatenAt(iso)).toBe(text)
+  })
+})
+
+// Like the date field: the history shows Buenos Aires time whatever the time
+// zone of the device (the process TZ is checked first, so the test cannot
+// pass by not switching).
+describe('formatEatenAt does not depend on the time zone of the device', () => {
+  afterEach(restoreTimeZone)
+
+  const expectedOffset: Record<string, number> = {
+    UTC: 0,
+    'Asia/Tokyo': -540,
+    'America/Los_Angeles': 480,
+    'Pacific/Kiritimati': -840,
+    'Pacific/Pago_Pago': 660,
+    'Asia/Kolkata': -330,
+    'Europe/Madrid': -60,
+  }
+
+  it.each(Object.keys(expectedOffset))('TZ=%s', (zone) => {
+    vi.stubEnv('TZ', zone)
+    expect(new Date(Date.UTC(2026, 10, 14, 12, 0)).getTimezoneOffset()).toBe(
+      expectedOffset[zone],
+    )
+
+    expect(formatEatenAt('2026-11-14T16:05:00+00:00')).toBe('14/11/2026 13:05')
+    expect(formatEatenAt('2026-11-14T16:05:00.123+00:00')).toBe(
+      '14/11/2026 13:05',
+    )
+    expect(formatEatenAt('2026-11-15T02:59:59.999Z')).toBe('14/11/2026 23:59')
+    expect(formatEatenAt('2026-11-15T03:00:00+00:00')).toBe('15/11/2026 00:00')
+    expect(formatEatenAt('2027-01-01T02:30:00Z')).toBe('31/12/2026 23:30')
+    expect(formatEatenAt('2008-01-15T15:00:00Z')).toBe('15/01/2008 13:00')
+  })
+})
+
+// --- Added by the tester ---
+
+// Last in the file (vitest runs the tests in order): the tests that change
+// TZ leave the process in the zone it had when the file loaded, not in the
+// last one they tried.
+describe('the time zone tests leave the zone of the process as it was', () => {
+  const probe = new Date(Date.UTC(2026, 10, 14, 12, 0))
+  // Read while collecting, before any test runs.
+  const before = {
+    zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    offset: probe.getTimezoneOffset(),
+  }
+
+  it('the same zone and offset after them', () => {
+    expect(before.zone).toBe(initialTimeZone)
+    expect({
+      zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      offset: probe.getTimezoneOffset(),
+    }).toEqual(before)
   })
 })

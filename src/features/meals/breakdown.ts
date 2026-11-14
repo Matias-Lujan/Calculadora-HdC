@@ -8,9 +8,11 @@ import {
   type MealItemInput,
 } from '../../domain/dose/index.ts'
 import type { Food } from '../../lib/foods.ts'
+import type { SavedMealItem } from './types.ts'
 
 // The lines of the meal breakdown (spec §8.3). They only format: every
-// number comes from the food, the typed input or calculateMeal's result.
+// number comes from the food, the typed input or calculateMeal's result
+// (in the history, from the values saved in the record).
 // Carbs with formatCarbs, cooking factor with formatCookingFactor, grams
 // with formatGrams, dose with formatDose; typed units and the ratio exact,
 // with formatUserNumber.
@@ -43,7 +45,7 @@ function unitsText(quantity: number): string {
  */
 export function itemCalculationLines(
   input: MealItemInput,
-  result: ItemSuccess,
+  result: Pick<ItemSuccess, 'grams' | 'effectiveCarbsPer100g' | 'carbsG'>,
 ): string[] {
   const effective = formatCarbs(result.effectiveCarbsPer100g)
   const carbs = `${formatCarbs(result.carbsG)} g HC`
@@ -74,6 +76,35 @@ export function itemCalculationLines(
   }
   lines.push(`${grams} g × ${effective} ÷ 100 = ${carbs}`)
   return lines
+}
+
+/**
+ * The lines of a saved item (the history detail, spec §6.7): the same lines
+ * the meal screen showed, from the values saved in the record and without
+ * calculating again. The quantity is the saved units in units mode,
+ * otherwise the saved grams (in grams mode they are the typed quantity).
+ */
+export function savedItemLines(item: SavedMealItem): string[] {
+  const input: MealItemInput = {
+    foodState: item.food_state,
+    carbsPer100g: item.carbs_per_100g,
+    cookingFactor: item.cooking_factor,
+    unitWeightG: item.unit_weight_g,
+    quantityMode: item.quantity_mode,
+    quantity: item.quantity_mode === 'units' ? item.units : item.grams,
+  }
+  return [
+    foodCarbsLine({
+      state: item.food_state,
+      carbs_per_100g: item.carbs_per_100g,
+      cooking_factor: item.cooking_factor,
+    }),
+    ...itemCalculationLines(input, {
+      grams: item.grams,
+      effectiveCarbsPer100g: item.effective_carbs_per_100g,
+      carbsG: item.carbs_g,
+    }),
+  ]
 }
 
 /** "HC total = 128,2 g". */

@@ -76,7 +76,9 @@ export function MealForm({ foods, settings }: Props) {
   const [confirming, setConfirming] = useState(false)
   // The last "Guardar" found errors.
   const [blocked, setBlocked] = useState(false)
-  const [justSaved, setJustSaved] = useState(false)
+  // The id of the meal just saved ("Comida guardada." and its link to the
+  // history), until the next change.
+  const [savedMealId, setSavedMealId] = useState<string | null>(null)
   const createMeal = useCreateMeal()
   // A save is in progress. isPending disables the fieldset only after the
   // next render, so a second tap in the same tick ("Guardar" or "Guardar
@@ -94,7 +96,7 @@ export function MealForm({ foods, settings }: Props) {
   function touch() {
     setConfirming(false)
     setBlocked(false)
-    setJustSaved(false)
+    setSavedMealId(null)
   }
 
   function handlePick(food: Food) {
@@ -135,14 +137,16 @@ export function MealForm({ foods, settings }: Props) {
     })
   }
 
-  function reset() {
+  // After a save: an empty form and "Comida guardada.", with the id that
+  // createMeal returned.
+  function reset(id: string) {
     setItems([])
     setShownErrors({})
     setAppliedDoseText(null)
     setAppliedDoseShownError(null)
     setEatenAtText(null)
     setEatenAtShownError(false)
-    setJustSaved(true)
+    setSavedMealId(id)
   }
 
   function save() {
@@ -232,13 +236,16 @@ export function MealForm({ foods, settings }: Props) {
         </div>
       )}
 
-      {justSaved && (
-        <p
-          role="status"
-          className="rounded-lg bg-green-50 p-3 text-sm text-green-800"
-        >
-          Comida guardada.
-        </p>
+      {savedMealId !== null && (
+        <div className="flex flex-col gap-1 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+          <p role="status">Comida guardada.</p>
+          <Link
+            to={`/history/${savedMealId}`}
+            className="flex min-h-11 items-center self-start font-medium underline"
+          >
+            Ver en el historial
+          </Link>
+        </div>
       )}
 
       {items.length > 0 && (

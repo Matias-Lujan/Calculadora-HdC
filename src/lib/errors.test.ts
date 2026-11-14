@@ -13,6 +13,7 @@ import type {
 } from '../domain/dose/index.ts'
 import {
   ARCHIVE_ERROR_MESSAGE,
+  DELETE_ERROR_MESSAGE,
   EATEN_AT_ERROR_MESSAGE,
   INVALID_RATIO_MESSAGE,
   MEAL_BLOCKED_MESSAGE,
@@ -248,6 +249,7 @@ describe('messages', () => {
     LOAD_ERROR_MESSAGE,
     SAVE_ERROR_MESSAGE,
     ARCHIVE_ERROR_MESSAGE,
+    DELETE_ERROR_MESSAGE,
     SIGN_OUT_ERROR_MESSAGE,
     INVALID_RATIO_MESSAGE,
     MEAL_OUT_OF_RANGE_MESSAGE,
@@ -279,6 +281,12 @@ describe('messages', () => {
   it('the archive error is the one from spec §14 #40', () => {
     expect(ARCHIVE_ERROR_MESSAGE).toBe(
       'No se pudo archivar. Revisá la conexión y reintentá.',
+    )
+  })
+
+  it('the delete error is the one from spec §14 #47', () => {
+    expect(DELETE_ERROR_MESSAGE).toBe(
+      'No se pudo borrar. Revisá la conexión y reintentá.',
     )
   })
 

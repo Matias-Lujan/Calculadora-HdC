@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMeal } from './api.ts'
+import {
+  MEALS_PAGE_SIZE,
+  createMeal,
+  deleteMeal,
+  fetchMeal,
+  fetchMealsPage,
+} from './api.ts'
 import type { NewMealRecord } from './types.ts'
 
 // A fake Supabase client. Each from() starts a chain that records its table
@@ -15,7 +21,17 @@ const fake = vi.hoisted(() => {
   }
   function builder(chain: Chain, result: Result): Record<string, unknown> {
     const b: Record<string, unknown> = {}
-    for (const method of ['insert', 'select', 'single', 'update', 'eq']) {
+    for (const method of [
+      'insert',
+      'select',
+      'single',
+      'maybeSingle',
+      'update',
+      'eq',
+      'is',
+      'order',
+      'range',
+    ]) {
       b[method] = (...args: unknown[]) => {
         chain.calls.push({ method, args })
         return b
@@ -327,5 +343,313 @@ describe('createMeal', () => {
     for (const chain of fake.state.chains) {
       expect(chain.calls.map((c) => c.method)).not.toContain('update')
     }
+  })
+})
+
+// --- The history (spec §6.7, §14 #47) ---
+
+function callsOf(index: number, method: string): unknown[][] {
+  return (
+    fake.state.chains[index]?.calls
+      .filter((c) => c.method === method)
+      .map((c) => c.args) ?? []
+  )
+}
+
+/** A row of the list, as PostgREST returns it (with the filtering embed). */
+function listRow(n: number): Record<string, unknown> {
+  return {
+    id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+    eaten_at: '2026-11-14T16:05:00+00:00',
+    total_carbs_g: 30,
+    calculated_dose_units: 2,
+    applied_dose_units: 2,
+    meal_items: [{ id: '00000000-0000-4000-8000-0000000000ee' }],
+  }
+}
+
+function listRows(count: number): Record<string, unknown>[] {
+  return Array.from({ length: count }, (_, n) => listRow(n))
+}
+
+describe('fetchMealsPage', () => {
+  it('builds the query: not deleted, with items, most recent first', async () => {
+    fake.state.results = [{ data: [], error: null }]
+    await fetchMealsPage(0)
+
+    expect(fake.state.chains).toHaveLength(1)
+    expect(fake.state.chains[0]?.table).toBe('meals')
+    expect(methods(0)).toEqual(['select', 'is', 'order', 'order', 'range'])
+    const columns = argsOf(0, 'select')?.[0] as string
+    expect(columns.split(',').map((c) => c.trim())).toEqual([
+      'id',
+      'eaten_at',
+      'total_carbs_g',
+      'calculated_dose_units',
+      'applied_dose_units',
+      'meal_items!inner(id)',
+    ])
+    expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
+    expect(callsOf(0, 'order')).toEqual([
+      ['eaten_at', { ascending: false }],
+      ['created_at', { ascending: false }],
+    ])
+  })
+
+  it('asks for one row more than the page, from the offset', async () => {
+    expect(MEALS_PAGE_SIZE).toBe(50)
+    fake.state.results = [
+      { data: [], error: null },
+      { data: [], error: null },
+    ]
+    await fetchMealsPage(0)
+    await fetchMealsPage(100)
+    expect(argsOf(0, 'range')).toEqual([0, 50])
+    expect(argsOf(1, 'range')).toEqual([100, 150])
+  })
+
+  it('51 rows: returns 50 and says there is more', async () => {
+    fake.state.results = [{ data: listRows(51), error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals).toHaveLength(50)
+    expect(page.meals[49]?.id).toBe(listRow(49).id)
+    expect(page.hasMore).toBe(true)
+  })
+
+  it('50 rows: returns 50 and says there is no more', async () => {
+    fake.state.results = [{ data: listRows(50), error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals).toHaveLength(50)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('0 rows: an empty page', async () => {
+    fake.state.results = [{ data: [], error: null }]
+    await expect(fetchMealsPage(0)).resolves.toEqual({
+      meals: [],
+      hasMore: false,
+    })
+  })
+
+  it('drops the meal_items embed', async () => {
+    fake.state.results = [{ data: [listRow(0)], error: null }]
+    const page = await fetchMealsPage(0)
+    expect(Object.keys(page.meals[0] ?? {})).not.toContain('meal_items')
+  })
+
+  it('data null throws', async () => {
+    fake.state.results = [{ data: null, error: null }]
+    await expect(fetchMealsPage(0)).rejects.toThrow()
+  })
+
+  it('an invalid row throws', async () => {
+    fake.state.results = [
+      { data: [{ ...listRow(0), total_carbs_g: '30' }], error: null },
+    ]
+    await expect(fetchMealsPage(0)).rejects.toThrow()
+  })
+
+  it('throws the Supabase error as is', async () => {
+    const error = { message: 'JWT expired', code: 'PGRST301' }
+    fake.state.results = [{ data: null, error }]
+    await expect(fetchMealsPage(0)).rejects.toBe(error)
+  })
+})
+
+const savedRow = {
+  id: MEAL_ID,
+  eaten_at: '2026-11-14T16:05:00.123+00:00',
+  carb_ratio_g_per_unit: 15,
+  total_carbs_g: 99.24,
+  calculated_dose_units: 6.616,
+  applied_dose_units: 6.5,
+  meal_items: record.items.map((item) => ({
+    position: item.position,
+    food_name: item.food_name,
+    food_brand: item.food_brand,
+    food_state: item.food_state,
+    quantity_mode: item.quantity_mode,
+    units: item.units,
+    unit_weight_g: item.unit_weight_g,
+    grams: item.grams,
+    carbs_per_100g: item.carbs_per_100g,
+    cooking_factor: item.cooking_factor,
+    effective_carbs_per_100g: item.effective_carbs_per_100g,
+    carbs_g: item.carbs_g,
+  })),
+}
+
+describe('fetchMeal', () => {
+  it.each(['abc', '', '1', `${MEAL_ID}x`])(
+    'an id that is not a UUID (%j) is null, without querying',
+    async (id) => {
+      await expect(fetchMeal(id)).resolves.toBeNull()
+      expect(fake.state.chains).toHaveLength(0)
+    },
+  )
+
+  it('builds the query: that meal, not deleted, its items in order', async () => {
+    fake.state.results = [{ data: savedRow, error: null }]
+    await fetchMeal(MEAL_ID)
+
+    expect(fake.state.chains[0]?.table).toBe('meals')
+    expect(methods(0)).toEqual(['select', 'eq', 'is', 'order', 'maybeSingle'])
+    const columns = argsOf(0, 'select')?.[0] as string
+    expect(columns).toContain('carb_ratio_g_per_unit')
+    expect(columns).toContain(
+      'meal_items!inner(position, food_name, food_brand, food_state, quantity_mode, units, unit_weight_g, grams, carbs_per_100g, cooking_factor, effective_carbs_per_100g, carbs_g)',
+    )
+    expect(columns).not.toContain('calc_version')
+    expect(columns).not.toContain('food_id')
+    expect(argsOf(0, 'eq')).toEqual(['id', MEAL_ID])
+    expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
+    expect(argsOf(0, 'order')).toEqual([
+      'position',
+      { referencedTable: 'meal_items' },
+    ])
+  })
+
+  it('no row (deleted, another user’s or without items) is null', async () => {
+    fake.state.results = [{ data: null, error: null }]
+    await expect(fetchMeal(MEAL_ID)).resolves.toBeNull()
+  })
+
+  it('a valid row is returned parsed', async () => {
+    fake.state.results = [{ data: savedRow, error: null }]
+    await expect(fetchMeal(MEAL_ID)).resolves.toEqual(savedRow)
+  })
+
+  it('a row with no items throws', async () => {
+    fake.state.results = [
+      { data: { ...savedRow, meal_items: [] }, error: null },
+    ]
+    await expect(fetchMeal(MEAL_ID)).rejects.toThrow()
+  })
+
+  it('an item with an unknown state throws', async () => {
+    const [first] = savedRow.meal_items
+    fake.state.results = [
+      {
+        data: { ...savedRow, meal_items: [{ ...first, food_state: 'cooked' }] },
+        error: null,
+      },
+    ]
+    await expect(fetchMeal(MEAL_ID)).rejects.toThrow()
+  })
+
+  it('throws the Supabase error as is', async () => {
+    const error = { message: 'x', code: '500' }
+    fake.state.results = [{ data: null, error }]
+    await expect(fetchMeal(MEAL_ID)).rejects.toBe(error)
+  })
+})
+
+describe('fetchMeal: the id', () => {
+  it.each([
+    // Postgres reads a UUID in capitals as the same one.
+    MEAL_ID.toUpperCase(),
+    // Not version 4: still a valid uuid for Postgres.
+    '00000000-0000-0000-0000-000000000000',
+    'ffffffff-ffff-ffff-ffff-ffffffffffff',
+  ])('%s is queried as is', async (id) => {
+    fake.state.results = [{ data: { ...savedRow, id: MEAL_ID }, error: null }]
+    await expect(fetchMeal(id)).resolves.toEqual(savedRow)
+    expect(fake.state.chains).toHaveLength(1)
+    expect(argsOf(0, 'eq')).toEqual(['id', id])
+  })
+
+  it.each([
+    ` ${MEAL_ID}`,
+    `${MEAL_ID} `,
+    `{${MEAL_ID}}`,
+    MEAL_ID.replaceAll('-', ''),
+    MEAL_ID.slice(0, -1),
+    MEAL_ID.replace('a', 'g'),
+    `${MEAL_ID}/`,
+  ])('%j is null, without querying', async (id) => {
+    await expect(fetchMeal(id)).resolves.toBeNull()
+    expect(fake.state.chains).toHaveLength(0)
+  })
+})
+
+describe('fetchMealsPage: bordes', () => {
+  it('the second page asks for 50 to 100', async () => {
+    fake.state.results = [{ data: [], error: null }]
+    await fetchMealsPage(50)
+    expect(argsOf(0, 'range')).toEqual([50, 100])
+  })
+
+  it('51 rows: the extra one is not returned', async () => {
+    fake.state.results = [{ data: listRows(51), error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals.map((m) => m.id)).not.toContain(listRow(50).id)
+    expect(page.meals.map((m) => m.id)).toEqual(
+      listRows(50).map((row) => row.id),
+    )
+  })
+
+  it('1 row: one meal and no more', async () => {
+    fake.state.results = [{ data: [listRow(0)], error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals).toHaveLength(1)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('49 rows: no more', async () => {
+    fake.state.results = [{ data: listRows(49), error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals).toHaveLength(49)
+    expect(page.hasMore).toBe(false)
+  })
+
+  it('keeps the order the base returns', async () => {
+    const rows = [listRow(2), listRow(0), listRow(1)]
+    fake.state.results = [{ data: rows, error: null }]
+    const page = await fetchMealsPage(0)
+    expect(page.meals.map((m) => m.id)).toEqual(rows.map((row) => row.id))
+  })
+
+  it('a rejected request rejects', async () => {
+    const network = new Error('network')
+    fake.state.results = [network]
+    await expect(fetchMealsPage(0)).rejects.toBe(network)
+  })
+})
+
+describe('deleteMeal', () => {
+  it('updates only deleted_at, with the current date, of that meal', async () => {
+    fake.state.results = [{ data: { id: MEAL_ID }, error: null }]
+    const before = Date.now()
+    await expect(deleteMeal(MEAL_ID)).resolves.toBeUndefined()
+    const after = Date.now()
+
+    expect(fake.state.chains).toHaveLength(1)
+    expect(fake.state.chains[0]?.table).toBe('meals')
+    expect(methods(0)).toEqual(['update', 'eq', 'select', 'single'])
+    const payload = argsOf(0, 'update')?.[0] as Record<string, unknown>
+    expect(Object.keys(payload)).toEqual(['deleted_at'])
+    const sent = Date.parse(payload.deleted_at as string)
+    expect(sent).toBeGreaterThanOrEqual(before)
+    expect(sent).toBeLessThanOrEqual(after)
+    expect(callsOf(0, 'eq')).toEqual([['id', MEAL_ID]])
+    expect(argsOf(0, 'select')).toEqual(['id'])
+  })
+
+  it('is not filtered by deleted_at (deleting again overwrites the date)', async () => {
+    fake.state.results = [{ data: { id: MEAL_ID }, error: null }]
+    await deleteMeal(MEAL_ID)
+    expect(methods(0)).not.toContain('is')
+  })
+
+  it('throws the Supabase error as is (for example, no row updated)', async () => {
+    const error = { message: 'x', code: 'PGRST116' }
+    fake.state.results = [{ data: null, error }]
+    await expect(deleteMeal(MEAL_ID)).rejects.toBe(error)
+  })
+
+  it('a rejected request rejects', async () => {
+    const network = new Error('network')
+    fake.state.results = [network]
+    await expect(deleteMeal(MEAL_ID)).rejects.toBe(network)
   })
 })

@@ -1,8 +1,9 @@
 // The date and time of a meal (spec §6.6), between the value of an
 // <input type="datetime-local"> ("2026-11-14T13:05", a wall-clock time in
-// Buenos Aires) and the instant saved in `eaten_at` (an ISO string). Only
-// UTC methods of Date and Intl.DateTimeFormat with the time zone are used:
-// never the device's local time, which may not be Buenos Aires.
+// Buenos Aires) and the instant saved in `eaten_at` (an ISO string), and how
+// the history shows it. Only UTC methods of Date and Intl.DateTimeFormat
+// with the time zone are used: never the device's local time, which may not
+// be Buenos Aires.
 
 const TIME_ZONE = 'America/Argentina/Buenos_Aires'
 
@@ -56,6 +57,16 @@ function pad(value: number, length: number): string {
 export function dateTimeInputValue(date: Date): string {
   const c = wallClockAt(date.getTime())
   return `${pad(c.year, 4)}-${pad(c.month, 2)}-${pad(c.day, 2)}T${pad(c.hour, 2)}:${pad(c.minute, 2)}`
+}
+
+/**
+ * The date and time of a saved meal, for the history: "dd/mm/aaaa HH:mm",
+ * in Buenos Aires time, 24 h. `iso` is the `eaten_at` read from the base
+ * (with an offset, already validated). The seconds are dropped, not rounded.
+ */
+export function formatEatenAt(iso: string): string {
+  const c = wallClockAt(Date.parse(iso))
+  return `${pad(c.day, 2)}/${pad(c.month, 2)}/${pad(c.year, 4)} ${pad(c.hour, 2)}:${pad(c.minute, 2)}`
 }
 
 const INPUT_VALUE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/

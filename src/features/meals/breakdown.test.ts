@@ -5,16 +5,27 @@ import {
   formatCookingFactor,
   formatDose,
   formatGrams,
+  formatUserNumber,
   type DoseSettings,
   type ItemSuccess,
   type MealItemInput,
 } from '../../domain/dose/index.ts'
+import type { Food } from '../../lib/foods.ts'
+import type { Settings } from '../../lib/settings.ts'
 import {
   doseLine,
   foodCarbsLine,
   itemCalculationLines,
+  savedItemLines,
   totalCarbsLine,
 } from './breakdown.ts'
+import { toMealItemInput, toNewMealRecord } from './mealDraft.ts'
+import {
+  savedMealItemSchema,
+  savedMealSchema,
+  type MealItemDraft,
+  type SavedMealItem,
+} from './types.ts'
 
 // Invented data: the illustrative values of spec §8.3.
 
@@ -218,25 +229,27 @@ describe('totalCarbsLine and doseLine', () => {
   })
 })
 
+// A grid of valid items, shared by the coherence tests of the live lines
+// and of the saved ones.
+const cases: MealItemInput[] = [
+  rice,
+  banana,
+  alfajor,
+  { ...rice, quantity: 187.35, cookingFactor: 8 / 3 },
+  { ...rice, carbsPer100g: 50, cookingFactor: 0.8 },
+  { ...rice, carbsPer100g: 0, cookingFactor: 3.1 },
+  { ...banana, quantity: 0.1 },
+  { ...banana, quantity: 1234.56, carbsPer100g: 100 },
+  { ...banana, quantity: 33.333333, carbsPer100g: 12.345 },
+  { ...alfajor, quantity: 0.25, unitWeightG: 33.3 },
+  { ...alfajor, quantity: 7, unitWeightG: 12.75 },
+  { ...alfajor, quantity: 2.5, unitWeightG: 0.1 },
+]
+
 describe('the lines show the numbers of calculateMeal', () => {
   // Coherence: each line only formats what the calculation returns, so the
   // numbers in the text are the formatted grams, effective carbs and carbs
   // of the result, for many inputs.
-  const cases: MealItemInput[] = [
-    rice,
-    banana,
-    alfajor,
-    { ...rice, quantity: 187.35, cookingFactor: 8 / 3 },
-    { ...rice, carbsPer100g: 50, cookingFactor: 0.8 },
-    { ...rice, carbsPer100g: 0, cookingFactor: 3.1 },
-    { ...banana, quantity: 0.1 },
-    { ...banana, quantity: 1234.56, carbsPer100g: 100 },
-    { ...banana, quantity: 33.333333, carbsPer100g: 12.345 },
-    { ...alfajor, quantity: 0.25, unitWeightG: 33.3 },
-    { ...alfajor, quantity: 7, unitWeightG: 12.75 },
-    { ...alfajor, quantity: 2.5, unitWeightG: 0.1 },
-  ]
-
   it.each(cases)('%o', (input) => {
     const result = success(input)
     const out = itemCalculationLines(input, result)
@@ -356,4 +369,314 @@ describe('doseLine: bordes', () => {
   it('2,675 U rounds half up to 2,68', () => {
     expect(doseLine(40.125, 15, 2.675)).toBe('Dosis = 40,1 ÷ 15 = 2,68 U')
   })
+})
+
+// --- The lines of a saved item (history detail, spec §6.7) ---
+
+// Saved items with the values of spec §8.3, as the history reads them.
+const savedRice: SavedMealItem = {
+  position: 0,
+  food_name: 'Arroz de prueba',
+  food_brand: null,
+  food_state: 'raw_cooked',
+  quantity_mode: 'grams',
+  units: null,
+  unit_weight_g: null,
+  grams: 250,
+  carbs_per_100g: 78,
+  cooking_factor: 2.6,
+  effective_carbs_per_100g: 30,
+  carbs_g: 75,
+}
+
+const savedBanana: SavedMealItem = {
+  position: 1,
+  food_name: 'Banana de prueba',
+  food_brand: null,
+  food_state: 'as_eaten',
+  quantity_mode: 'grams',
+  units: null,
+  unit_weight_g: null,
+  grams: 120,
+  carbs_per_100g: 20.2,
+  cooking_factor: null,
+  effective_carbs_per_100g: 20.2,
+  carbs_g: 24.24,
+}
+
+const savedAlfajor: SavedMealItem = {
+  position: 2,
+  food_name: 'Alfajor de prueba',
+  food_brand: 'Marca Inventada',
+  food_state: 'as_eaten',
+  quantity_mode: 'units',
+  units: 1,
+  unit_weight_g: 50,
+  grams: 50,
+  carbs_per_100g: 58,
+  cooking_factor: null,
+  effective_carbs_per_100g: 58,
+  carbs_g: 29,
+}
+
+describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
+  it('rice (raw, eaten cooked)', () => {
+    expect(savedItemLines(savedRice)).toEqual([
+      'HC 78,0 g/100 g crudo, factor 2,60',
+      '78,0 ÷ 2,60 = 30,0 g/100 g cocido',
+      '250 g cocido × 30,0 ÷ 100 = 75,0 g HC',
+    ])
+  })
+
+  it('banana (as eaten, grams)', () => {
+    expect(savedItemLines(savedBanana)).toEqual([
+      'HC 20,2 g/100 g',
+      '120 g × 20,2 ÷ 100 = 24,2 g HC',
+    ])
+  })
+
+  it('alfajor (1 unit of 50 g)', () => {
+    expect(savedItemLines(savedAlfajor)).toEqual([
+      'HC 58,0 g/100 g',
+      '1 unidad × 50 g = 50 g',
+      '50 g × 58,0 ÷ 100 = 29,0 g HC',
+    ])
+  })
+
+  it('0,5 units of 45 g', () => {
+    expect(
+      savedItemLines({
+        ...savedAlfajor,
+        units: 0.5,
+        unit_weight_g: 45,
+        grams: 22.5,
+        carbs_g: 13.05,
+      }),
+    ).toEqual([
+      'HC 58,0 g/100 g',
+      '0,5 unidades × 45 g = 22,5 g',
+      '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
+    ])
+  })
+
+  it('the dose line of a saved meal shows its ratio (12,5)', () => {
+    expect(doseLine(25, 12.5, 2)).toContain('÷ 12,5 =')
+  })
+})
+
+describe('savedItemLines: does not calculate again', () => {
+  it('shows the saved effective carbs, not 78 ÷ 2,6', () => {
+    // An inconsistent record (the CHECKs would not allow it): the detail
+    // shows what was saved, without recalculating.
+    expect(
+      savedItemLines({ ...savedRice, effective_carbs_per_100g: 31 })[1],
+    ).toBe('78,0 ÷ 2,60 = 31,0 g/100 g cocido')
+  })
+
+  it('shows the saved grams and carbs', () => {
+    expect(savedItemLines({ ...savedBanana, grams: 100, carbs_g: 50 })[1]).toBe(
+      '100 g × 20,2 ÷ 100 = 50,0 g HC',
+    )
+  })
+
+  it('in units, shows the saved grams, not units × weight', () => {
+    // Also inconsistent on purpose: 1 × 50 would be 50 g.
+    expect(
+      savedItemLines({ ...savedAlfajor, grams: 52, carbs_g: 30.16 }),
+    ).toEqual([
+      'HC 58,0 g/100 g',
+      '1 unidad × 50 g = 52 g',
+      '52 g × 58,0 ÷ 100 = 30,2 g HC',
+    ])
+  })
+
+  it('shows the saved raw carbs and factor in the first lines', () => {
+    // An effective of 30 that does not come from 80 ÷ 2,5 (= 32).
+    expect(
+      savedItemLines({ ...savedRice, carbs_per_100g: 80, cooking_factor: 2.5 }),
+    ).toEqual([
+      'HC 80,0 g/100 g crudo, factor 2,50',
+      '80,0 ÷ 2,50 = 30,0 g/100 g cocido',
+      '250 g cocido × 30,0 ÷ 100 = 75,0 g HC',
+    ])
+  })
+
+  it('an as_eaten item does not show a factor', () => {
+    const lines = savedItemLines(savedBanana)
+    expect(lines.some((line) => line.includes('factor'))).toBe(false)
+    expect(lines.some((line) => line.includes('cocido'))).toBe(false)
+  })
+
+  it('does not modify the item', () => {
+    const item = structuredClone(savedAlfajor)
+    savedItemLines(item)
+    expect(item).toEqual(savedAlfajor)
+  })
+})
+
+describe('savedItemLines: the same lines the meal screen showed', () => {
+  // Equivalence: an item goes through the meal screen (draft → calculateMeal
+  // → toNewMealRecord), is saved, comes back as JSON and is validated; the
+  // detail shows exactly the lines the screen showed.
+  const userSettings: Settings = {
+    user_id: '00000000-0000-4000-8000-0000000000ff',
+    carb_ratio_g_per_unit: 15,
+    max_dose_warning_units: null,
+    max_item_grams_warning: 500,
+  }
+
+  function draftOf(input: MealItemInput, key: number): MealItemDraft {
+    if (input.carbsPer100g === null || input.quantity === null) {
+      throw new Error('invalid test item')
+    }
+    const food: Food = {
+      id: `00000000-0000-4000-8000-${String(key).padStart(12, '0')}`,
+      name: `Alimento de prueba ${key}`,
+      brand: null,
+      source: 'manual',
+      state: input.foodState,
+      carbs_per_100g: input.carbsPer100g,
+      cooking_factor: input.cookingFactor,
+      unit_weight_g: input.unitWeightG,
+      unit_label: null,
+      reference_db: null,
+      reference_code: null,
+      reference_description: null,
+      notes: 'Inventado',
+      archived_at: null,
+    }
+    return {
+      key,
+      food,
+      quantityMode: input.quantityMode,
+      quantityText: formatUserNumber(input.quantity),
+    }
+  }
+
+  const inputs: MealItemInput[] = [
+    ...cases,
+    { ...alfajor, unitWeightG: 45, quantity: 0.5 },
+    // An as_eaten food that carries a factor (saved as null).
+    { ...banana, cookingFactor: 2 },
+    // A food with a weight per unit, entered in grams.
+    { ...alfajor, quantityMode: 'grams', quantity: 30 },
+  ]
+
+  it('for every item of the grid', () => {
+    const drafts = inputs.map(draftOf)
+    const result = calculateMeal(drafts.map(toMealItemInput), {
+      carbRatioGPerUnit: userSettings.carb_ratio_g_per_unit,
+      maxDoseWarningUnits: userSettings.max_dose_warning_units,
+      maxItemGramsWarning: userSettings.max_item_grams_warning,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const record = toNewMealRecord(
+      drafts,
+      result,
+      userSettings,
+      result.doseUnits,
+      '2026-11-14T16:05:00.000Z',
+    )
+    expect(record.items).toHaveLength(drafts.length)
+
+    record.items.forEach((item, index) => {
+      const draft = drafts[index]
+      const calc = result.items[index]
+      if (draft === undefined || calc === undefined) throw new Error('missing')
+      const saved = savedMealItemSchema.parse(
+        JSON.parse(JSON.stringify(item)) as unknown,
+      )
+      expect(savedItemLines(saved)).toEqual([
+        foodCarbsLine(draft.food),
+        ...itemCalculationLines(toMealItemInput(draft), calc),
+      ])
+    })
+  })
+
+  // The edges of the CHECKs and of the formatting, one meal per ratio. The
+  // detail (items, total and dose line) has to show what Inicio showed.
+  const edges: MealItemInput[] = [
+    // Factor 1: the effective is the raw value.
+    { ...rice, cookingFactor: 1 },
+    // Effective carbs at the ends (0 and 100).
+    { ...rice, carbsPer100g: 100, cookingFactor: 1 },
+    { ...banana, carbsPer100g: 0 },
+    { ...banana, carbsPer100g: 100, quantity: 0.001 },
+    // A raw food with a weight per unit (always in grams; saved as null).
+    { ...rice, unitWeightG: 80 },
+    { ...rice, quantity: 0.05, cookingFactor: 3.999 },
+    { ...rice, quantity: 1000, cookingFactor: 2.5 },
+    // Units whose grams are not exact in binary (3 × 0,1).
+    { ...alfajor, quantity: 3, unitWeightG: 0.1 },
+    { ...alfajor, quantity: 1.333, unitWeightG: 30 },
+    { ...alfajor, quantity: 1000, unitWeightG: 50 },
+    { ...alfajor, quantity: 0.001, unitWeightG: 45 },
+    // Halves that round (the 5 of the second decimal).
+    { ...banana, quantity: 0.25, carbsPer100g: 10 },
+    { ...banana, quantity: 105, carbsPer100g: 12.3 },
+  ]
+
+  it.each([15, 12.5, 7.25, 1, 0.5, 100])(
+    'the edges, with a ratio of %s: items, total and dose',
+    (ratio) => {
+      const ratioSettings: Settings = {
+        ...userSettings,
+        carb_ratio_g_per_unit: ratio,
+      }
+      const drafts = edges.map(draftOf)
+      const result = calculateMeal(drafts.map(toMealItemInput), {
+        carbRatioGPerUnit: ratio,
+        maxDoseWarningUnits: ratioSettings.max_dose_warning_units,
+        maxItemGramsWarning: ratioSettings.max_item_grams_warning,
+      })
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      const record = toNewMealRecord(
+        drafts,
+        result,
+        ratioSettings,
+        result.doseUnits,
+        '2026-11-14T16:05:00.000Z',
+      )
+      // The row the detail reads: the meal with its items embedded.
+      const saved = savedMealSchema.parse(
+        JSON.parse(
+          JSON.stringify({
+            id: '00000000-0000-4000-8000-0000000000aa',
+            ...record.meal,
+            meal_items: record.items,
+          }),
+        ) as unknown,
+      )
+
+      saved.meal_items.forEach((item, index) => {
+        const draft = drafts[index]
+        const calc = result.items[index]
+        if (draft === undefined || calc === undefined) {
+          throw new Error('missing')
+        }
+        expect(savedItemLines(item)).toEqual([
+          foodCarbsLine(draft.food),
+          ...itemCalculationLines(toMealItemInput(draft), calc),
+        ])
+      })
+      expect(totalCarbsLine(saved.total_carbs_g)).toBe(
+        totalCarbsLine(result.totalCarbsG),
+      )
+      expect(
+        doseLine(
+          saved.total_carbs_g,
+          saved.carb_ratio_g_per_unit,
+          saved.calculated_dose_units,
+        ),
+      ).toBe(
+        doseLine(
+          result.totalCarbsG,
+          ratioSettings.carb_ratio_g_per_unit,
+          result.doseUnits,
+        ),
+      )
+    },
+  )
 })
