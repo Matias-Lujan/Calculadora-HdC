@@ -118,7 +118,8 @@ Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests
 ```
 src/
   domain/            # lógica pura, sin dependencias: dose/, label/
-  lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts
+  lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts,
+                     # y lo que comparten varios features: foods.ts, settings.ts, search.ts
   components/        # UI reutilizable, sin lógica de negocio
   features/
     foods/
@@ -134,7 +135,7 @@ Dirección de dependencias: `pages → components / queries → api → lib`. Cu
 ## Cuándo usar react-query
 
 **Sí:**
-- Toda **lectura** del servidor va con `useQuery`, con las query keys centralizadas en `queries.ts` de cada feature, por ejemplo `['foods', 'list', { search }]` o `['foods', 'detail', id]`.
+- Toda **lectura** del servidor va con `useQuery`, con las query keys centralizadas en `queries.ts` de cada feature, por ejemplo `['foods', 'list', { search }]` o `['foods', 'detail', id]`. Si una lectura la usan varios features, su fetch, sus keys y su hook van en `lib/` (hoy `lib/foods.ts` con `foodsKeys` y `useFoods`, y `lib/settings.ts` con `settingsKeys` y `useSettings`), y cada key sigue definida en un solo lugar.
 - Toda **escritura** va con `useMutation`, y al terminar invalida las keys afectadas.
 - La llamada a `transcribe-label` también es una `useMutation`, porque es una acción y no un dato que se cachea.
 
@@ -149,13 +150,13 @@ Hay cuatro tipos de error, y cada uno se muestra distinto:
 
 | Tipo | Ejemplo | Cómo se muestra |
 |---|---|---|
-| Error de validación del cálculo | `INVALID_QUANTITY`, `MISSING_COOKING_FACTOR` (spec §8.4) | Al lado del campo o del ítem, **cuando el usuario sale del campo (blur)**, no en cada tecla. Bloquea "Guardar". |
+| Error de validación del cálculo | `INVALID_QUANTITY`, `MISSING_COOKING_FACTOR` (spec §8.4) | Al lado del campo o del ítem. El error de un campo tipeado (el `INVALID_QUANTITY` de un ítem) aparece **cuando el usuario sale del campo (blur)**, no en cada tecla. Los que no dependen de un campo se muestran enseguida: los del alimento (`MISSING_COOKING_FACTOR`), en el ítem, y los de la comida (total o dosis que desbordan, spec §14 #45), en el cuadro del total, junto con el desglose en vivo. Bloquea "Guardar". |
 | Advertencia | `DOSE_ABOVE_THRESHOLD` (spec §8.5) | Pide una confirmación explícita antes de guardar. No bloquea. |
 | Error esperable del backend | `VISION_QUOTA_EXCEEDED`, `DAILY_CAP_REACHED` (spec §9.3) | El mensaje de la tabla del spec, junto con la acción que corresponda ("Cargar a mano", "Reintentar"). |
 | Error inesperado | Red caída, 500, excepción | Un mensaje genérico ("No se pudo guardar. Revisá la conexión y reintentá"), con la opción de reintentar y sin perder lo que se cargó. |
 
 Reglas:
-- Los errores de validación aparecen al salir del campo, para que no salten mientras el usuario está escribiendo (por ejemplo, un campo vacío a mitad de tipeo). El desglose en vivo se sigue calculando con cada tecla; lo que espera al blur es solo el mensaje de error. Al tocar "Guardar" se muestran todos los errores pendientes, aunque el usuario no haya pasado por esos campos.
+- Los errores de validación de un campo tipeado aparecen al salir del campo (los que no dependen de un campo, según la tabla), para que no salten mientras el usuario está escribiendo (por ejemplo, un campo vacío a mitad de tipeo). El desglose en vivo se sigue calculando con cada tecla; lo que espera al blur es solo el mensaje de error. Al tocar "Guardar" se muestran todos los errores pendientes, aunque el usuario no haya pasado por esos campos.
 - Al usuario **nunca** se le muestran códigos, stack traces ni mensajes crudos de Supabase o Gemini.
 - La traducción de código a mensaje en español se centraliza en `src/lib/errors.ts`, en un solo lugar.
 - Un 401 o una sesión vencida llevan al login.

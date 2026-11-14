@@ -1,14 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchSettings, signOut, updateSettings } from './api.ts'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { settingsKeys } from '../../lib/settings.ts'
+import { signOut, updateSettings } from './api.ts'
 
-export const settingsKeys = {
-  all: ['settings'] as const,
-  detail: ['settings', 'detail'] as const,
-}
-
-export function useSettings() {
-  return useQuery({ queryKey: settingsKeys.detail, queryFn: fetchSettings })
-}
+// settingsKeys and useSettings (the read) live in lib/settings.ts, shared
+// with the meal screen.
 
 // No optimistic update: the form shows "Guardado." only when the server
 // confirms (CLAUDE.md).

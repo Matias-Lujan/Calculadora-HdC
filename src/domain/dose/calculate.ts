@@ -16,7 +16,7 @@ import type {
  * Version of the calculation rules. It is stored with every meal record.
  * Bump it whenever the calculation behavior changes.
  */
-export const CALC_VERSION = '1'
+export const CALC_VERSION = '2'
 
 function positiveOrNull(value: number | null): number | null {
   return value !== null && Number.isFinite(value) && value > 0 ? value : null
@@ -93,6 +93,13 @@ function calculateItem(
     return { ok: false, errors }
   }
 
+  // Finite inputs can still overflow: units × unit weight, or grams × carbs.
+  // A success never carries a number that is not finite (spec §8.4).
+  const carbsG = (grams * effectiveCarbsPer100g) / 100
+  if (!Number.isFinite(grams) || !Number.isFinite(carbsG)) {
+    return { ok: false, errors: ['INVALID_QUANTITY'] }
+  }
+
   const warnings: ItemWarningCode[] = []
   if (grams > maxItemGramsWarning) {
     warnings.push('ITEM_GRAMS_ABOVE_THRESHOLD')
@@ -105,7 +112,7 @@ function calculateItem(
     ok: true,
     grams,
     effectiveCarbsPer100g,
-    carbsG: (grams * effectiveCarbsPer100g) / 100,
+    carbsG,
     warnings,
   }
 }
@@ -140,6 +147,13 @@ export function calculateMeal(
 
   const totalCarbsG = successes.reduce((sum, item) => sum + item.carbsG, 0)
   const doseUnits = totalCarbsG / ratio
+
+  // Finite items can still add up to Infinity, and a tiny ratio can make the
+  // dose overflow. Both need absurd values, so they are reported as one
+  // meal-level INVALID_QUANTITY, without blaming an item (spec §8.4).
+  if (!Number.isFinite(totalCarbsG) || !Number.isFinite(doseUnits)) {
+    return { ok: false, items: results, errors: ['INVALID_QUANTITY'] }
+  }
 
   const warnings: MealWarningCode[] = []
   if (

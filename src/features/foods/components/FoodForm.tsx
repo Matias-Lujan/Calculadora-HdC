@@ -19,8 +19,9 @@ import {
   type FoodFormErrors,
   type FoodFormTexts,
 } from '../foodForm.ts'
+import type { Food } from '../../../lib/foods.ts'
 import { useCreateFood, useUpdateFood } from '../queries.ts'
-import type { Food, FoodFormValues, FormSource } from '../types.ts'
+import type { FoodFormValues, FormSource } from '../types.ts'
 import { CookingFactorFields } from './CookingFactorFields.tsx'
 import { FieldError, RadioGroup, TextField } from './FormControls.tsx'
 

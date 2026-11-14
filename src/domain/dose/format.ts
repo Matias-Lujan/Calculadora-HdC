@@ -32,3 +32,15 @@ export function formatDose(units: number): string {
 export function formatCookingFactor(factor: number): string {
   return formatFixed(factor, 2)
 }
+
+/**
+ * Grams for display (the meal breakdown): up to 1 decimal, without a
+ * trailing ",0", decimal comma and no thousands separator (22.5 → "22,5",
+ * 250 → "250", 249.96 → "250", 1500 → "1500"). Never shows "-0".
+ */
+export function formatGrams(grams: number): string {
+  const rounded = roundHalfUp(grams, 1)
+  // toFixed(0) of -0 is "0", so a rounded -0 does not show a sign.
+  const decimals = Number.isInteger(rounded) ? 0 : 1
+  return rounded.toFixed(decimals).replace('.', ',')
+}

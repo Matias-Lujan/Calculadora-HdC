@@ -1,24 +1,10 @@
 import { z } from 'zod'
+import { FOOD_COLUMNS, foodSchema, type Food } from '../../lib/foods.ts'
 import { supabase } from '../../lib/supabase.ts'
-import {
-  FOOD_COLUMNS,
-  foodSchema,
-  type Food,
-  type FoodFormValues,
-  type NewFood,
-} from './types.ts'
+import type { FoodFormValues, NewFood } from './types.ts'
 
-// RLS returns only the user's own foods (spec §7.3).
-
-/** Active foods (not archived). Sorted in the client, by searchFoods. */
-export async function fetchFoods(): Promise<Food[]> {
-  const { data, error } = await supabase
-    .from('foods')
-    .select(FOOD_COLUMNS)
-    .is('archived_at', null)
-  if (error) throw error
-  return z.array(foodSchema).parse(data as unknown)
-}
+// RLS returns only the user's own foods (spec §7.3). The list of active
+// foods (fetchFoods) lives in lib/foods.ts, shared with the meal screen.
 
 /**
  * One food, archived or not. Returns null when it does not exist (or is

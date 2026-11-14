@@ -4,6 +4,7 @@ import {
 } from '@supabase/supabase-js'
 import type {
   CarbsPer100gError,
+  ItemErrorCode,
   PositiveNumberError,
   TypedNumberNotice,
 } from '../domain/dose/index.ts'
@@ -115,6 +116,41 @@ export function foodFieldErrorMessage(code: FoodFieldError): string {
 export function cookingFactorUnusualMessage(formattedFactor: string): string {
   return `El factor de cocción da ${formattedFactor}, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?`
 }
+
+/**
+ * Errors of a meal item that come from its food, not from the quantity
+ * (spec §8.4). They are shown in the item right away; INVALID_QUANTITY is
+ * the quantity field error, shown on blur with positiveNumberErrorMessage.
+ */
+export type MealItemFoodError = Exclude<ItemErrorCode, 'INVALID_QUANTITY'>
+
+const MEAL_ITEM_ERRORS: Record<MealItemFoodError, string> = {
+  INVALID_CARBS:
+    'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+  MISSING_COOKING_FACTOR:
+    'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
+  INVALID_COOKING_FACTOR:
+    'El factor de cocción de este alimento no es válido. Revisalo en el catálogo.',
+  MISSING_UNIT_WEIGHT:
+    'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
+  UNITS_NOT_ALLOWED_FOR_RAW_COOKED:
+    'Este alimento se carga en gramos cocidos, no en unidades.',
+  EFFECTIVE_CARBS_OVER_100:
+    'Con su factor de cocción, este alimento da más de 100 g de HC cada 100 g. Revisá el factor en el catálogo.',
+}
+
+export function mealItemErrorMessage(code: MealItemFoodError): string {
+  return MEAL_ITEM_ERRORS[code]
+}
+
+// The meal total when the ratio is not valid (INVALID_RATIO, spec §8.4).
+export const INVALID_RATIO_MESSAGE =
+  'El ratio de Configuración no es válido. Revisalo en Configuración.'
+
+// The meal total when every item is valid but the total carbs or the dose
+// overflow (meal-level INVALID_QUANTITY, spec §8.4).
+export const MEAL_OUT_OF_RANGE_MESSAGE =
+  'El total o la dosis dan un número demasiado grande. Revisá las cantidades y el ratio de Configuración.'
 
 // Unexpected errors (network down, 500): the form keeps what was entered
 // and the user retries.

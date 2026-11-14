@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
-import { needsCookingFactor, type Food } from '../types.ts'
-import { MissingFactorBadge } from './MissingFactorBadge.tsx'
+import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
+import { needsCookingFactor } from '../../../domain/dose/index.ts'
+import type { Food } from '../../../lib/foods.ts'
 
 type Props = {
   food: Food
@@ -16,7 +17,7 @@ export function FoodListItem({ food }: Props) {
       {food.brand !== null && (
         <span className="text-sm text-slate-500">{food.brand}</span>
       )}
-      {needsCookingFactor(food) && (
+      {needsCookingFactor(food.state, food.cooking_factor) && (
         <span>
           <MissingFactorBadge />
         </span>

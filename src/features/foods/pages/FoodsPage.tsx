@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
+import { useFoods } from '../../../lib/foods.ts'
+import { searchFoods } from '../../../lib/search.ts'
 import { FoodListItem } from '../components/FoodListItem.tsx'
-import { useFoods } from '../queries.ts'
-import { searchFoods } from '../search.ts'
 
 export function FoodsPage() {
   const foods = useFoods()

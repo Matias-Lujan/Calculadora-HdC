@@ -10,8 +10,9 @@ import {
   SAVE_ERROR_MESSAGE,
   positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
+import type { Settings } from '../../../lib/settings.ts'
 import { useUpdateSettings } from '../queries.ts'
-import type { Settings, SettingsValues } from '../types.ts'
+import type { SettingsValues } from '../types.ts'
 
 type FieldName = keyof SettingsValues
 

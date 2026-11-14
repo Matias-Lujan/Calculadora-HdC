@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ARCHIVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
+import type { Food } from '../../../lib/foods.ts'
 import { useArchiveFood } from '../queries.ts'
-import type { Food } from '../types.ts'
 
 type Props = {
   food: Food

@@ -13,6 +13,8 @@ import type {
 } from '../domain/dose/index.ts'
 import {
   ARCHIVE_ERROR_MESSAGE,
+  INVALID_RATIO_MESSAGE,
+  MEAL_OUT_OF_RANGE_MESSAGE,
   LOAD_ERROR_MESSAGE,
   SAVE_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
@@ -20,7 +22,9 @@ import {
   cookingFactorUnusualMessage,
   foodFieldErrorMessage,
   isUnauthorized,
+  mealItemErrorMessage,
   type FoodFieldError,
+  type MealItemFoodError,
   positiveNumberErrorMessage,
   typedNumberNoticeMessage,
 } from './errors.ts'
@@ -241,6 +245,8 @@ describe('messages', () => {
     SAVE_ERROR_MESSAGE,
     ARCHIVE_ERROR_MESSAGE,
     SIGN_OUT_ERROR_MESSAGE,
+    INVALID_RATIO_MESSAGE,
+    MEAL_OUT_OF_RANGE_MESSAGE,
   ]
 
   it.each(messages)('%j is not empty and is not a code', (message) => {
@@ -333,5 +339,43 @@ describe('cookingFactorUnusualMessage', () => {
     expect(message).toBe(
       'El factor de cocción da 0,90, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
+  })
+})
+
+describe('mealItemErrorMessage', () => {
+  const codes: MealItemFoodError[] = [
+    'INVALID_CARBS',
+    'MISSING_COOKING_FACTOR',
+    'INVALID_COOKING_FACTOR',
+    'MISSING_UNIT_WEIGHT',
+    'UNITS_NOT_ALLOWED_FOR_RAW_COOKED',
+    'EFFECTIVE_CARBS_OVER_100',
+  ]
+
+  it.each(codes)('%s has a message that is not a code', (code) => {
+    const message = mealItemErrorMessage(code)
+    expect(message.trim()).not.toBe('')
+    expect(message).not.toContain(code)
+    expect(message).not.toMatch(/[A-Z_]{4,}/)
+    expect(message.endsWith('.')).toBe(true)
+  })
+
+  it('all messages are different', () => {
+    const messages = codes.map(mealItemErrorMessage)
+    expect(new Set(messages).size).toBe(messages.length)
+  })
+
+  it('MISSING_COOKING_FACTOR asks to load the factor in the catalog', () => {
+    expect(mealItemErrorMessage('MISSING_COOKING_FACTOR')).toBe(
+      'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
+    )
+  })
+})
+
+describe('INVALID_RATIO_MESSAGE', () => {
+  it('is not a code and points to Configuración', () => {
+    expect(INVALID_RATIO_MESSAGE).not.toMatch(/[A-Z_]{4,}/)
+    expect(INVALID_RATIO_MESSAGE).toContain('Configuración')
+    expect(INVALID_RATIO_MESSAGE.endsWith('.')).toBe(true)
   })
 })

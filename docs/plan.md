@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). La próxima es la etapa 5. Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-13.
+**Estado: etapas 0 a 4 terminadas (PR #1 a #4, #7 y #8, mergeados). Etapa 5 en curso, rama `etapa-5-comidas` (funcionalidad 1 implementada). Orden de lo que falta: 5, 6b, 6 y 7 (la tabla va antes que la foto, spec §14 #42).** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Última actualización: 2026-11-14.
 
 ---
 
@@ -212,9 +212,11 @@ Incluye:
 - Historial: lista y detalle, mostrados desde los valores guardados en el registro. Borrado lógico.
 - **Guardado provisorio sin `create_meal`**: el cliente inserta primero el `meal` y después sus `meal_items`. No es atómico. Si falla el segundo insert, el cliente marca el `meal` como borrado (`deleted_at`, que sí se puede actualizar), para que no quede un registro sin ítems. Los CHECK de la base siguen actuando. En la etapa 7 se reemplaza por `create_meal`.
 
-Decisión pendiente para esta etapa (propuesta, spec §15): al registrar una comida con un alimento `raw_cooked`, permitir actualizar el factor del alimento si el usuario pesó esa tanda (crudo y olla terminada). El spec hoy dice que no hay tandas (§6.4, §14 #11); se decide acá si se suma como atajo opcional o se deja como está.
+Decidido: sin atajo de tandas. Al registrar una comida no se ofrece actualizar el factor del alimento; se edita solo desde el catálogo (spec §6.4, §14 #43).
 
-Nota del catálogo (etapa 4): el selector de alimentos de la comida usa `fetchFoods` o la misma query de la lista (`foodsKeys.list`), que excluye los archivados. Queda para esta etapa decidir qué pasa si un alimento se archiva mientras está en una comida sin guardar; la opción simple es que se pueda guardar igual (la FK no lo impide).
+Nota del catálogo (etapa 4): el selector de alimentos de la comida usa la misma query de la lista (`useFoods`, `foodsKeys.list`, ahora en `src/lib/foods.ts`), que excluye los archivados. Decidido: si un alimento se archiva mientras está en una comida sin guardar, la pantalla no saca el ítem (guarda una copia del alimento) y se guarda igual; la FK no lo impide (spec §14 #44).
+
+Funcionalidades (ciclo de agentes): 1) pantalla de nueva comida, sin guardar (Inicio `/`, buscador, ítems en gramos o unidades, desglose en vivo con `calculateMeal`, aviso del umbral sin configurar, `formatGrams` y `needsCookingFactor` en `src/domain/dose/`, lo compartido movido a `src/lib/` y `src/components/`, spec §6.6 y §14 #44) — implementada; al revisarla, un resultado no finito (desborde) pasó a dar `INVALID_QUANTITY` y `CALC_VERSION` subió a "2" (spec §14 #45); 2) guardado provisorio (dosis aplicada, fecha y hora, confirmación de advertencias, insert de `meal` y `meal_items`); 3) historial (lista, detalle y borrado lógico).
 
 **Terminada cuando**:
 - [ ] Una comida mixta (arroz + banana + alfajor) muestra el mismo desglose que la cuenta a mano.

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { calculateMeal } from './calculate.ts'
 import {
   cookingFactorFromWeights,
   isCookingFactorUnusual,
+  needsCookingFactor,
 } from './cookingFactor.ts'
+import type { DoseSettings } from './types.ts'
 
 describe('cookingFactorFromWeights', () => {
   it('divides cooked weight by raw weight', () => {
@@ -109,4 +112,112 @@ describe('measured factor and unusual warning together', () => {
     expect(factor).toBe(4)
     expect(factor !== null && isCookingFactorUnusual(factor)).toBe(false)
   })
+})
+
+describe('needsCookingFactor', () => {
+  it('raw_cooked without a factor → true', () => {
+    expect(needsCookingFactor('raw_cooked', null)).toBe(true)
+  })
+
+  it('raw_cooked with a factor → false', () => {
+    expect(needsCookingFactor('raw_cooked', 2.6)).toBe(false)
+  })
+
+  it('as_eaten without a factor → false', () => {
+    expect(needsCookingFactor('as_eaten', null)).toBe(false)
+  })
+
+  it('as_eaten with a factor (should not exist) → false', () => {
+    expect(needsCookingFactor('as_eaten', 2)).toBe(false)
+  })
+
+  it('a factor of 0 does not count as missing (it is INVALID_COOKING_FACTOR)', () => {
+    expect(needsCookingFactor('raw_cooked', 0)).toBe(false)
+  })
+
+  it('a negative or non-finite factor does not count as missing either', () => {
+    expect(needsCookingFactor('raw_cooked', -1)).toBe(false)
+    expect(needsCookingFactor('raw_cooked', NaN)).toBe(false)
+    expect(needsCookingFactor('raw_cooked', Infinity)).toBe(false)
+  })
+
+  const settings: DoseSettings = {
+    carbRatioGPerUnit: 15,
+    maxDoseWarningUnits: null,
+    maxItemGramsWarning: 500,
+  }
+
+  it.each(
+    (['as_eaten', 'raw_cooked'] as const).flatMap((state) =>
+      [null, 0, 2.6, -1].map((factor) => [state, factor] as const),
+    ),
+  )(
+    'is true exactly when calculateMeal reports MISSING_COOKING_FACTOR (%s, %s)',
+    (state, factor) => {
+      const result = calculateMeal(
+        [
+          {
+            foodState: state,
+            carbsPer100g: 50,
+            cookingFactor: factor,
+            unitWeightG: null,
+            quantityMode: 'grams',
+            quantity: 100,
+          },
+        ],
+        settings,
+      )
+      const item = result.items[0]
+      const missing =
+        item !== undefined &&
+        !item.ok &&
+        item.errors.includes('MISSING_COOKING_FACTOR')
+      expect(needsCookingFactor(state, factor)).toBe(missing)
+    },
+  )
+})
+
+describe('needsCookingFactor: bordes', () => {
+  it('-Infinity and -0 do not count as missing (only null does)', () => {
+    expect(needsCookingFactor('raw_cooked', -Infinity)).toBe(false)
+    expect(needsCookingFactor('raw_cooked', -0)).toBe(false)
+  })
+
+  it('as_eaten never needs a factor, whatever it carries', () => {
+    for (const factor of [null, 0, -1, NaN, Infinity, 2.6]) {
+      expect(needsCookingFactor('as_eaten', factor)).toBe(false)
+    }
+  })
+
+  const settings: DoseSettings = {
+    carbRatioGPerUnit: 15,
+    maxDoseWarningUnits: null,
+    maxItemGramsWarning: 500,
+  }
+
+  it.each([NaN, Infinity, -Infinity, 0.5, 4.5])(
+    'agrees with calculateMeal for the factor %s',
+    (factor) => {
+      for (const state of ['as_eaten', 'raw_cooked'] as const) {
+        const item = calculateMeal(
+          [
+            {
+              foodState: state,
+              carbsPer100g: 30,
+              cookingFactor: factor,
+              unitWeightG: null,
+              quantityMode: 'grams',
+              quantity: 100,
+            },
+          ],
+          settings,
+        ).items[0]
+        const missing =
+          item !== undefined &&
+          !item.ok &&
+          item.errors.includes('MISSING_COOKING_FACTOR')
+        expect(needsCookingFactor(state, factor)).toBe(missing)
+      }
+    },
+  )
 })

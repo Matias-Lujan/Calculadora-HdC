@@ -43,8 +43,12 @@ export type ItemErrorCode =
   | 'UNITS_NOT_ALLOWED_FOR_RAW_COOKED'
   | 'EFFECTIVE_CARBS_OVER_100'
 
-/** Errors that block the calculation of the whole meal (spec §8.4). */
-export type MealErrorCode = 'EMPTY_MEAL' | 'INVALID_RATIO'
+/**
+ * Errors that block the calculation of the whole meal (spec §8.4).
+ * INVALID_QUANTITY here means that every item is valid but the total carbs
+ * or the dose overflow (they are not finite).
+ */
+export type MealErrorCode = 'EMPTY_MEAL' | 'INVALID_RATIO' | 'INVALID_QUANTITY'
 
 /** Warnings that ask for confirmation but do not block (spec §8.5). */
 export type ItemWarningCode =
