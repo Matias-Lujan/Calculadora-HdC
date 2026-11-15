@@ -14,6 +14,7 @@ import {
 } from '../../../lib/foodText.ts'
 import { carbsLabel } from '../foodForm.ts'
 import { ArchiveFoodSection } from './ArchiveFoodSection.tsx'
+import { FoodPhoto } from './FoodPhoto.tsx'
 
 // The answer to "¿Se cocina antes de comer?", as in the form.
 const COOKED_ANSWERS: Record<Food['state'], string> = {
@@ -50,6 +51,8 @@ export function FoodDetail({ food }: Props) {
           </div>
         )}
       </header>
+
+      {food.photo_path !== null && <FoodPhoto path={food.photo_path} />}
 
       <dl className="flex flex-col gap-3">
         <div>

@@ -71,7 +71,7 @@ Si cambian los scripts de npm, se actualiza esta sección.
 npm install
 npm run dev           # servidor local de Vite
 npm run build         # chequeo de tipos + build de producción (tsc -b && vite build)
-npm run typecheck     # tsc -b (el tsconfig usa project references; tsc --noEmit no chequea nada)
+npm run typecheck     # tsc -b (el tsconfig usa project references; tsc --noEmit no chequea nada); también chequea supabase/functions
 npm run lint          # oxlint, con los warnings tratados como error
 npm run format        # Prettier (escribe)
 npm run format:check  # Prettier (solo verifica; lo usa la CI)

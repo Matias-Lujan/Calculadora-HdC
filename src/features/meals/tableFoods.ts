@@ -26,6 +26,7 @@ export function tableFoodAsMealFood(ref: ReferenceFood): MealFood {
     reference_code: ref.reference_code,
     reference_description: ref.description_original,
     notes: null,
+    photo_path: null,
     archived_at: null,
   }
 }

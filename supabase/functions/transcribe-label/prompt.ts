@@ -1,5 +1,5 @@
-// Instructions for the vision model (docs/spec.md §9.5). Starting point for
-// supabase/functions/transcribe-label/prompt.ts in stage 6.
+// Instructions for the vision model (docs/spec.md §9.5), validated with real
+// labels in stage 1b. scripts/gemini-probe/probe.ts imports them from here.
 
 export const INSTRUCTIONS = `
 You transcribe nutrition facts tables printed on food packages sold in

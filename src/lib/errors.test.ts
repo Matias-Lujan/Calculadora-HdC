@@ -25,6 +25,9 @@ import {
   cookingFactorUnusualMessage,
   foodFieldErrorMessage,
   isUnauthorized,
+  UnauthorizedError,
+  VisionError,
+  visionErrorMessage,
   mealItemErrorMessage,
   mealSaveWarningMessage,
   type FoodFieldError,
@@ -197,6 +200,16 @@ describe('isUnauthorized', () => {
 
   it('is false for AuthRetryableFetchError (the session is kept)', () => {
     expect(isUnauthorized(new AuthRetryableFetchError('x', 0))).toBe(false)
+  })
+
+  it('is true for UnauthorizedError (a 401 of transcribe-label)', () => {
+    expect(isUnauthorized(new UnauthorizedError())).toBe(true)
+  })
+
+  it('is false for a VisionError', () => {
+    expect(isUnauthorized(new VisionError('DAILY_CAP_REACHED', false))).toBe(
+      false,
+    )
   })
 
   it.each([null, undefined, 'PGRST301', 401, new Error('x')])(
@@ -488,5 +501,32 @@ describe('meal save messages', () => {
     expect(MEAL_BLOCKED_MESSAGE).toBe(
       'Corregí los datos marcados para poder guardar.',
     )
+  })
+})
+
+describe('visionErrorMessage', () => {
+  it('uses the texts of spec §9.3', () => {
+    expect(visionErrorMessage('VISION_QUOTA_EXCEEDED')).toBe(
+      'Se alcanzó el límite gratuito de lecturas de etiquetas. Podés cargar los datos a mano o probar de nuevo más tarde.',
+    )
+    expect(visionErrorMessage('DAILY_CAP_REACHED')).toBe(
+      'Llegaste al máximo de lecturas automáticas de hoy. Podés cargar los datos a mano.',
+    )
+    expect(visionErrorMessage('VISION_UNAVAILABLE')).toBe(
+      'El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar.',
+    )
+    expect(visionErrorMessage('VISION_BAD_RESPONSE')).toBe(
+      'No se pudo interpretar la lectura de la etiqueta. Podés cargar los datos a mano o reintentar.',
+    )
+    expect(visionErrorMessage('INVALID_REQUEST')).toBe(
+      'No se pudo leer la foto. Podés sacar otra o cargar los datos a mano.',
+    )
+  })
+
+  it('a VisionError keeps its code and retryable', () => {
+    const error = new VisionError('VISION_QUOTA_EXCEEDED', true)
+    expect(error).toBeInstanceOf(Error)
+    expect(error.code).toBe('VISION_QUOTA_EXCEEDED')
+    expect(error.retryable).toBe(true)
   })
 })

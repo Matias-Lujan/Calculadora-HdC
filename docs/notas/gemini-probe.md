@@ -39,7 +39,7 @@ Fechas: 2026-11-10 y 2026-11-11 · Plan: [etapa 1b](../plan.md#etapa-1b--prueba-
 | v3-extra, v3-borrosa-1…3 | v3, sobre fotos borrosas y sin tabla | Flash-Lite | 17 | al menos 1 |
 | v4, v4-extra, v4-borrosa-1…4 | + regla estricta para fotos borrosas | Flash-Lite | 30 | al menos 2 (una misma llamada falló dos veces seguidas) |
 
-Las instrucciones de cada corrida quedaron guardadas en `scripts/gemini-probe/output/<corrida>/prompt.txt` (fuera de git). La versión final (v4) es la de `scripts/gemini-probe/prompt.ts`.
+Las instrucciones de cada corrida quedaron guardadas en `scripts/gemini-probe/output/<corrida>/prompt.txt` (fuera de git). La versión final (v4) es la de `scripts/gemini-probe/prompt.ts`, que en la etapa 6 pasó a `supabase/functions/transcribe-label/prompt.ts`.
 
 Cada respuesta se pasó por el mismo código que va a usar la app (`parseLabelNumber` y `carbsPer100gFromPortion`, etapa 1), para ver el HC/100 g final y no solo el texto.
 

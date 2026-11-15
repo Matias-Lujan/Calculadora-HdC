@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7, #8 y #10 mergeados). Etapa 6b terminada en la rama `etapa-6b-tabla-referencia`, con su PR por mergear. La próxima es la etapa 6. Orden de lo que falta: 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-15.
+**Estado: etapas 0 a 5 y 6b terminadas (PR #1 a #4, #7, #8, #10 y #11 mergeados). Etapa 6 en curso en la rama `etapa-6-foto`: la Edge Function `transcribe-label` (funcionalidad 1) y el flujo en el cliente (funcionalidad 2) están implementados; falta desplegar la función y cargar sus secrets en `dev`, y probar en el iPhone. Orden de lo que falta: 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-15.
 
 ---
 
@@ -33,8 +33,8 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
-| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR por mergear |
-| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
+| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR #11 |
+| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | En curso (`etapa-6-foto`) |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
 ---
@@ -103,6 +103,8 @@ Incluye:
 - [x] Las etiquetas pasaron por los dos modelos. En lugar de tres fotos elegidas por caso se usaron cinco productos reales de la alacena, sacados como lo haría un usuario común; ninguno traía columna por 100 g ni "preparado" (ver limitaciones en las notas).
 - [x] Los resultados están anotados en [docs/notas/gemini-probe.md](notas/gemini-probe.md): aciertos, errores y datos inventados (ninguno), **sin incluir las fotos**.
 - [x] Hay una decisión: `gemini-3.5-flash-lite`, con tres reglas nuevas en las instrucciones (tabla en español; observaciones en español; regla estricta para fotos borrosas, porque sin ella el modelo inventó números) y el esquema sin cambios. Además, la Edge Function va a reintentar una vez ante fallas momentáneas (spec §9.3).
+
+En la etapa 6, las instrucciones (`prompt.ts`) y el esquema (`schema.ts`) pasaron de `scripts/gemini-probe/` a `supabase/functions/transcribe-label/`, y el script los importa de ahí (spec §14 #54).
 
 ## Etapa 2 — Supabase: esquema, RLS y storage
 
@@ -233,8 +235,8 @@ Probado en el iPhone (2026-11-14), en Safari con el *preview* de la rama: comida
 
 Incluye:
 - La pantalla de confirmación de la foto usa el formulario simple de la etapa 6b (spec §14 #41 y #48).
-- **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta cuánto rinde" (spec §14 #52). Se decide en la etapa si además sugiere la entrada cocida de la tabla.
-- Edge Function `transcribe-label`: `index.ts`, `prompt.ts`, `schema.ts` y `provider.ts` (§9.2). Las instrucciones y el esquema parten de los de la etapa 1b.
+- **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta cuánto rinde" (spec §14 #52). **Decidido** (usuario, spec §14 #55): no se sugiere la entrada cocida de la tabla; queda "Falta cuánto rinde" y la medición opcional.
+- Edge Function `transcribe-label`: `index.ts`, `prompt.ts`, `schema.ts` y `provider.ts` (§9.2), más `readLabel.ts` (reintento y validación) y `dailyCap.ts` (tope de 30 por día de Buenos Aires), spec §14 #54. Las instrucciones y el esquema son los de la etapa 1b, movidos a la función.
 - Secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev`.
 - Tope diario propio en `vision_requests`.
 - Tests del mapeo de errores de `provider.ts`, con un `fetch` simulado.
@@ -249,6 +251,10 @@ Incluye:
 - Mostrar las fotos con URLs firmadas.
 - Arreglo menor, anotado en la etapa 3: `parseLabelNumber('9'.repeat(400))` devuelve `Infinity` porque no chequea `Number.isFinite`. Hoy no hace daño, porque el cálculo rechaza los valores no finitos. Se arregla con una línea y un test.
 
+**Avance**:
+- **Funcionalidad 1, implementada** (Edge Function y arreglo de `parseLabelNumber`, spec §14 #54): código y tests en `supabase/functions/transcribe-label/`, chequeada por `npm run typecheck` y `npm test`. **Falta**: cargar los secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev` y desplegarla (`npx supabase functions deploy transcribe-label --use-api`), con el OK del usuario.
+- **Funcionalidad 2, implementada** (el flujo en el cliente, spec §6.1, §9.4 y §14 #55): `/foods/label` desde el Catálogo ("Agregar con una foto"), foto → JPEG achicado → subida → lectura → confirmación, carga a mano, borrado al cancelar y la foto en el detalle. Las cuentas en `src/domain/label/` (`labelCarbsPer100g`, `isMercosurCarbsLabel`, `singleUnitLabel`) y la pantalla en `src/features/foods/labelForm.ts`, con tests; chequeada por `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Sin migración. **Falta**: la prueba en el iPhone (necesita la función desplegada) y marcar los "Terminada cuando".
+
 **Terminada cuando**:
 - [ ] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
 - [ ] En la pantalla de confirmación, la porción y los HC se ven destacados y juntos, con la foto a la vista (spec §6.1).
@@ -257,7 +263,7 @@ Incluye:
 - [ ] El tope diario propio corta en el valor configurado.
 - [ ] Una foto que no es una etiqueta da el mensaje correspondiente.
 - [ ] La key de Gemini no aparece en el bundle del frontend ni en el repo.
-- [ ] Cargar un producto con paquete desde la foto lleva, en el caso normal, la foto y un toque para confirmar.
+- [ ] En el caso normal, cargar un producto con paquete lleva la foto, responder ¿Se cocina antes de comer? (y elegir la columna si hay varias) y Guardar, sin tipear números. (Reescrito por el usuario en la etapa 6: antes decía "la foto y un toque para confirmar", pero la pregunta de si se cocina es obligatoria y sin valor por defecto, spec §6.3.)
 
 ## Etapa 6b — Tabla de referencia y formulario simple
 
@@ -295,6 +301,7 @@ Incluye:
 - **`create_meal(payload jsonb)`** (spec §7.2): inserción atómica, `security invoker`, verificación de que los totales y la dosis coincidan con la suma de los ítems. El cliente pasa a usarla y se elimina el guardado provisorio de la etapa 5.
 - Pulido: estados vacíos, mensajes de error y revisión general de la UI en el iPhone.
 - Salir de Inicio pierde la comida en curso (también los links «Cargar cuánto rinde» e «Ir a Configuración», spec §14 #52): conservarla al salir, por ejemplo en `sessionStorage`.
+- Entrada al alta por foto desde Inicio («Agregar con una foto»), una vez que la comida en curso se conserve al salir (spec §6.1 y §14 #55).
 - **Cambio a prod**:
   - aplicar todas las migraciones en `prod`: `npx supabase link --project-ref zoxlvutjqolwfjcsbtog`, `npx supabase db push --remote`, y después volver a vincular `dev` (`npx supabase link --project-ref xyolhiklqqoejkapqbxt`), porque la CLI queda vinculada a un solo proyecto;
   - correr la prueba de aislamiento contra `prod`, con dos usuarios de prueba creados ahí y borrados al terminar;

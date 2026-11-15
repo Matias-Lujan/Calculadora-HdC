@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-// Transcription schema from docs/spec.md §9.6. Starting point for
-// supabase/functions/transcribe-label/schema.ts in stage 6.
+// Transcription schema from docs/spec.md §9.6. scripts/gemini-probe/probe.ts
+// imports it from here.
 
 const fieldStatus = z.enum(['legible', 'illegible', 'not_present'])
 

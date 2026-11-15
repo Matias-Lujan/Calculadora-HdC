@@ -9,6 +9,7 @@ import { FoodDetailPage } from './features/foods/pages/FoodDetailPage.tsx'
 import { EditFoodPage } from './features/foods/pages/EditFoodPage.tsx'
 import { FoodsPage } from './features/foods/pages/FoodsPage.tsx'
 import { NewFoodPage } from './features/foods/pages/NewFoodPage.tsx'
+import { NewLabelFoodPage } from './features/foods/pages/NewLabelFoodPage.tsx'
 import { HistoryPage } from './features/meals/pages/HistoryPage.tsx'
 import { MealDetailPage } from './features/meals/pages/MealDetailPage.tsx'
 import { NewMealPage } from './features/meals/pages/NewMealPage.tsx'
@@ -39,6 +40,11 @@ export const router = createBrowserRouter([
       {
         path: 'foods/new',
         Component: NewFoodPage,
+        ErrorBoundary: RouteErrorBoundary,
+      },
+      {
+        path: 'foods/label',
+        Component: NewLabelFoodPage,
         ErrorBoundary: RouteErrorBoundary,
       },
       {

@@ -1,4 +1,5 @@
 import type { Food } from '../../lib/foods.ts'
+import type { Transcription } from './transcription.ts'
 
 /**
  * What the food form saves (spec §6.5): the columns the user can edit.
@@ -19,8 +20,18 @@ export type FoodFormValues = Pick<
 >
 
 /**
- * A food to insert from the form: always manual (spec §6.3). user_id comes
- * from the column default (auth.uid()); reference_db, reference_code and
- * reference_description stay null by default.
+ * A food to insert: manual from the form (spec §6.3), or from the photo of
+ * a label (§6.1), with the photo and the original transcription (null when
+ * it was loaded by hand). user_id comes from the column default
+ * (auth.uid()); reference_db, reference_code and reference_description stay
+ * null by default.
  */
-export type NewFood = FoodFormValues & { source: 'manual' }
+export type NewFood = FoodFormValues &
+  (
+    | { source: 'manual' }
+    | {
+        source: 'label'
+        photo_path: string
+        label_transcription: Transcription | null
+      }
+  )

@@ -24,6 +24,13 @@ import {
   savedItemLines,
   totalCarbsText,
 } from './features/meals/breakdown.ts'
+import {
+  carbsLine,
+  columnOptionText,
+  fieldNote,
+  initialLabelFormTexts,
+  nameNote,
+} from './features/foods/labelForm.ts'
 import { appliedDoseText, mealSummaryText } from './features/meals/history.ts'
 import { SETTINGS_FIELDS } from './features/settings/fields.ts'
 import * as errors from './lib/errors.ts'
@@ -101,6 +108,10 @@ describe('plain words on the screen', () => {
       'STATE_REQUIRED',
       'UNIT_WEIGHT_REQUIRED',
       'FACTOR_NOT_COMPUTABLE',
+      'CARBS_EXCEED_PORTION',
+      'FIBER_EXCEEDS_CARBS',
+      'COLUMN_REQUIRED',
+      'BASIS_REQUIRED',
     ]
     const items: Exclude<ItemErrorCode, 'INVALID_QUANTITY'>[] = [
       'INVALID_CARBS',
@@ -116,6 +127,7 @@ describe('plain words on the screen', () => {
       ...foodFields.map(errors.foodFieldErrorMessage),
       ...items.map(errors.mealItemErrorMessage),
       ...notices.map(errors.typedNumberNoticeMessage),
+      ...errors.VISION_ERROR_CODES.map(errors.visionErrorMessage),
       errors.cookingFactorUnusualMessage('90'),
       errors.cookingFactorUnusualMessage('450'),
     ])
@@ -171,6 +183,48 @@ describe('plain words on the screen', () => {
       unitLine({ unitWeight: '45', unitLabel: '' }),
       unusualYieldText(4.5),
       unusualYieldText(0.9),
+    ])
+  })
+
+  it('the texts of the label confirmation', () => {
+    const legible = (text: string) => ({ status: 'legible' as const, text })
+    const illegible = { status: 'illegible' as const, text: null }
+    const absent = { status: 'not_present' as const, text: null }
+    const column = {
+      basis: 'per_portion' as const,
+      header_text: 'Porción',
+      state: 'prepared' as const,
+      state_text: 'preparado',
+      portion_size_g: legible('50 g'),
+      portion_description: legible('1 alfajor'),
+      carbohydrates_g: legible('38'),
+    }
+    const transcription = {
+      is_nutrition_label: true,
+      product_name: illegible,
+      brand: absent,
+      carbohydrate_row_label: legible('Total Carbohydrate'),
+      columns: [column],
+      observations: null,
+    }
+    const texts = {
+      ...initialLabelFormTexts(transcription),
+      fiber: '3',
+    }
+    expectPlain([
+      fieldNote(legible('50 g')),
+      fieldNote(legible('<0,5')),
+      fieldNote(illegible),
+      fieldNote(absent),
+      nameNote(transcription),
+      columnOptionText(column, 0),
+      columnOptionText({ ...column, header_text: null, state_text: null }, 1),
+      carbsLine(texts, transcription),
+      carbsLine({ ...texts, state: 'raw_cooked' }, transcription),
+      carbsLine(
+        { ...texts, basis: 'per_100g', labelCarbs: '78' },
+        transcription,
+      ),
     ])
   })
 
@@ -269,6 +323,10 @@ describe('plain words: every code, exhaustively', () => {
     STATE_REQUIRED: true,
     UNIT_WEIGHT_REQUIRED: true,
     FACTOR_NOT_COMPUTABLE: true,
+    CARBS_EXCEED_PORTION: true,
+    FIBER_EXCEEDS_CARBS: true,
+    COLUMN_REQUIRED: true,
+    BASIS_REQUIRED: true,
   }
   const itemCodes: Record<errors.MealItemFoodError, true> = {
     INVALID_CARBS: true,
@@ -281,6 +339,13 @@ describe('plain words: every code, exhaustively', () => {
   const noticeCodes: Record<TypedNumberNotice, true> = {
     DECIMAL_DOT: true,
     REJECTED: true,
+  }
+  const visionCodes: Record<errors.VisionErrorCode, true> = {
+    VISION_QUOTA_EXCEEDED: true,
+    DAILY_CAP_REACHED: true,
+    VISION_UNAVAILABLE: true,
+    VISION_BAD_RESPONSE: true,
+    INVALID_REQUEST: true,
   }
   const warningCodes: Record<errors.MealSaveWarning['code'], true> = {
     ITEM_GRAMS_ABOVE_THRESHOLD: true,
@@ -296,6 +361,12 @@ describe('plain words: every code, exhaustively', () => {
   it('meal item errors', () => {
     const codes = Object.keys(itemCodes) as errors.MealItemFoodError[]
     expectPlain(codes.map(errors.mealItemErrorMessage))
+  })
+
+  it('label reading errors', () => {
+    const codes = Object.keys(visionCodes) as errors.VisionErrorCode[]
+    expect([...errors.VISION_ERROR_CODES].sort()).toEqual([...codes].sort())
+    expectPlain(codes.map(errors.visionErrorMessage))
   })
 
   it('typed number notices', () => {

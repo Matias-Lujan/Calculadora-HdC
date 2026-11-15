@@ -48,6 +48,7 @@ const manual: Food = {
   reference_code: null,
   reference_description: null,
   notes: null,
+  photo_path: null,
   archived_at: null,
 }
 
@@ -77,6 +78,7 @@ describe('tableFoodAsMealFood', () => {
       reference_code: '900007',
       reference_description: 'Invented 900007',
       notes: null,
+      photo_path: null,
       archived_at: null,
     })
   })

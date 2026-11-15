@@ -2,19 +2,19 @@ import { NumberInput } from '../../../components/NumberInput.tsx'
 import { cookedPer100gText } from '../../../lib/foodText.ts'
 import {
   yieldLine,
-  type FoodFormErrors,
-  type FoodFormTexts,
+  type CommonFoodErrors,
+  type CommonFoodTexts,
 } from '../foodForm.ts'
 import { FieldError } from './FormControls.tsx'
 
 type WeightField = 'rawWeight' | 'cookedWeight'
 
 type Props = {
-  texts: Pick<FoodFormTexts, 'rawWeight' | 'cookedWeight'>
-  errors: FoodFormErrors
+  texts: Pick<CommonFoodTexts, WeightField>
+  errors: Pick<CommonFoodErrors, WeightField | 'measuredFactor'>
   /** The factor of the food being edited; null for a new food. */
   savedCookingFactor: number | null
-  onChange: (patch: Partial<FoodFormTexts>) => void
+  onChange: (patch: Partial<Pick<CommonFoodTexts, WeightField>>) => void
   onBlur: (field: WeightField) => void
 }
 

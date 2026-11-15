@@ -10,7 +10,10 @@ import {
   carbsPer100gFromPortion,
   parseLabelNumber,
 } from '../../src/domain/label/index.ts'
-import { transcriptionSchema, type Transcription } from './schema.ts'
+import {
+  transcriptionSchema,
+  type Transcription,
+} from '../../supabase/functions/transcribe-label/schema.ts'
 
 const [runName = 'v1'] = process.argv.slice(2)
 const outputDir = path.join(import.meta.dirname, 'output', runName)
