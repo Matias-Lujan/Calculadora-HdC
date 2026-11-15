@@ -33,12 +33,15 @@ import {
   toNewMealRecord,
 } from '../mealDraft.ts'
 import { useCreateMeal } from '../queries.ts'
-import type { MealItemDraft } from '../types.ts'
+import { tableFoodAsMealFood } from '../tableFoods.ts'
+import type { MealFood, MealItemDraft, ReferenceFood } from '../types.ts'
 import { FoodPicker } from './FoodPicker.tsx'
 import { MealItemCard } from './MealItemCard.tsx'
 
 type Props = {
   foods: Food[]
+  /** The reference table (spec §5.2), picked directly (spec §6.2). */
+  referenceFoods: ReferenceFood[]
   settings: Settings
 }
 
@@ -55,7 +58,11 @@ function errorOf<E>(result: { value: number } | { error: E }): E | null {
  * calculation is derived in the render from the form state, with
  * calculateMeal (CLAUDE.md: no react-query for the dose).
  */
-export function MealForm({ foods, settings }: Props) {
+export function MealForm({ foods, referenceFoods, settings }: Props) {
+  const tableFoods = useMemo(
+    () => referenceFoods.map(tableFoodAsMealFood),
+    [referenceFoods],
+  )
   const [items, setItems] = useState<MealItemDraft[]>([])
   // The quantity error each item shows: the one found on its last blur or
   // on the last "Guardar". It does not change while the user types
@@ -99,7 +106,7 @@ export function MealForm({ foods, settings }: Props) {
     setSavedMealId(null)
   }
 
-  function handlePick(food: Food) {
+  function handlePick(food: MealFood) {
     touch()
     const key = nextKey.current
     nextKey.current += 1
@@ -303,7 +310,7 @@ export function MealForm({ foods, settings }: Props) {
         )}
       </div>
 
-      <FoodPicker foods={foods} onPick={handlePick} />
+      <FoodPicker foods={foods} tableFoods={tableFoods} onPick={handlePick} />
 
       {items.length > 0 && (
         <div className="flex flex-col gap-4">

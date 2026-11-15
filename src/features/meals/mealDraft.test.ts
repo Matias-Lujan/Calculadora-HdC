@@ -20,6 +20,7 @@ import {
   toMealItemInput,
   toNewMealRecord,
 } from './mealDraft.ts'
+import { tableFoodAsMealFood } from './tableFoods.ts'
 import type { MealItemDraft, NewMealItem, NewMealRecord } from './types.ts'
 
 // Invented data, not real foods (the values of spec §8.3).
@@ -1102,7 +1103,7 @@ describe('toNewMealRecord', () => {
       EATEN_AT,
     )
     expect(itemAt(record, 0)).toEqual({
-      food_id: rice.id,
+      food: { id: rice.id },
       position: 0,
       food_name: 'Arroz de prueba',
       food_brand: null,
@@ -1128,7 +1129,7 @@ describe('toNewMealRecord', () => {
       EATEN_AT,
     )
     expect(itemAt(record, 1)).toEqual({
-      food_id: base.id,
+      food: { id: base.id },
       position: 1,
       food_name: 'Banana de prueba',
       food_brand: null,
@@ -1154,7 +1155,7 @@ describe('toNewMealRecord', () => {
       EATEN_AT,
     )
     expect(itemAt(record, 2)).toEqual({
-      food_id: alfajor.id,
+      food: { id: alfajor.id },
       position: 2,
       food_name: 'Alfajor de prueba',
       food_brand: 'Marca Inventada',
@@ -1220,13 +1221,16 @@ describe('toNewMealRecord', () => {
     expect(itemAt(record, 0).effective_carbs_per_100g).toBe(20.2)
   })
 
-  it('the same food twice: same food_id, positions 0 and 1', () => {
+  it('the same food twice: same food, positions 0 and 1', () => {
     const items = [
       draft(base, '120', 'grams', 0),
       draft(base, '80', 'grams', 1),
     ]
     const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
-    expect(record.items.map((item) => item.food_id)).toEqual([base.id, base.id])
+    expect(record.items.map((item) => item.food)).toEqual([
+      { id: base.id },
+      { id: base.id },
+    ])
     expect(record.items.map((item) => item.position)).toEqual([0, 1])
     expect(record.items.map((item) => item.grams)).toEqual([120, 80])
   })
@@ -1235,7 +1239,7 @@ describe('toNewMealRecord', () => {
     const archived = { ...base, archived_at: '2026-11-14T12:00:00+00:00' }
     const items = [draft(archived, '120')]
     const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
-    expect(itemAt(record, 0).food_id).toBe(base.id)
+    expect(itemAt(record, 0).food).toEqual({ id: base.id })
   })
 
   it('copies the source of the food', () => {
@@ -1416,8 +1420,8 @@ describe('toNewMealRecord, edge cases', () => {
       Array.from({ length: 100 }, (_, index) => index),
     )
     // Each item keeps its food, in the order of the form.
-    expect(record.items.map((item) => item.food_id)).toEqual(
-      items.map((item) => item.food.id),
+    expect(record.items.map((item) => item.food)).toEqual(
+      items.map((item) => ({ id: item.food.id })),
     )
     expect(record.items.map((item) => item.carbs_g)).toEqual(
       result.items.map((item) => item.carbsG),
@@ -1569,8 +1573,8 @@ describe('toNewMealRecord, edge cases', () => {
         'carbs_per_100g',
         'cooking_factor',
         'effective_carbs_per_100g',
+        'food',
         'food_brand',
-        'food_id',
         'food_name',
         'food_source',
         'food_state',
@@ -1725,5 +1729,97 @@ describe('the CHECK mirror itself', () => {
       'meals.applied_dose',
     ])
     expect(withMeal({ calc_version: '' })).toEqual(['meals.calc_version'])
+  })
+})
+
+describe('a food of the reference table (spec §6.2, §14 #51)', () => {
+  // Invented code and values.
+  const tableBanana = tableFoodAsMealFood({
+    reference_db: 'usda_fdc',
+    reference_code: '900001',
+    description_original: 'Invented banana',
+    name_es: 'Banana',
+    state: 'as_eaten',
+    carbs_per_100g: 20.229999999999997,
+  })
+
+  function tableDraft(quantityText: string, key = 0): MealItemDraft {
+    return { ...newItemDraft(key, tableBanana), quantityText }
+  }
+
+  it('newItemDraft: in grams, with the quantity empty', () => {
+    expect(newItemDraft(4, tableBanana)).toEqual({
+      key: 4,
+      food: tableBanana,
+      quantityMode: 'grams',
+      quantityText: '',
+    })
+  })
+
+  it('toNewMealRecord: the item carries the copy, not an id', () => {
+    const items = [tableDraft('120')]
+    const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
+    expect(itemAt(record, 0)).toEqual({
+      food: {
+        copy: {
+          name: 'Banana',
+          brand: null,
+          source: 'reference',
+          state: 'as_eaten',
+          carbs_per_100g: 20.229999999999997,
+          reference_db: 'usda_fdc',
+          reference_code: '900001',
+          reference_description: 'Invented banana',
+        },
+      },
+      position: 0,
+      food_name: 'Banana',
+      food_brand: null,
+      food_source: 'reference',
+      food_state: 'as_eaten',
+      quantity_mode: 'grams',
+      units: null,
+      unit_weight_g: null,
+      grams: 120,
+      carbs_per_100g: 20.229999999999997,
+      cooking_factor: null,
+      effective_carbs_per_100g: 20.229999999999997,
+      carbs_g: (120 * 20.229999999999997) / 100,
+    })
+    expect(failedChecks(record)).toEqual([])
+  })
+
+  it('the same entry twice: two items with the same copy', () => {
+    const items = [tableDraft('120', 0), tableDraft('80', 1)]
+    const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
+    const [first, second] = record.items
+    expect(first?.food).toEqual(second?.food)
+    expect(record.items.map((item) => item.grams)).toEqual([120, 80])
+  })
+
+  it('a mixed meal: the catalog foods keep their id', () => {
+    const items = [
+      draft(rice, '250'),
+      tableDraft('120', 1),
+      draft(base, '50', 'grams', 2),
+    ]
+    const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
+    expect(record.items.map((item) => item.food)).toEqual([
+      { id: rice.id },
+      { copy: expect.objectContaining({ reference_code: '900001' }) },
+      { id: base.id },
+    ])
+    expect(failedChecks(record)).toEqual([])
+  })
+
+  it('a copy already in the catalog (with id) is saved with its id', () => {
+    const copy: Food = {
+      ...tableBanana,
+      id: 'c0000000-0000-4000-8000-000000000001',
+    }
+    const items = [draft(copy, '120')]
+    const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
+    expect(itemAt(record, 0).food).toEqual({ id: copy.id })
+    expect(itemAt(record, 0).food_source).toBe('reference')
   })
 })

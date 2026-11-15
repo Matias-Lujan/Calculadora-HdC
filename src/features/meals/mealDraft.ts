@@ -19,7 +19,13 @@ import {
 import type { MealItemFoodError, MealSaveWarning } from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
-import type { MealItemDraft, NewMealItem, NewMealRecord } from './types.ts'
+import { tableFoodCopy } from './tableFoods.ts'
+import type {
+  MealFood,
+  MealItemDraft,
+  NewMealItem,
+  NewMealRecord,
+} from './types.ts'
 
 // Pure logic of the meal form (spec §6.6). It does no math of its own: the
 // numbers go through src/domain/dose.
@@ -39,7 +45,7 @@ export function canUseUnits(
  * The item added when a food is picked: in units if the food allows it,
  * otherwise in grams, with the quantity empty.
  */
-export function newItemDraft(key: number, food: Food): MealItemDraft {
+export function newItemDraft(key: number, food: MealFood): MealItemDraft {
   return {
     key,
     food,
@@ -211,7 +217,9 @@ function toNewMealItem(
     throw new Error('A calculated item in units has no quantity')
   }
   return {
-    food_id: food.id,
+    // A food of the reference table not copied yet is resolved by
+    // createMeal (spec §6.2).
+    food: food.id !== null ? { id: food.id } : { copy: tableFoodCopy(food) },
     position,
     food_name: food.name,
     food_brand: food.brand,

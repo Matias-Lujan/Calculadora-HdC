@@ -2,19 +2,35 @@ import {
   InfiniteQueryObserver,
   QueryClient,
   useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
 } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextMealsOffset } from './history.ts'
-import { mealListOptions, mealsKeys, useMealList } from './queries.ts'
+import { foodsKeys } from '../../lib/foods.ts'
+import { createMeal, fetchReferenceFoods } from './api.ts'
+import {
+  mealListOptions,
+  mealsKeys,
+  referenceFoodsKey,
+  referenceFoodsOptions,
+  useCreateMeal,
+  useMealList,
+  useReferenceFoods,
+} from './queries.ts'
 import type { MealsPage } from './types.ts'
 
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {} }))
 
-// Only useInfiniteQuery is replaced (to see what useMealList passes it);
+// Only the hooks are replaced (to see what each hook passes them);
 // QueryClient and InfiniteQueryObserver stay the real ones.
 vi.mock('@tanstack/react-query', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@tanstack/react-query')>()),
   useInfiniteQuery: vi.fn(),
+  useQuery: vi.fn(),
+  useMutation: vi.fn(),
+  useQueryClient: vi.fn(),
 }))
 
 const MINUTE = 60 * 1000
@@ -71,5 +87,48 @@ describe('useMealList', () => {
     useMealList()
     expect(useInfiniteQuery).toHaveBeenCalledTimes(1)
     expect(vi.mocked(useInfiniteQuery).mock.calls[0]?.[0]).toBe(mealListOptions)
+  })
+})
+
+describe('useReferenceFoods', () => {
+  it('reads the table once, with its own key, never stale', () => {
+    expect(referenceFoodsOptions.queryKey).toEqual(['reference-foods'])
+    expect(referenceFoodsOptions.queryKey).toBe(referenceFoodsKey)
+    expect(referenceFoodsOptions.queryFn).toBe(fetchReferenceFoods)
+    expect(referenceFoodsOptions.staleTime).toBe(Infinity)
+
+    vi.mocked(useQuery).mockClear()
+    useReferenceFoods()
+    expect(useQuery).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(useQuery).mock.calls[0]?.[0]).toBe(referenceFoodsOptions)
+  })
+
+  it('its key is outside the meals prefix, so saving a meal does not read it again', () => {
+    expect(referenceFoodsKey[0]).not.toBe(mealsKeys.all[0])
+  })
+})
+
+describe('useCreateMeal', () => {
+  it('after saving, reads again the meals and the catalog list', async () => {
+    const client = new QueryClient()
+    const invalidate = vi
+      .spyOn(client, 'invalidateQueries')
+      .mockResolvedValue(undefined)
+    vi.mocked(useQueryClient).mockReturnValue(client)
+    vi.mocked(useMutation).mockClear()
+
+    useCreateMeal()
+    const options = vi.mocked(useMutation).mock.calls[0]?.[0]
+    expect(options?.mutationFn).toBe(createMeal)
+    await options?.onSuccess?.(
+      'id' as never,
+      undefined as never,
+      undefined as never,
+      undefined as never,
+    )
+    expect(invalidate.mock.calls.map((call) => call[0])).toEqual([
+      { queryKey: mealsKeys.all },
+      { queryKey: foodsKeys.list },
+    ])
   })
 })

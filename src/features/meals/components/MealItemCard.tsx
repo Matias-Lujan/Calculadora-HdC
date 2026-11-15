@@ -1,3 +1,4 @@
+import { InfoTip } from '../../../components/InfoTip.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
   formatUserNumber,
@@ -12,6 +13,7 @@ import {
 } from '../../../lib/errors.ts'
 import { foodCarbsLine, itemCalculationLines } from '../breakdown.ts'
 import { canUseUnits, foodErrors } from '../mealDraft.ts'
+import { TABLE_VALUE_INFO, isFromTable } from '../tableFoods.ts'
 import type { MealItemDraft } from '../types.ts'
 
 type Props = {
@@ -124,7 +126,14 @@ export function MealItemCard({
       ))}
 
       <div className="flex flex-col gap-0.5 text-sm text-slate-700">
-        <p>{foodCarbsLine(food)}</p>
+        {isFromTable(food) ? (
+          <div className="flex flex-wrap items-center">
+            <p>{foodCarbsLine(food)}</p>
+            <InfoTip text={TABLE_VALUE_INFO} />
+          </div>
+        ) : (
+          <p>{foodCarbsLine(food)}</p>
+        )}
         {lines.map((line, index) => (
           <p key={index}>{line}</p>
         ))}
