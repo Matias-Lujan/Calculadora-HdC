@@ -1,3 +1,5 @@
+import { shiftDecimal } from './format.ts'
+import { normalizeForDisplay } from './normalizeForDisplay.ts'
 import type { FoodState } from './types.ts'
 
 const USUAL_COOKING_FACTOR_MIN = 1
@@ -22,6 +24,24 @@ export function cookingFactorFromWeights(
   }
   const factor = cookedWeightG / rawWeightG
   return isPositiveFinite(factor) ? factor : null
+}
+
+/**
+ * Cooked grams that 100 g raw yield: factor × 100 (spec §6.4), shown as
+ * "100 g crudo rinden 260 g cocido". The factor is first normalized to 15
+ * significant digits, so a quotient like 100.35 / 100 = 1.0034999999999998
+ * gives 100.35 and is shown as "100,4", not "100,3". Then the decimal point
+ * is moved in the decimal representation instead of multiplying in binary:
+ * 1.1 × 100 is 110.00000000000001, and 1.0045 × 100 is 100.44999999999999,
+ * which would be shown as "100,4" instead of "100,5". Only for display: what
+ * is saved is the factor, as is. Returns `null` when the factor is not finite
+ * or not > 0, or when the result overflows (a factor close to
+ * Number.MAX_VALUE).
+ */
+export function cookedGramsPer100gRaw(factor: number): number | null {
+  if (!isPositiveFinite(factor)) return null
+  const grams = shiftDecimal(normalizeForDisplay(factor), 2)
+  return isPositiveFinite(grams) ? grams : null
 }
 
 /**

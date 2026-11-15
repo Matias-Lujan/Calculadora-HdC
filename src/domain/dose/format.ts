@@ -8,8 +8,12 @@ function roundHalfUp(value: number, decimals: number): number {
   return shiftDecimal(Math.round(shiftDecimal(value, decimals)), -decimals)
 }
 
-/** Multiplies by 10^places by moving the decimal exponent of the string form. */
-function shiftDecimal(value: number, places: number): number {
+/**
+ * Multiplies by 10^places by moving the decimal exponent of the string form,
+ * so 1.1 shifted by 2 is exactly 110 (1.1 * 100 is 110.00000000000001).
+ * Shared with cookingFactor.ts; not exported from index.ts.
+ */
+export function shiftDecimal(value: number, places: number): number {
   const [mantissa, exponent = '0'] = String(value).split('e')
   return Number(`${mantissa}e${Number(exponent) + places}`)
 }
@@ -26,11 +30,6 @@ export function formatCarbs(grams: number): string {
 /** Dose for display: 2 decimals, decimal comma (8.5493 → "8,55"). */
 export function formatDose(units: number): string {
   return formatFixed(units, 2)
-}
-
-/** Cooking factor for display: 2 decimals, decimal comma (8/3 → "2,67"). */
-export function formatCookingFactor(factor: number): string {
-  return formatFixed(factor, 2)
 }
 
 /**

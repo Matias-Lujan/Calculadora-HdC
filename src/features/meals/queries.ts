@@ -1,12 +1,20 @@
 import {
   infiniteQueryOptions,
+  queryOptions,
   useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query'
-import { createMeal, deleteMeal, fetchMeal, fetchMealsPage } from './api.ts'
+import { foodsKeys } from '../../lib/foods.ts'
+import {
+  createMeal,
+  deleteMeal,
+  fetchMeal,
+  fetchMealsPage,
+  fetchReferenceFoods,
+} from './api.ts'
 import { nextMealsOffset, withoutMeal } from './history.ts'
 import type { MealsPage } from './types.ts'
 
@@ -16,13 +24,37 @@ export const mealsKeys = {
   detail: (id: string) => ['meals', 'detail', id] as const,
 }
 
+// Outside mealsKeys.all on purpose: saving a meal invalidates that prefix,
+// and the table does not change with a meal.
+export const referenceFoodsKey = ['reference-foods'] as const
+
+/**
+ * The reference table, read once: it only changes with a migration, so it
+ * is never stale while the app is open.
+ */
+export const referenceFoodsOptions = queryOptions({
+  queryKey: referenceFoodsKey,
+  queryFn: fetchReferenceFoods,
+  staleTime: Infinity,
+})
+
+export function useReferenceFoods() {
+  return useQuery(referenceFoodsOptions)
+}
+
 // No optimistic updates (CLAUDE.md): "Comida guardada." is shown only when
-// the server confirms. A 401 is handled by the global MutationCache.
+// the server confirms. A 401 is handled by the global MutationCache. Saving
+// can copy reference table foods to the catalog (spec §6.2), so the catalog
+// list is read again too.
 export function useCreateMeal() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createMeal,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: mealsKeys.all }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: mealsKeys.all }),
+        queryClient.invalidateQueries({ queryKey: foodsKeys.list }),
+      ]),
   })
 }
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   calculateMeal,
+  cookedGramsPer100gRaw,
   formatCarbs,
-  formatCookingFactor,
   formatDose,
   formatGrams,
   formatUserNumber,
@@ -14,10 +14,14 @@ import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
 import {
   doseLine,
+  doseText,
   foodCarbsLine,
+  foodLines,
+  foodYieldLine,
   itemCalculationLines,
+  itemCarbsText,
   savedItemLines,
-  totalCarbsLine,
+  totalCarbsText,
 } from './breakdown.ts'
 import { toMealItemInput, toNewMealRecord } from './mealDraft.ts'
 import {
@@ -76,28 +80,32 @@ function lines(input: MealItemInput): string[] {
 
 describe('the breakdown of spec §8.3, line by line', () => {
   it('rice (raw, eaten cooked)', () => {
-    expect(
-      foodCarbsLine({
-        state: 'raw_cooked',
-        carbs_per_100g: 78,
-        cooking_factor: 2.6,
-      }),
-    ).toBe('HC 78,0 g/100 g crudo, factor 2,60')
+    const food = {
+      state: 'raw_cooked',
+      carbs_per_100g: 78,
+      cooking_factor: 2.6,
+    } as const
+    expect(foodLines(food)).toEqual([
+      '78,0 g de HC cada 100 g en crudo',
+      '100 g crudo rinden 260 g cocido',
+    ])
     expect(lines(rice)).toEqual([
-      '78,0 ÷ 2,60 = 30,0 g/100 g cocido',
+      'Cocido: 78,0 × 100 ÷ 260 = 30,0 g de HC cada 100 g',
       '250 g cocido × 30,0 ÷ 100 = 75,0 g HC',
     ])
+    expect(itemCarbsText(success(rice).carbsG)).toBe('75,0 g de HC')
   })
 
   it('banana (as eaten, grams)', () => {
     expect(
-      foodCarbsLine({
+      foodLines({
         state: 'as_eaten',
         carbs_per_100g: 20.2,
         cooking_factor: null,
       }),
-    ).toBe('HC 20,2 g/100 g')
+    ).toEqual(['20,2 g de HC cada 100 g'])
     expect(lines(banana)).toEqual(['120 g × 20,2 ÷ 100 = 24,2 g HC'])
+    expect(itemCarbsText(success(banana).carbsG)).toBe('24,2 g de HC')
   })
 
   it('alfajor (1 unit of 50 g)', () => {
@@ -111,7 +119,8 @@ describe('the breakdown of spec §8.3, line by line', () => {
     const result = calculateMeal([rice, banana, alfajor], settings)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(totalCarbsLine(result.totalCarbsG)).toBe('HC total = 128,2 g')
+    expect(totalCarbsText(result.totalCarbsG)).toBe('HC total 128,2 g')
+    expect(doseText(result.doseUnits)).toBe('Dosis 8,55 U')
     expect(doseLine(result.totalCarbsG, 15, result.doseUnits)).toBe(
       'Dosis = 128,2 ÷ 15 = 8,55 U',
     )
@@ -176,45 +185,116 @@ describe('itemCalculationLines, grams', () => {
 
   it('a cooked item with decimals in the grams', () => {
     expect(lines({ ...rice, quantity: 0.1 })).toEqual([
-      '78,0 ÷ 2,60 = 30,0 g/100 g cocido',
+      'Cocido: 78,0 × 100 ÷ 260 = 30,0 g de HC cada 100 g',
       '0,1 g cocido × 30,0 ÷ 100 = 0,0 g HC',
     ])
   })
 })
 
 describe('foodCarbsLine', () => {
-  it('raw_cooked without a factor leaves the factor out', () => {
+  it.each([2.6, null, 0])(
+    'raw_cooked says "en crudo", with or without a factor (%s)',
+    (factor) => {
+      const food = {
+        state: 'raw_cooked',
+        carbs_per_100g: 78,
+        cooking_factor: factor,
+      } as const
+      expect(foodCarbsLine(food)).toBe('78,0 g de HC cada 100 g en crudo')
+    },
+  )
+
+  it('as_eaten ignores a factor it carries', () => {
+    const food = {
+      state: 'as_eaten',
+      carbs_per_100g: 50,
+      cooking_factor: 2,
+    } as const
+    expect(foodCarbsLine(food)).toBe('50,0 g de HC cada 100 g')
+    expect(foodLines(food)).toEqual(['50,0 g de HC cada 100 g'])
+  })
+
+  it('rounds for display only', () => {
+    expect(foodCarbsLine({ state: 'raw_cooked', carbs_per_100g: 72.25 })).toBe(
+      '72,3 g de HC cada 100 g en crudo',
+    )
+  })
+})
+
+describe('foodYieldLine', () => {
+  it.each([
+    [2.6, '100 g crudo rinden 260 g cocido'],
+    [8 / 3, '100 g crudo rinden 266,7 g cocido'],
+    [0.9, '100 g crudo rinden 90 g cocido'],
+    [1, '100 g crudo rinden 100 g cocido'],
+    [4.5, '100 g crudo rinden 450 g cocido'],
+  ])('raw_cooked with %s → %j', (factor, text) => {
+    expect(foodYieldLine({ state: 'raw_cooked', cooking_factor: factor })).toBe(
+      text,
+    )
+  })
+
+  it.each([null, 0, -1, NaN, Infinity, 1e307])(
+    'raw_cooked with %s → null',
+    (factor) => {
+      expect(
+        foodYieldLine({ state: 'raw_cooked', cooking_factor: factor }),
+      ).toBeNull()
+    },
+  )
+
+  it('as_eaten with a factor → null', () => {
+    expect(foodYieldLine({ state: 'as_eaten', cooking_factor: 2.6 })).toBeNull()
+  })
+
+  it('foodLines leaves out a yield that is missing or cannot be shown', () => {
     expect(
-      foodCarbsLine({
+      foodLines({
         state: 'raw_cooked',
         carbs_per_100g: 78,
         cooking_factor: null,
       }),
-    ).toBe('HC 78,0 g/100 g crudo')
-  })
-
-  it('as_eaten never shows a factor', () => {
+    ).toEqual(['78,0 g de HC cada 100 g en crudo'])
     expect(
-      foodCarbsLine({
-        state: 'as_eaten',
-        carbs_per_100g: 50,
-        cooking_factor: 2,
-      }),
-    ).toBe('HC 50,0 g/100 g')
-  })
-
-  it('rounds for display only', () => {
-    expect(
-      foodCarbsLine({
+      foodLines({
         state: 'raw_cooked',
-        carbs_per_100g: 72.25,
-        cooking_factor: 8 / 3,
+        carbs_per_100g: 50,
+        cooking_factor: 1e307,
       }),
-    ).toBe('HC 72,3 g/100 g crudo, factor 2,67')
+    ).toEqual(['50,0 g de HC cada 100 g en crudo'])
   })
 })
 
-describe('totalCarbsLine and doseLine', () => {
+describe('the texts in sight', () => {
+  it.each([
+    [75, '75,0 g de HC'],
+    [0, '0,0 g de HC'],
+    [24.24, '24,2 g de HC'],
+    [0.05, '0,1 g de HC'],
+    [1500.25, '1500,3 g de HC'],
+  ])('itemCarbsText(%s) → %j', (carbs, text) => {
+    expect(itemCarbsText(carbs)).toBe(text)
+  })
+
+  it.each([
+    [128.24, 'HC total 128,2 g'],
+    [0, 'HC total 0,0 g'],
+    [15.05, 'HC total 15,1 g'],
+  ])('totalCarbsText(%s) → %j', (total, text) => {
+    expect(totalCarbsText(total)).toBe(text)
+  })
+
+  it.each([
+    [8.546666666666667, 'Dosis 8,55 U'],
+    [0, 'Dosis 0,00 U'],
+    [1.005, 'Dosis 1,01 U'],
+    [2.675, 'Dosis 2,68 U'],
+  ])('doseText(%s) → %j', (dose, text) => {
+    expect(doseText(dose)).toBe(text)
+  })
+})
+
+describe('doseLine', () => {
   it('a ratio with decimals is shown exact', () => {
     expect(doseLine(25, 12.5, 2)).toBe('Dosis = 25,0 ÷ 12,5 = 2,00 U')
   })
@@ -224,7 +304,6 @@ describe('totalCarbsLine and doseLine', () => {
   })
 
   it('a total of 0', () => {
-    expect(totalCarbsLine(0)).toBe('HC total = 0,0 g')
     expect(doseLine(0, 15, 0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
   })
 })
@@ -264,7 +343,7 @@ describe('the lines show the numbers of calculateMeal', () => {
     if (input.foodState === 'raw_cooked') {
       expect(out).toHaveLength(2)
       expect(out[0]).toBe(
-        `${formatCarbs(input.carbsPer100g ?? NaN)} ÷ ${formatCookingFactor(input.cookingFactor ?? NaN)} = ${effective} g/100 g cocido`,
+        `Cocido: ${formatCarbs(input.carbsPer100g ?? NaN)} × 100 ÷ ${formatGrams(cookedGramsPer100gRaw(input.cookingFactor ?? NaN) ?? NaN)} = ${effective} g de HC cada 100 g`,
       )
     } else if (input.quantityMode === 'units') {
       expect(out).toHaveLength(2)
@@ -279,8 +358,11 @@ describe('the lines show the numbers of calculateMeal', () => {
     const result = calculateMeal(items, { ...settings, carbRatioGPerUnit: 7.5 })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(totalCarbsLine(result.totalCarbsG)).toBe(
-      `HC total = ${formatCarbs(result.totalCarbsG)} g`,
+    expect(totalCarbsText(result.totalCarbsG)).toBe(
+      `HC total ${formatCarbs(result.totalCarbsG)} g`,
+    )
+    expect(doseText(result.doseUnits)).toBe(
+      `Dosis ${formatDose(result.doseUnits)} U`,
     )
     expect(doseLine(result.totalCarbsG, 7.5, result.doseUnits)).toBe(
       `Dosis = ${formatCarbs(result.totalCarbsG)} ÷ 7,5 = ${formatDose(result.doseUnits)} U`,
@@ -289,11 +371,27 @@ describe('the lines show the numbers of calculateMeal', () => {
 })
 
 describe('itemCalculationLines: bordes', () => {
-  it('a factor below 1 that is still valid (50 ÷ 0,80)', () => {
+  it('a factor below 1 that is still valid (100 g rinden 80 g)', () => {
     expect(lines({ ...rice, carbsPer100g: 50, cookingFactor: 0.8 })).toEqual([
-      '50,0 ÷ 0,80 = 62,5 g/100 g cocido',
+      'Cocido: 50,0 × 100 ÷ 80 = 62,5 g de HC cada 100 g',
       '250 g cocido × 62,5 ÷ 100 = 156,3 g HC',
     ])
+  })
+
+  it('a factor whose yield cannot be shown leaves the calculation out', () => {
+    // 50 ÷ 1e307 is a valid effective (5e-306) that is shown as 0,0.
+    const input = { ...rice, carbsPer100g: 50, cookingFactor: 1e307 }
+    expect(success(input).effectiveCarbsPer100g).toBe(50 / 1e307)
+    expect(lines(input)).toEqual([
+      'Cocido: 0,0 g de HC cada 100 g',
+      '250 g cocido × 0,0 ÷ 100 = 0,0 g HC',
+    ])
+  })
+
+  it('a cooked yield with decimals (8/3 → 266,7)', () => {
+    expect(lines({ ...rice, cookingFactor: 8 / 3 })[0]).toBe(
+      'Cocido: 78,0 × 100 ÷ 266,7 = 29,3 g de HC cada 100 g',
+    )
   })
 
   it('a food with 100 g/100 g of carbs', () => {
@@ -335,27 +433,23 @@ describe('itemCalculationLines: bordes', () => {
 
 describe('foodCarbsLine: bordes', () => {
   it.each([
-    [0, 'HC 0,0 g/100 g'],
-    [100, 'HC 100,0 g/100 g'],
-    [0.05, 'HC 0,1 g/100 g'],
+    [0, '0,0 g de HC cada 100 g'],
+    [100, '100,0 g de HC cada 100 g'],
+    [0.05, '0,1 g de HC cada 100 g'],
+    [20.2, '20,2 g de HC cada 100 g'],
   ])('as_eaten %s → %s', (carbs, text) => {
-    expect(
-      foodCarbsLine({
-        state: 'as_eaten',
-        carbs_per_100g: carbs,
-        cooking_factor: null,
-      }),
-    ).toBe(text)
+    expect(foodCarbsLine({ state: 'as_eaten', carbs_per_100g: carbs })).toBe(
+      text,
+    )
   })
 
-  it('raw_cooked with a factor of 0 still shows it (the item shows the error)', () => {
-    expect(
-      foodCarbsLine({
-        state: 'raw_cooked',
-        carbs_per_100g: 78,
-        cooking_factor: 0,
-      }),
-    ).toBe('HC 78,0 g/100 g crudo, factor 0,00')
+  it('raw_cooked with a factor of 0 has no yield line (the item shows the error)', () => {
+    const food = {
+      state: 'raw_cooked',
+      carbs_per_100g: 78,
+      cooking_factor: 0,
+    } as const
+    expect(foodLines(food)).toEqual(['78,0 g de HC cada 100 g en crudo'])
   })
 })
 
@@ -368,6 +462,37 @@ describe('doseLine: bordes', () => {
 
   it('2,675 U rounds half up to 2,68', () => {
     expect(doseLine(40.125, 15, 2.675)).toBe('Dosis = 40,1 ÷ 15 = 2,68 U')
+  })
+
+  it('never shows "-0"', () => {
+    expect(doseLine(-0, 15, -0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+  })
+
+  it('a ratio below 1 and one with three decimals are shown exact', () => {
+    expect(doseLine(10, 0.5, 20)).toBe('Dosis = 10,0 ÷ 0,5 = 20,00 U')
+    expect(doseLine(10, 7.125, 10 / 7.125)).toBe(
+      'Dosis = 10,0 ÷ 7,125 = 1,40 U',
+    )
+  })
+
+  it('a dose that does not end (50 ÷ 3) is rounded only when shown', () => {
+    expect(doseLine(50, 3, 50 / 3)).toBe('Dosis = 50,0 ÷ 3 = 16,67 U')
+  })
+
+  it('tiny values round to zero, without "-" or exponent', () => {
+    expect(doseLine(0.04, 15, 0.04 / 15)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+  })
+
+  it('large values, without thousands separator', () => {
+    expect(doseLine(12345.67, 1, 12345.67)).toBe(
+      'Dosis = 12345,7 ÷ 1 = 12345,67 U',
+    )
+  })
+
+  it('is only the dose: there is no sum of the items (spec §14 #52 (5))', () => {
+    const line = doseLine(128.2, 15, 128.2 / 15)
+    expect(line).not.toContain('+')
+    expect(line).not.toMatch(/HC total/)
   })
 })
 
@@ -422,22 +547,23 @@ const savedAlfajor: SavedMealItem = {
 describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
   it('rice (raw, eaten cooked)', () => {
     expect(savedItemLines(savedRice)).toEqual([
-      'HC 78,0 g/100 g crudo, factor 2,60',
-      '78,0 ÷ 2,60 = 30,0 g/100 g cocido',
+      '78,0 g de HC cada 100 g en crudo',
+      '100 g crudo rinden 260 g cocido',
+      'Cocido: 78,0 × 100 ÷ 260 = 30,0 g de HC cada 100 g',
       '250 g cocido × 30,0 ÷ 100 = 75,0 g HC',
     ])
   })
 
   it('banana (as eaten, grams)', () => {
     expect(savedItemLines(savedBanana)).toEqual([
-      'HC 20,2 g/100 g',
+      '20,2 g de HC cada 100 g',
       '120 g × 20,2 ÷ 100 = 24,2 g HC',
     ])
   })
 
   it('alfajor (1 unit of 50 g)', () => {
     expect(savedItemLines(savedAlfajor)).toEqual([
-      'HC 58,0 g/100 g',
+      '58,0 g de HC cada 100 g',
       '1 unidad × 50 g = 50 g',
       '50 g × 58,0 ÷ 100 = 29,0 g HC',
     ])
@@ -453,7 +579,7 @@ describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
         carbs_g: 13.05,
       }),
     ).toEqual([
-      'HC 58,0 g/100 g',
+      '58,0 g de HC cada 100 g',
       '0,5 unidades × 45 g = 22,5 g',
       '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
     ])
@@ -469,8 +595,8 @@ describe('savedItemLines: does not calculate again', () => {
     // An inconsistent record (the CHECKs would not allow it): the detail
     // shows what was saved, without recalculating.
     expect(
-      savedItemLines({ ...savedRice, effective_carbs_per_100g: 31 })[1],
-    ).toBe('78,0 ÷ 2,60 = 31,0 g/100 g cocido')
+      savedItemLines({ ...savedRice, effective_carbs_per_100g: 31 })[2],
+    ).toBe('Cocido: 78,0 × 100 ÷ 260 = 31,0 g de HC cada 100 g')
   })
 
   it('shows the saved grams and carbs', () => {
@@ -484,7 +610,7 @@ describe('savedItemLines: does not calculate again', () => {
     expect(
       savedItemLines({ ...savedAlfajor, grams: 52, carbs_g: 30.16 }),
     ).toEqual([
-      'HC 58,0 g/100 g',
+      '58,0 g de HC cada 100 g',
       '1 unidad × 50 g = 52 g',
       '52 g × 58,0 ÷ 100 = 30,2 g HC',
     ])
@@ -495,16 +621,34 @@ describe('savedItemLines: does not calculate again', () => {
     expect(
       savedItemLines({ ...savedRice, carbs_per_100g: 80, cooking_factor: 2.5 }),
     ).toEqual([
-      'HC 80,0 g/100 g crudo, factor 2,50',
-      '80,0 ÷ 2,50 = 30,0 g/100 g cocido',
+      '80,0 g de HC cada 100 g en crudo',
+      '100 g crudo rinden 250 g cocido',
+      'Cocido: 80,0 × 100 ÷ 250 = 30,0 g de HC cada 100 g',
       '250 g cocido × 30,0 ÷ 100 = 75,0 g HC',
     ])
   })
 
-  it('an as_eaten item does not show a factor', () => {
+  it('a saved factor whose yield cannot be shown', () => {
+    expect(
+      savedItemLines({
+        ...savedRice,
+        carbs_per_100g: 50,
+        cooking_factor: 1e307,
+        effective_carbs_per_100g: 50 / 1e307,
+        carbs_g: (250 * (50 / 1e307)) / 100,
+      }),
+    ).toEqual([
+      '50,0 g de HC cada 100 g en crudo',
+      'Cocido: 0,0 g de HC cada 100 g',
+      '250 g cocido × 0,0 ÷ 100 = 0,0 g HC',
+    ])
+  })
+
+  it('an as_eaten item does not say how much it yields', () => {
     const lines = savedItemLines(savedBanana)
-    expect(lines.some((line) => line.includes('factor'))).toBe(false)
+    expect(lines.some((line) => line.includes('rinden'))).toBe(false)
     expect(lines.some((line) => line.includes('cocido'))).toBe(false)
+    expect(lines.some((line) => line.includes('crudo'))).toBe(false)
   })
 
   it('does not modify the item', () => {
@@ -588,7 +732,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
         JSON.parse(JSON.stringify(item)) as unknown,
       )
       expect(savedItemLines(saved)).toEqual([
-        foodCarbsLine(draft.food),
+        ...foodLines(draft.food),
         ...itemCalculationLines(toMealItemInput(draft), calc),
       ])
     })
@@ -657,13 +801,21 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
           throw new Error('missing')
         }
         expect(savedItemLines(item)).toEqual([
-          foodCarbsLine(draft.food),
+          ...foodLines(draft.food),
           ...itemCalculationLines(toMealItemInput(draft), calc),
         ])
       })
-      expect(totalCarbsLine(saved.total_carbs_g)).toBe(
-        totalCarbsLine(result.totalCarbsG),
+      expect(totalCarbsText(saved.total_carbs_g)).toBe(
+        totalCarbsText(result.totalCarbsG),
       )
+      expect(doseText(saved.calculated_dose_units)).toBe(
+        doseText(result.doseUnits),
+      )
+      saved.meal_items.forEach((item, index) => {
+        expect(itemCarbsText(item.carbs_g)).toBe(
+          itemCarbsText(result.items[index]?.carbsG ?? NaN),
+        )
+      })
       expect(
         doseLine(
           saved.total_carbs_g,
@@ -679,4 +831,30 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
       )
     },
   )
+})
+
+describe('the texts in sight: -0', () => {
+  it('never show "-0"', () => {
+    expect(itemCarbsText(-0)).toBe('0,0 g de HC')
+    expect(totalCarbsText(-0)).toBe('HC total 0,0 g')
+    expect(doseText(-0)).toBe('Dosis 0,00 U')
+  })
+})
+
+describe('foodYieldLine: bounds of the usual range', () => {
+  it.each([
+    [4.0004, '100 g crudo rinden 400 g cocido'],
+    [3.999, '100 g crudo rinden 399,9 g cocido'],
+    [0.999, '100 g crudo rinden 99,9 g cocido'],
+  ])('%s → %j', (factor, text) => {
+    expect(foodYieldLine({ state: 'raw_cooked', cooking_factor: factor })).toBe(
+      text,
+    )
+  })
+
+  it('as_eaten without a factor → null', () => {
+    expect(
+      foodYieldLine({ state: 'as_eaten', cooking_factor: null }),
+    ).toBeNull()
+  })
 })

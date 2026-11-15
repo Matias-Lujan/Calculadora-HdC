@@ -1,0 +1,927 @@
+[
+  {
+    "fdc_id": 173944,
+    "usda_description": "Bananas, raw",
+    "name_es": "Banana"
+  },
+  {
+    "fdc_id": 171688,
+    "usda_description": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+    "name_es": "Manzana con cáscara"
+  },
+  {
+    "fdc_id": 171689,
+    "usda_description": "Apples, raw, without skin",
+    "name_es": "Manzana sin cáscara"
+  },
+  {
+    "fdc_id": 169118,
+    "usda_description": "Pears, raw",
+    "name_es": "Pera"
+  },
+  {
+    "fdc_id": 169097,
+    "usda_description": "Oranges, raw, all commercial varieties",
+    "name_es": "Naranja"
+  },
+  {
+    "fdc_id": 169105,
+    "usda_description": "Tangerines, (mandarin oranges), raw",
+    "name_es": "Mandarina"
+  },
+  {
+    "fdc_id": 173033,
+    "usda_description": "Grapefruit, raw, pink and red and white, all areas",
+    "name_es": "Pomelo"
+  },
+  {
+    "fdc_id": 167746,
+    "usda_description": "Lemons, raw, without peel",
+    "name_es": "Limón"
+  },
+  {
+    "fdc_id": 168155,
+    "usda_description": "Limes, raw",
+    "name_es": "Lima"
+  },
+  {
+    "fdc_id": 167762,
+    "usda_description": "Strawberries, raw",
+    "name_es": "Frutillas"
+  },
+  {
+    "fdc_id": 174683,
+    "usda_description": "Grapes, red or green (European type, such as Thompson seedless), raw",
+    "name_es": "Uvas"
+  },
+  {
+    "fdc_id": 169928,
+    "usda_description": "Peaches, yellow, raw",
+    "name_es": "Durazno"
+  },
+  {
+    "fdc_id": 169914,
+    "usda_description": "Nectarines, raw",
+    "name_es": "Pelón (nectarina)"
+  },
+  {
+    "fdc_id": 171697,
+    "usda_description": "Apricots, raw",
+    "name_es": "Damasco"
+  },
+  {
+    "fdc_id": 169949,
+    "usda_description": "Plums, raw",
+    "name_es": "Ciruela"
+  },
+  {
+    "fdc_id": 171719,
+    "usda_description": "Cherries, sweet, raw",
+    "name_es": "Cerezas"
+  },
+  {
+    "fdc_id": 168153,
+    "usda_description": "Kiwifruit, green, raw",
+    "name_es": "Kiwi"
+  },
+  {
+    "fdc_id": 169124,
+    "usda_description": "Pineapple, raw, all varieties",
+    "name_es": "Ananá"
+  },
+  {
+    "fdc_id": 169910,
+    "usda_description": "Mangos, raw",
+    "name_es": "Mango"
+  },
+  {
+    "fdc_id": 169926,
+    "usda_description": "Papayas, raw",
+    "name_es": "Mamón (papaya)"
+  },
+  {
+    "fdc_id": 171705,
+    "usda_description": "Avocados, raw, all commercial varieties",
+    "name_es": "Palta"
+  },
+  {
+    "fdc_id": 167765,
+    "usda_description": "Watermelon, raw",
+    "name_es": "Sandía"
+  },
+  {
+    "fdc_id": 169911,
+    "usda_description": "Melons, honeydew, raw",
+    "name_es": "Melón rocío de miel"
+  },
+  {
+    "fdc_id": 169092,
+    "usda_description": "Melons, cantaloupe, raw",
+    "name_es": "Melón cantalupo"
+  },
+  {
+    "fdc_id": 171711,
+    "usda_description": "Blueberries, raw",
+    "name_es": "Arándanos"
+  },
+  {
+    "fdc_id": 167755,
+    "usda_description": "Raspberries, raw",
+    "name_es": "Frambuesas"
+  },
+  {
+    "fdc_id": 173946,
+    "usda_description": "Blackberries, raw",
+    "name_es": "Moras"
+  },
+  {
+    "fdc_id": 173021,
+    "usda_description": "Figs, raw",
+    "name_es": "Higo"
+  },
+  {
+    "fdc_id": 169134,
+    "usda_description": "Pomegranates, raw",
+    "name_es": "Granada"
+  },
+  {
+    "fdc_id": 168163,
+    "usda_description": "Quinces, raw",
+    "name_es": "Membrillo"
+  },
+  {
+    "fdc_id": 169941,
+    "usda_description": "Persimmons, japanese, raw",
+    "name_es": "Caqui"
+  },
+  {
+    "fdc_id": 169108,
+    "usda_description": "Passion-fruit, (granadilla), purple, raw",
+    "name_es": "Maracuyá (pulpa)"
+  },
+  {
+    "fdc_id": 169096,
+    "usda_description": "Olives, pickled, canned or bottled, green",
+    "name_es": "Aceitunas verdes"
+  },
+  {
+    "fdc_id": 169094,
+    "usda_description": "Olives, ripe, canned (small-extra large)",
+    "name_es": "Aceitunas negras"
+  },
+  {
+    "fdc_id": 168165,
+    "usda_description": "Raisins, dark, seedless (Includes foods for USDA's Food Distribution Program)",
+    "name_es": "Pasas de uva"
+  },
+  {
+    "fdc_id": 173941,
+    "usda_description": "Apricots, dried, sulfured, uncooked",
+    "name_es": "Orejones de damasco"
+  },
+  {
+    "fdc_id": 168162,
+    "usda_description": "Plums, dried (prunes), uncooked",
+    "name_es": "Ciruelas pasas"
+  },
+  {
+    "fdc_id": 171726,
+    "usda_description": "Dates, deglet noor",
+    "name_es": "Dátiles"
+  },
+  {
+    "fdc_id": 174665,
+    "usda_description": "Figs, dried, uncooked",
+    "name_es": "Higos secos"
+  },
+  {
+    "fdc_id": 170393,
+    "usda_description": "Carrots, raw",
+    "name_es": "Zanahoria cruda"
+  },
+  {
+    "fdc_id": 170394,
+    "usda_description": "Carrots, cooked, boiled, drained, without salt",
+    "name_es": "Zanahoria hervida"
+  },
+  {
+    "fdc_id": 169145,
+    "usda_description": "Beets, raw",
+    "name_es": "Remolacha cruda"
+  },
+  {
+    "fdc_id": 169146,
+    "usda_description": "Beets, cooked, boiled, drained",
+    "name_es": "Remolacha hervida"
+  },
+  {
+    "fdc_id": 168449,
+    "usda_description": "Pumpkin, cooked, boiled, drained, without salt",
+    "name_es": "Zapallo hervido"
+  },
+  {
+    "fdc_id": 170490,
+    "usda_description": "Squash, winter, all varieties, cooked, baked, without salt",
+    "name_es": "Zapallo al horno"
+  },
+  {
+    "fdc_id": 169296,
+    "usda_description": "Squash, winter, butternut, cooked, baked, without salt",
+    "name_es": "Zapallo anco al horno"
+  },
+  {
+    "fdc_id": 170488,
+    "usda_description": "Squash, summer, all varieties, cooked, boiled, drained, without salt",
+    "name_es": "Zapallito hervido"
+  },
+  {
+    "fdc_id": 169292,
+    "usda_description": "Squash, summer, zucchini, includes skin, cooked, boiled, drained, without salt",
+    "name_es": "Zucchini (zapallito largo) hervido"
+  },
+  {
+    "fdc_id": 169999,
+    "usda_description": "Corn, sweet, yellow, cooked, boiled, drained, without salt",
+    "name_es": "Choclo hervido"
+  },
+  {
+    "fdc_id": 170420,
+    "usda_description": "Peas, green, cooked, boiled, drained, without salt",
+    "name_es": "Arvejas hervidas"
+  },
+  {
+    "fdc_id": 169141,
+    "usda_description": "Beans, snap, green, cooked, boiled, drained, without salt",
+    "name_es": "Chauchas hervidas"
+  },
+  {
+    "fdc_id": 170379,
+    "usda_description": "Broccoli, raw",
+    "name_es": "Brócoli crudo"
+  },
+  {
+    "fdc_id": 169967,
+    "usda_description": "Broccoli, cooked, boiled, drained, without salt",
+    "name_es": "Brócoli hervido"
+  },
+  {
+    "fdc_id": 170397,
+    "usda_description": "Cauliflower, cooked, boiled, drained, without salt",
+    "name_es": "Coliflor hervida"
+  },
+  {
+    "fdc_id": 170401,
+    "usda_description": "Chard, swiss, cooked, boiled, drained, without salt",
+    "name_es": "Acelga hervida"
+  },
+  {
+    "fdc_id": 168462,
+    "usda_description": "Spinach, raw",
+    "name_es": "Espinaca cruda"
+  },
+  {
+    "fdc_id": 168463,
+    "usda_description": "Spinach, cooked, boiled, drained, without salt",
+    "name_es": "Espinaca hervida"
+  },
+  {
+    "fdc_id": 169229,
+    "usda_description": "Eggplant, cooked, boiled, drained, without salt",
+    "name_es": "Berenjena hervida"
+  },
+  {
+    "fdc_id": 170108,
+    "usda_description": "Peppers, sweet, red, raw",
+    "name_es": "Morrón rojo"
+  },
+  {
+    "fdc_id": 170427,
+    "usda_description": "Peppers, sweet, green, raw",
+    "name_es": "Morrón verde"
+  },
+  {
+    "fdc_id": 169383,
+    "usda_description": "Peppers, sweet, yellow, raw",
+    "name_es": "Morrón amarillo"
+  },
+  {
+    "fdc_id": 170457,
+    "usda_description": "Tomatoes, red, ripe, raw, year round average",
+    "name_es": "Tomate"
+  },
+  {
+    "fdc_id": 169249,
+    "usda_description": "Lettuce, green leaf, raw",
+    "name_es": "Lechuga"
+  },
+  {
+    "fdc_id": 168429,
+    "usda_description": "Lettuce, butterhead (includes boston and bibb types), raw",
+    "name_es": "Lechuga mantecosa"
+  },
+  {
+    "fdc_id": 169247,
+    "usda_description": "Lettuce, cos or romaine, raw",
+    "name_es": "Lechuga romana"
+  },
+  {
+    "fdc_id": 170000,
+    "usda_description": "Onions, raw",
+    "name_es": "Cebolla cruda"
+  },
+  {
+    "fdc_id": 170001,
+    "usda_description": "Onions, cooked, boiled, drained, without salt",
+    "name_es": "Cebolla hervida"
+  },
+  {
+    "fdc_id": 170005,
+    "usda_description": "Onions, spring or scallions (includes tops and bulb), raw",
+    "name_es": "Cebolla de verdeo"
+  },
+  {
+    "fdc_id": 168426,
+    "usda_description": "Leeks, (bulb and lower leaf-portion), cooked, boiled, drained, without salt",
+    "name_es": "Puerro hervido"
+  },
+  {
+    "fdc_id": 169251,
+    "usda_description": "Mushrooms, white, raw",
+    "name_es": "Champiñones crudos"
+  },
+  {
+    "fdc_id": 169252,
+    "usda_description": "Mushrooms, white, cooked, boiled, drained, without salt",
+    "name_es": "Champiñones hervidos"
+  },
+  {
+    "fdc_id": 168409,
+    "usda_description": "Cucumber, with peel, raw",
+    "name_es": "Pepino con cáscara"
+  },
+  {
+    "fdc_id": 169225,
+    "usda_description": "Cucumber, peeled, raw",
+    "name_es": "Pepino sin cáscara"
+  },
+  {
+    "fdc_id": 169975,
+    "usda_description": "Cabbage, raw",
+    "name_es": "Repollo crudo"
+  },
+  {
+    "fdc_id": 169976,
+    "usda_description": "Cabbage, cooked, boiled, drained, without salt",
+    "name_es": "Repollo hervido"
+  },
+  {
+    "fdc_id": 169977,
+    "usda_description": "Cabbage, red, raw",
+    "name_es": "Repollo colorado"
+  },
+  {
+    "fdc_id": 169988,
+    "usda_description": "Celery, raw",
+    "name_es": "Apio"
+  },
+  {
+    "fdc_id": 169387,
+    "usda_description": "Arugula, raw",
+    "name_es": "Rúcula"
+  },
+  {
+    "fdc_id": 169992,
+    "usda_description": "Chicory greens, raw",
+    "name_es": "Radicheta"
+  },
+  {
+    "fdc_id": 169276,
+    "usda_description": "Radishes, raw",
+    "name_es": "Rabanitos"
+  },
+  {
+    "fdc_id": 169230,
+    "usda_description": "Garlic, raw",
+    "name_es": "Ajo"
+  },
+  {
+    "fdc_id": 168390,
+    "usda_description": "Asparagus, cooked, boiled, drained",
+    "name_es": "Espárragos hervidos"
+  },
+  {
+    "fdc_id": 168386,
+    "usda_description": "Artichokes, (globe or french), cooked, boiled, drained, without salt",
+    "name_es": "Alcaucil hervido"
+  },
+  {
+    "fdc_id": 169385,
+    "usda_description": "Fennel, bulb, raw",
+    "name_es": "Hinojo"
+  },
+  {
+    "fdc_id": 169971,
+    "usda_description": "Brussels sprouts, cooked, boiled, drained, without salt",
+    "name_es": "Repollitos de Bruselas hervidos"
+  },
+  {
+    "fdc_id": 170378,
+    "usda_description": "Broadbeans, immature seeds, cooked, boiled, drained, without salt",
+    "name_es": "Habas hervidas"
+  },
+  {
+    "fdc_id": 169957,
+    "usda_description": "Mung beans, mature seeds, sprouted, raw",
+    "name_es": "Brotes de soja"
+  },
+  {
+    "fdc_id": 170068,
+    "usda_description": "Watercress, raw",
+    "name_es": "Berro"
+  },
+  {
+    "fdc_id": 170404,
+    "usda_description": "Chicory, witloof, raw",
+    "name_es": "Endivia"
+  },
+  {
+    "fdc_id": 170416,
+    "usda_description": "Parsley, fresh",
+    "name_es": "Perejil"
+  },
+  {
+    "fdc_id": 170440,
+    "usda_description": "Potatoes, boiled, cooked without skin, flesh, without salt",
+    "name_es": "Papa hervida sin cáscara"
+  },
+  {
+    "fdc_id": 170438,
+    "usda_description": "Potatoes, boiled, cooked in skin, flesh, without salt",
+    "name_es": "Papa hervida con cáscara"
+  },
+  {
+    "fdc_id": 170093,
+    "usda_description": "Potatoes, baked, flesh and skin, without salt",
+    "name_es": "Papa al horno con cáscara"
+  },
+  {
+    "fdc_id": 170033,
+    "usda_description": "Potatoes, baked, flesh, without salt",
+    "name_es": "Papa al horno sin cáscara"
+  },
+  {
+    "fdc_id": 168555,
+    "usda_description": "Potatoes, mashed, home-prepared, whole milk and butter added",
+    "name_es": "Puré de papas"
+  },
+  {
+    "fdc_id": 170698,
+    "usda_description": "Fast foods, potato, french fried in vegetable oil",
+    "name_es": "Papas fritas"
+  },
+  {
+    "fdc_id": 168484,
+    "usda_description": "Sweet potato, cooked, boiled, without skin",
+    "name_es": "Batata hervida"
+  },
+  {
+    "fdc_id": 168483,
+    "usda_description": "Sweet potato, cooked, baked in skin, flesh, without salt",
+    "name_es": "Batata al horno"
+  },
+  {
+    "fdc_id": 168878,
+    "usda_description": "Rice, white, long-grain, regular, enriched, cooked",
+    "name_es": "Arroz blanco hervido"
+  },
+  {
+    "fdc_id": 169704,
+    "usda_description": "Rice, brown, long-grain, cooked (Includes foods for USDA's Food Distribution Program)",
+    "name_es": "Arroz integral hervido"
+  },
+  {
+    "fdc_id": 169708,
+    "usda_description": "Rice, white, long-grain, parboiled, enriched, cooked",
+    "name_es": "Arroz parboil hervido"
+  },
+  {
+    "fdc_id": 169737,
+    "usda_description": "Pasta, cooked, enriched, without added salt",
+    "name_es": "Fideos hervidos"
+  },
+  {
+    "fdc_id": 168910,
+    "usda_description": "Pasta, whole-wheat, cooked (Includes foods for USDA's Food Distribution Program)",
+    "name_es": "Fideos integrales hervidos"
+  },
+  {
+    "fdc_id": 169732,
+    "usda_description": "Noodles, egg, enriched, cooked",
+    "name_es": "Fideos al huevo hervidos"
+  },
+  {
+    "fdc_id": 169734,
+    "usda_description": "Noodles, egg, spinach, enriched, cooked",
+    "name_es": "Fideos de espinaca hervidos"
+  },
+  {
+    "fdc_id": 168914,
+    "usda_description": "Rice noodles, cooked",
+    "name_es": "Fideos de arroz hervidos"
+  },
+  {
+    "fdc_id": 171672,
+    "usda_description": "Cereals, corn grits, yellow, regular and quick, enriched, cooked with water, without salt",
+    "name_es": "Polenta cocida"
+  },
+  {
+    "fdc_id": 173905,
+    "usda_description": "Cereals, oats, regular and quick, unenriched, cooked with water (includes boiling and microwaving), without salt",
+    "name_es": "Avena cocida con agua"
+  },
+  {
+    "fdc_id": 168917,
+    "usda_description": "Quinoa, cooked",
+    "name_es": "Quinoa hervida"
+  },
+  {
+    "fdc_id": 169700,
+    "usda_description": "Couscous, cooked",
+    "name_es": "Cuscús cocido"
+  },
+  {
+    "fdc_id": 170287,
+    "usda_description": "Bulgur, cooked",
+    "name_es": "Trigo burgol cocido"
+  },
+  {
+    "fdc_id": 170285,
+    "usda_description": "Barley, pearled, cooked",
+    "name_es": "Cebada perlada hervida"
+  },
+  {
+    "fdc_id": 168871,
+    "usda_description": "Millet, cooked",
+    "name_es": "Mijo hervido"
+  },
+  {
+    "fdc_id": 170683,
+    "usda_description": "Amaranth grain, cooked",
+    "name_es": "Amaranto hervido"
+  },
+  {
+    "fdc_id": 172421,
+    "usda_description": "Lentils, mature seeds, cooked, boiled, without salt",
+    "name_es": "Lentejas hervidas"
+  },
+  {
+    "fdc_id": 173757,
+    "usda_description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, cooked, boiled, without salt",
+    "name_es": "Garbanzos hervidos"
+  },
+  {
+    "fdc_id": 173735,
+    "usda_description": "Beans, black, mature seeds, cooked, boiled, without salt",
+    "name_es": "Porotos negros hervidos"
+  },
+  {
+    "fdc_id": 175194,
+    "usda_description": "Beans, kidney, red, mature seeds, cooked, boiled, without salt",
+    "name_es": "Porotos colorados hervidos"
+  },
+  {
+    "fdc_id": 175203,
+    "usda_description": "Beans, white, mature seeds, cooked, boiled, without salt",
+    "name_es": "Porotos blancos hervidos"
+  },
+  {
+    "fdc_id": 174271,
+    "usda_description": "Soybeans, mature cooked, boiled, without salt",
+    "name_es": "Porotos de soja hervidos"
+  },
+  {
+    "fdc_id": 173728,
+    "usda_description": "Beans, adzuki, mature seeds, cooked, boiled, without salt",
+    "name_es": "Porotos aduki hervidos"
+  },
+  {
+    "fdc_id": 172429,
+    "usda_description": "Peas, split, mature seeds, cooked, boiled, without salt",
+    "name_es": "Arvejas secas partidas hervidas"
+  },
+  {
+    "fdc_id": 172675,
+    "usda_description": "Bread, french or vienna (includes sourdough)",
+    "name_es": "Pan francés"
+  },
+  {
+    "fdc_id": 174091,
+    "usda_description": "Bread, french or vienna, whole wheat",
+    "name_es": "Pan francés integral"
+  },
+  {
+    "fdc_id": 174915,
+    "usda_description": "Bread, pita, white, enriched",
+    "name_es": "Pan árabe"
+  },
+  {
+    "fdc_id": 174916,
+    "usda_description": "Bread, pita, whole-wheat",
+    "name_es": "Pan árabe integral"
+  },
+  {
+    "fdc_id": 172684,
+    "usda_description": "Bread, rye",
+    "name_es": "Pan de centeno"
+  },
+  {
+    "fdc_id": 174927,
+    "usda_description": "Bread, white, prepared from recipe, made with low fat (2%) milk",
+    "name_es": "Pan blanco casero"
+  },
+  {
+    "fdc_id": 174987,
+    "usda_description": "Croissants, butter",
+    "name_es": "Medialuna de manteca"
+  },
+  {
+    "fdc_id": 172755,
+    "usda_description": "Danish pastry, fruit, enriched (includes apple, cinnamon, raisin, lemon, raspberry, strawberry)",
+    "name_es": "Factura con dulce (masa danesa)"
+  },
+  {
+    "fdc_id": 172759,
+    "usda_description": "Doughnuts, yeast-leavened, with jelly filling",
+    "name_es": "Bola de fraile con mermelada"
+  },
+  {
+    "fdc_id": 172757,
+    "usda_description": "Doughnuts, yeast-leavened, with creme filling",
+    "name_es": "Bola de fraile con crema pastelera"
+  },
+  {
+    "fdc_id": 172706,
+    "usda_description": "Cake, sponge, commercially prepared",
+    "name_es": "Bizcochuelo"
+  },
+  {
+    "fdc_id": 174940,
+    "usda_description": "Cake, pound, commercially prepared, other than all butter, enriched",
+    "name_es": "Budín"
+  },
+  {
+    "fdc_id": 167930,
+    "usda_description": "Pie crust, refrigerated, regular, baked",
+    "name_es": "Tapa de tarta horneada"
+  },
+  {
+    "fdc_id": 174929,
+    "usda_description": "Bread, sticks, plain",
+    "name_es": "Grisines"
+  },
+  {
+    "fdc_id": 174928,
+    "usda_description": "Bread, crumbs, dry, grated, plain",
+    "name_es": "Pan rallado"
+  },
+  {
+    "fdc_id": 172223,
+    "usda_description": "Cheese, fresh, queso fresco",
+    "name_es": "Queso fresco"
+  },
+  {
+    "fdc_id": 170849,
+    "usda_description": "Cheese, port de salut",
+    "name_es": "Queso port salut"
+  },
+  {
+    "fdc_id": 170845,
+    "usda_description": "Cheese, mozzarella, whole milk",
+    "name_es": "Muzzarella (mozzarella)"
+  },
+  {
+    "fdc_id": 170848,
+    "usda_description": "Cheese, parmesan, hard",
+    "name_es": "Queso rallado (parmesano)"
+  },
+  {
+    "fdc_id": 170850,
+    "usda_description": "Cheese, provolone",
+    "name_es": "Queso provolone"
+  },
+  {
+    "fdc_id": 171241,
+    "usda_description": "Cheese, gouda",
+    "name_es": "Queso gouda"
+  },
+  {
+    "fdc_id": 172175,
+    "usda_description": "Cheese, blue",
+    "name_es": "Queso azul"
+  },
+  {
+    "fdc_id": 170851,
+    "usda_description": "Cheese, ricotta, whole milk",
+    "name_es": "Ricota"
+  },
+  {
+    "fdc_id": 171248,
+    "usda_description": "Cheese, ricotta, part skim milk",
+    "name_es": "Ricota semidescremada"
+  },
+  {
+    "fdc_id": 167575,
+    "usda_description": "Ice creams, vanilla",
+    "name_es": "Helado de crema (vainilla)"
+  },
+  {
+    "fdc_id": 168809,
+    "usda_description": "Ice creams, chocolate",
+    "name_es": "Helado de chocolate"
+  },
+  {
+    "fdc_id": 168810,
+    "usda_description": "Ice creams, strawberry",
+    "name_es": "Helado de frutilla"
+  },
+  {
+    "fdc_id": 174034,
+    "usda_description": "Beef, ground, 85% lean meat / 15% fat, crumbles, cooked, pan-browned",
+    "name_es": "Carne picada cocida"
+  },
+  {
+    "fdc_id": 168634,
+    "usda_description": "Beef, top sirloin, steak, separable lean only, trimmed to 0\" fat, all grades, cooked, broiled",
+    "name_es": "Bife de vaca a la parrilla"
+  },
+  {
+    "fdc_id": 168627,
+    "usda_description": "Beef, variety meats and by-products, liver, cooked, pan-fried",
+    "name_es": "Hígado de vaca a la plancha"
+  },
+  {
+    "fdc_id": 171477,
+    "usda_description": "Chicken, broilers or fryers, breast, meat only, cooked, roasted",
+    "name_es": "Pechuga de pollo al horno sin piel"
+  },
+  {
+    "fdc_id": 171450,
+    "usda_description": "Chicken, broilers or fryers, meat and skin, cooked, roasted",
+    "name_es": "Pollo al horno con piel"
+  },
+  {
+    "fdc_id": 172388,
+    "usda_description": "Chicken, broilers or fryers, thigh, meat only, cooked, roasted",
+    "name_es": "Muslo de pollo al horno sin piel"
+  },
+  {
+    "fdc_id": 167821,
+    "usda_description": "Pork, fresh, loin, whole, separable lean and fat, cooked, roasted",
+    "name_es": "Carré de cerdo al horno"
+  },
+  {
+    "fdc_id": 175161,
+    "usda_description": "Fish, whiting, mixed species, cooked, dry heat",
+    "name_es": "Merluza cocida"
+  },
+  {
+    "fdc_id": 175168,
+    "usda_description": "Fish, salmon, Atlantic, farmed, cooked, dry heat",
+    "name_es": "Salmón cocido"
+  },
+  {
+    "fdc_id": 171971,
+    "usda_description": "Crustaceans, shrimp, mixed species, cooked, moist heat (may contain additives to retain moisture)",
+    "name_es": "Langostinos hervidos"
+  },
+  {
+    "fdc_id": 171982,
+    "usda_description": "Mollusks, squid, mixed species, cooked, fried",
+    "name_es": "Rabas (calamar frito)"
+  },
+  {
+    "fdc_id": 173424,
+    "usda_description": "Egg, whole, cooked, hard-boiled",
+    "name_es": "Huevo duro"
+  },
+  {
+    "fdc_id": 173423,
+    "usda_description": "Egg, whole, cooked, fried",
+    "name_es": "Huevo frito"
+  },
+  {
+    "fdc_id": 172187,
+    "usda_description": "Egg, whole, cooked, scrambled",
+    "name_es": "Huevo revuelto"
+  },
+  {
+    "fdc_id": 169655,
+    "usda_description": "Sugars, granulated",
+    "name_es": "Azúcar"
+  },
+  {
+    "fdc_id": 169640,
+    "usda_description": "Honey",
+    "name_es": "Miel"
+  },
+  {
+    "fdc_id": 169861,
+    "usda_description": "Snacks, popcorn, home-prepared, oil-popped, unsalted",
+    "name_es": "Pochoclo"
+  },
+  {
+    "fdc_id": 173806,
+    "usda_description": "Peanuts, all types, dry-roasted, without salt",
+    "name_es": "Maní tostado"
+  },
+  {
+    "fdc_id": 170187,
+    "usda_description": "Nuts, walnuts, english",
+    "name_es": "Nueces"
+  },
+  {
+    "fdc_id": 170182,
+    "usda_description": "Nuts, pecans",
+    "name_es": "Nueces pecán"
+  },
+  {
+    "fdc_id": 170567,
+    "usda_description": "Nuts, almonds",
+    "name_es": "Almendras"
+  },
+  {
+    "fdc_id": 170571,
+    "usda_description": "Nuts, cashew nuts, dry roasted, without salt added",
+    "name_es": "Castañas de cajú"
+  },
+  {
+    "fdc_id": 170581,
+    "usda_description": "Nuts, hazelnuts or filberts",
+    "name_es": "Avellanas"
+  },
+  {
+    "fdc_id": 170185,
+    "usda_description": "Nuts, pistachio nuts, dry roasted, without salt added",
+    "name_es": "Pistachos"
+  },
+  {
+    "fdc_id": 170569,
+    "usda_description": "Nuts, brazilnuts, dried, unblanched",
+    "name_es": "Castañas de Pará (nueces de Brasil)"
+  },
+  {
+    "fdc_id": 170190,
+    "usda_description": "Nuts, chestnuts, european, roasted",
+    "name_es": "Castañas asadas"
+  },
+  {
+    "fdc_id": 170170,
+    "usda_description": "Nuts, coconut meat, dried (desiccated), not sweetened",
+    "name_es": "Coco rallado"
+  },
+  {
+    "fdc_id": 170554,
+    "usda_description": "Seeds, chia seeds, dried",
+    "name_es": "Semillas de chía"
+  },
+  {
+    "fdc_id": 169414,
+    "usda_description": "Seeds, flaxseed",
+    "name_es": "Semillas de lino"
+  },
+  {
+    "fdc_id": 170562,
+    "usda_description": "Seeds, sunflower seed kernels, dried",
+    "name_es": "Semillas de girasol"
+  },
+  {
+    "fdc_id": 170150,
+    "usda_description": "Seeds, sesame seeds, whole, dried",
+    "name_es": "Semillas de sésamo"
+  },
+  {
+    "fdc_id": 170556,
+    "usda_description": "Seeds, pumpkin and squash seed kernels, dried",
+    "name_es": "Semillas de zapallo"
+  },
+  {
+    "fdc_id": 169098,
+    "usda_description": "Orange juice, raw (Includes foods for USDA's Food Distribution Program)",
+    "name_es": "Jugo de naranja exprimido"
+  },
+  {
+    "fdc_id": 169925,
+    "usda_description": "Tangerine juice, raw",
+    "name_es": "Jugo de mandarina exprimido"
+  },
+  {
+    "fdc_id": 173039,
+    "usda_description": "Grapefruit juice, white, raw",
+    "name_es": "Jugo de pomelo exprimido"
+  },
+  {
+    "fdc_id": 167747,
+    "usda_description": "Lemon juice, raw",
+    "name_es": "Jugo de limón"
+  }
+]

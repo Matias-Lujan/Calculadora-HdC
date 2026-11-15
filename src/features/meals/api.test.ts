@@ -5,8 +5,9 @@ import {
   deleteMeal,
   fetchMeal,
   fetchMealsPage,
+  fetchReferenceFoods,
 } from './api.ts'
-import type { NewMealRecord } from './types.ts'
+import type { NewMealItem, NewMealRecord, NewTableFood } from './types.ts'
 
 // A fake Supabase client. Each from() starts a chain that records its table
 // and its calls, and resolves with the next result of a queue (one per
@@ -31,6 +32,7 @@ const fake = vi.hoisted(() => {
       'is',
       'order',
       'range',
+      'limit',
     ]) {
       b[method] = (...args: unknown[]) => {
         chain.calls.push({ method, args })
@@ -68,7 +70,7 @@ const record: NewMealRecord = {
   },
   items: [
     {
-      food_id: '00000000-0000-4000-8000-000000000002',
+      food: { id: '00000000-0000-4000-8000-000000000002' },
       position: 0,
       food_name: 'Arroz de prueba',
       food_brand: null,
@@ -84,7 +86,7 @@ const record: NewMealRecord = {
       carbs_g: 75,
     },
     {
-      food_id: '00000000-0000-4000-8000-000000000001',
+      food: { id: '00000000-0000-4000-8000-000000000001' },
       position: 1,
       food_name: 'Banana de prueba',
       food_brand: null,
@@ -103,6 +105,14 @@ const record: NewMealRecord = {
 }
 
 const MEAL_ID = '00000000-0000-4000-8000-0000000000aa'
+
+/** The meal_items rows createMeal sends for items of the catalog. */
+function catalogRows(items: NewMealItem[], mealId: string) {
+  return items.map(({ food, ...row }) => {
+    if (!('id' in food)) throw new Error('not a catalog item')
+    return { ...row, food_id: food.id, meal_id: mealId }
+  })
+}
 
 function methods(index: number): string[] {
   return fake.state.chains[index]?.calls.map((c) => c.method) ?? []
@@ -135,9 +145,7 @@ describe('createMeal', () => {
     expect(methods(1)).toEqual(['insert'])
     const rows = argsOf(1, 'insert')?.[0]
     expect(Array.isArray(rows)).toBe(true)
-    expect(rows).toEqual(
-      record.items.map((item) => ({ ...item, meal_id: MEAL_ID })),
-    )
+    expect(rows).toEqual(catalogRows(record.items, MEAL_ID))
   })
 
   it('does not modify the record', async () => {
@@ -234,7 +242,7 @@ describe('createMeal', () => {
     expect(fake.state.chains).toHaveLength(2)
     const rows = argsOf(1, 'insert')?.[0]
     expect(Array.isArray(rows)).toBe(true)
-    expect(rows).toEqual([{ ...record.items[0], meal_id: MEAL_ID }])
+    expect(rows).toEqual(catalogRows(record.items.slice(0, 1), MEAL_ID))
   })
 
   it('a meal with many items still makes a single items request, in order', async () => {
@@ -651,5 +659,396 @@ describe('deleteMeal', () => {
     const network = new Error('network')
     fake.state.results = [network]
     await expect(deleteMeal(MEAL_ID)).rejects.toBe(network)
+  })
+})
+
+// --- Reference table (spec §6.2, §14 #51) ---
+
+// Invented code and values.
+const refRow = {
+  reference_db: 'usda_fdc',
+  reference_code: '900001',
+  description_original: 'Invented banana, raw',
+  name_es: 'Banana',
+  state: 'as_eaten',
+  carbs_per_100g: 20.229999999999997,
+}
+
+describe('fetchReferenceFoods', () => {
+  it('reads the USDA rows with their columns and validates them', async () => {
+    fake.state.results = [{ data: [refRow], error: null }]
+    await expect(fetchReferenceFoods()).resolves.toEqual([refRow])
+    expect(fake.state.chains[0]?.table).toBe('reference_foods')
+    expect(methods(0)).toEqual(['select', 'eq', 'eq'])
+    expect(argsOf(0, 'select')).toEqual([
+      'reference_db, reference_code, description_original, name_es, state, carbs_per_100g',
+    ])
+    const eqCalls = fake.state.chains[0]?.calls
+      .filter((c) => c.method === 'eq')
+      .map((c) => c.args)
+    expect(eqCalls).toEqual([
+      ['reference_db', 'usda_fdc'],
+      ['state', 'as_eaten'],
+    ])
+  })
+
+  it('keeps the binary noise of the HC exactly (tester)', async () => {
+    fake.state.results = [
+      {
+        data: [{ ...refRow, carbs_per_100g: 11.459999999999999 }],
+        error: null,
+      },
+    ]
+    const [row] = await fetchReferenceFoods()
+    expect(row?.carbs_per_100g).toBe(11.459999999999999)
+    expect(row?.carbs_per_100g).not.toBe(11.46)
+  })
+
+  it('an empty table is an empty list', async () => {
+    fake.state.results = [{ data: [], error: null }]
+    await expect(fetchReferenceFoods()).resolves.toEqual([])
+  })
+
+  it('a raw_cooked row (the query filters them out) throws', async () => {
+    fake.state.results = [
+      { data: [refRow, { ...refRow, state: 'raw_cooked' }], error: null },
+    ]
+    await expect(fetchReferenceFoods()).rejects.toThrow()
+  })
+
+  it('an invalid row throws', async () => {
+    fake.state.results = [
+      { data: [refRow, { ...refRow, carbs_per_100g: 'x' }], error: null },
+    ]
+    await expect(fetchReferenceFoods()).rejects.toThrow()
+  })
+
+  it('a Supabase error is thrown as is', async () => {
+    const error = { message: 'JWT expired', code: 'PGRST301' }
+    fake.state.results = [{ data: null, error }]
+    await expect(fetchReferenceFoods()).rejects.toBe(error)
+  })
+})
+
+describe('createMeal with foods of the reference table', () => {
+  const COPY_ID = '00000000-0000-4000-8000-0000000000c1'
+  const NEW_COPY_ID = '00000000-0000-4000-8000-0000000000c2'
+  const CATALOG_ID = '00000000-0000-4000-8000-000000000002'
+
+  const copy: NewTableFood = {
+    name: 'Banana',
+    brand: null,
+    source: 'reference',
+    state: 'as_eaten',
+    carbs_per_100g: 20.229999999999997,
+    reference_db: 'usda_fdc',
+    reference_code: '900001',
+    reference_description: 'Invented banana, raw',
+  }
+
+  const catalogItem: NewMealItem = {
+    food: { id: CATALOG_ID },
+    position: 0,
+    food_name: 'Arroz de prueba',
+    food_brand: null,
+    food_source: 'manual',
+    food_state: 'raw_cooked',
+    quantity_mode: 'grams',
+    units: null,
+    unit_weight_g: null,
+    grams: 250,
+    carbs_per_100g: 78,
+    cooking_factor: 2.6,
+    effective_carbs_per_100g: 30,
+    carbs_g: 75,
+  }
+
+  function tableItem(position: number, grams = 120): NewMealItem {
+    return {
+      ...catalogItem,
+      food: { copy },
+      position,
+      food_name: 'Banana',
+      food_source: 'reference',
+      food_state: 'as_eaten',
+      grams,
+      carbs_per_100g: copy.carbs_per_100g,
+      cooking_factor: null,
+      effective_carbs_per_100g: copy.carbs_per_100g,
+      carbs_g: (grams * copy.carbs_per_100g) / 100,
+    }
+  }
+
+  const withItems = (items: NewMealItem[]): NewMealRecord => ({
+    meal: record.meal,
+    items,
+  })
+
+  const tables = () => fake.state.chains.map((chain) => chain.table)
+
+  it('finds the existing copy: one select, no insert in foods', async () => {
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await expect(createMeal(withItems([tableItem(0)]))).resolves.toBe(MEAL_ID)
+
+    expect(tables()).toEqual(['foods', 'meals', 'meal_items'])
+    expect(methods(0)).toEqual([
+      'select',
+      'eq',
+      'eq',
+      'eq',
+      'is',
+      'order',
+      'limit',
+      'maybeSingle',
+    ])
+    expect(argsOf(0, 'select')).toEqual(['id'])
+    const eqs = fake.state.chains[0]?.calls
+      .filter((c) => c.method === 'eq')
+      .map((c) => c.args)
+    expect(eqs).toEqual([
+      ['source', 'reference'],
+      ['reference_db', 'usda_fdc'],
+      ['reference_code', '900001'],
+    ])
+    expect(argsOf(0, 'is')).toEqual(['archived_at', null])
+    expect(argsOf(0, 'order')).toEqual(['created_at'])
+    expect(argsOf(0, 'limit')).toEqual([1])
+
+    const rows = argsOf(2, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.food_id).toBe(COPY_ID)
+    expect(rows[0]?.meal_id).toBe(MEAL_ID)
+    expect(Object.keys(rows[0] ?? {})).not.toContain('food')
+  })
+
+  it('without a copy, inserts it (without user_id) and uses the new id', async () => {
+    fake.state.results = [
+      { data: null, error: null },
+      { data: { id: NEW_COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await expect(createMeal(withItems([tableItem(0)]))).resolves.toBe(MEAL_ID)
+
+    expect(tables()).toEqual(['foods', 'foods', 'meals', 'meal_items'])
+    expect(methods(1)).toEqual(['insert', 'select', 'single'])
+    const inserted = argsOf(1, 'insert')?.[0] as Record<string, unknown>
+    expect(inserted).toEqual(copy)
+    expect(Object.keys(inserted)).not.toContain('user_id')
+    expect(argsOf(1, 'select')).toEqual(['id'])
+
+    const rows = argsOf(3, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows[0]?.food_id).toBe(NEW_COPY_ID)
+  })
+
+  it('the same entry twice is resolved once', async () => {
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(withItems([tableItem(0, 120), tableItem(1, 80)]))
+    expect(tables()).toEqual(['foods', 'meals', 'meal_items'])
+    const rows = argsOf(2, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows.map((r) => r.food_id)).toEqual([COPY_ID, COPY_ID])
+    expect(rows.map((r) => r.grams)).toEqual([120, 80])
+  })
+
+  it('a mixed meal: each item gets its food, in order', async () => {
+    const otherCopy: NewTableFood = {
+      ...copy,
+      name: 'Arroz blanco hervido',
+      reference_code: '900002',
+    }
+    const rice: NewMealItem = { ...tableItem(2), food: { copy: otherCopy } }
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: null, error: null },
+      { data: { id: NEW_COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(
+      withItems([tableItem(0), { ...catalogItem, position: 1 }, rice]),
+    )
+    expect(tables()).toEqual(['foods', 'foods', 'foods', 'meals', 'meal_items'])
+    expect(fake.state.chains[1]?.calls).toContainEqual({
+      method: 'eq',
+      args: ['reference_code', '900002'],
+    })
+    expect(argsOf(2, 'insert')?.[0]).toEqual(otherCopy)
+    const rows = argsOf(4, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows.map((r) => r.food_id)).toEqual([
+      COPY_ID,
+      CATALOG_ID,
+      NEW_COPY_ID,
+    ])
+  })
+
+  it('a meal only of catalog foods never touches foods', async () => {
+    fake.state.results = [
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(withItems([catalogItem]))
+    expect(tables()).toEqual(['meals', 'meal_items'])
+  })
+
+  it('if looking for the copy fails, throws and does not insert the meal', async () => {
+    const error = { message: 'x', code: '500' }
+    fake.state.results = [{ data: null, error }]
+    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(error)
+    expect(tables()).toEqual(['foods'])
+  })
+
+  it('if looking for the copy rejects, throws and does not insert the meal', async () => {
+    const network = new Error('network')
+    fake.state.results = [network]
+    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(network)
+    expect(tables()).toEqual(['foods'])
+  })
+
+  it('if inserting the copy fails, throws and does not insert the meal', async () => {
+    const error = { message: 'x', code: '23514' }
+    fake.state.results = [
+      { data: null, error: null },
+      { data: null, error },
+    ]
+    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(error)
+    expect(tables()).toEqual(['foods', 'foods'])
+  })
+
+  it('if the second copy fails, the first stays and the meal is not inserted', async () => {
+    const error = new Error('network')
+    const rice: NewMealItem = {
+      ...tableItem(1),
+      food: { copy: { ...copy, reference_code: '900002' } },
+    }
+    fake.state.results = [
+      { data: null, error: null },
+      { data: { id: NEW_COPY_ID }, error: null },
+      error,
+    ]
+    await expect(createMeal(withItems([tableItem(0), rice]))).rejects.toBe(
+      error,
+    )
+    expect(tables()).toEqual(['foods', 'foods', 'foods'])
+    // Nothing is undone in foods.
+    const all = fake.state.chains.flatMap((c) => c.calls.map((x) => x.method))
+    expect(all).not.toContain('update')
+  })
+
+  it('a copy found or inserted without an id throws, without the meal', async () => {
+    fake.state.results = [{ data: { other: 1 }, error: null }]
+    await expect(createMeal(withItems([tableItem(0)]))).rejects.toThrow()
+    expect(tables()).toEqual(['foods'])
+
+    fake.state.chains = []
+    fake.state.results = [
+      { data: null, error: null },
+      { data: null, error: null },
+    ]
+    await expect(createMeal(withItems([tableItem(0)]))).rejects.toThrow()
+    expect(tables()).toEqual(['foods', 'foods'])
+  })
+
+  it('does not modify the record', async () => {
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    const twice = withItems([tableItem(0), tableItem(1)])
+    const before = structuredClone(twice)
+    await createMeal(twice)
+    expect(twice).toEqual(before)
+  })
+
+  it('three items with two codes: resolved in order, once per code (tester)', async () => {
+    const rice: NewMealItem = {
+      ...tableItem(1),
+      food: { copy: { ...copy, name: 'Arroz', reference_code: '900002' } },
+    }
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: NEW_COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(withItems([tableItem(0), rice, tableItem(2, 50)]))
+    expect(tables()).toEqual(['foods', 'foods', 'meals', 'meal_items'])
+    const codeOf = (i: number) =>
+      fake.state.chains[i]?.calls.find(
+        (c) => c.method === 'eq' && c.args[0] === 'reference_code',
+      )?.args[1]
+    expect([codeOf(0), codeOf(1)]).toEqual(['900001', '900002'])
+    const rows = argsOf(3, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows.map((r) => r.food_id)).toEqual([COPY_ID, NEW_COPY_ID, COPY_ID])
+    expect(rows.map((r) => r.position)).toEqual([0, 1, 2])
+  })
+
+  it('a table item and a catalog item that is its copy: one lookup, both rows (tester)', async () => {
+    const copyItem: NewMealItem = {
+      ...tableItem(1, 60),
+      food: { id: COPY_ID },
+      // The catalog copy was edited: other HC.
+      carbs_per_100g: 25,
+      effective_carbs_per_100g: 25,
+      carbs_g: 15,
+    }
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(withItems([tableItem(0), copyItem]))
+    expect(tables()).toEqual(['foods', 'meals', 'meal_items'])
+    const rows = argsOf(2, 'insert')?.[0] as Record<string, unknown>[]
+    expect(rows.map((r) => r.food_id)).toEqual([COPY_ID, COPY_ID])
+    expect(rows.map((r) => r.carbs_per_100g)).toEqual([copy.carbs_per_100g, 25])
+  })
+
+  it('the saved row keeps the values shown, whatever the copy found has (tester)', async () => {
+    fake.state.results = [
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    const item = tableItem(0, 133)
+    await createMeal(withItems([item]))
+    // The lookup only asks for the id: nothing of the copy enters the row.
+    expect(argsOf(0, 'select')).toEqual(['id'])
+    const rows = argsOf(2, 'insert')?.[0] as Record<string, unknown>[]
+    const { food: _food, ...expected } = item
+    expect(rows).toEqual([{ ...expected, food_id: COPY_ID, meal_id: MEAL_ID }])
+    expect(rows[0]?.food_source).toBe('reference')
+  })
+
+  it('the meal is inserted only after every copy is resolved (tester)', async () => {
+    const rice: NewMealItem = {
+      ...tableItem(1),
+      food: { copy: { ...copy, reference_code: '900002' } },
+    }
+    fake.state.results = [
+      { data: null, error: null },
+      { data: { id: NEW_COPY_ID }, error: null },
+      { data: null, error: null },
+      { data: { id: COPY_ID }, error: null },
+      { data: { id: MEAL_ID }, error: null },
+      { data: null, error: null },
+    ]
+    await createMeal(withItems([tableItem(0), rice]))
+    expect(tables()).toEqual([
+      'foods',
+      'foods',
+      'foods',
+      'foods',
+      'meals',
+      'meal_items',
+    ])
   })
 })

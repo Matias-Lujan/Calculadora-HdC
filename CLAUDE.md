@@ -7,7 +7,7 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 - **[docs/plan.md](docs/plan.md)**: en qué orden se construye y **en qué etapa estamos** (encabezado y tabla de resumen). Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
 - **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1; las decisiones tomadas, en §14.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
-- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real.
+- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real; `usda-seed/` arma la migración del seed de `reference_foods` desde SR Legacy de USDA (la lista curada es `selection.json`; los CSV van en `scripts/usda-seed/data/`, que no se commitea). Si cambia la lista, se genera una migración nueva (spec §14 #50).
 - **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer). Ver "Flujo de trabajo".
 
 Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
@@ -33,16 +33,21 @@ Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.m
 
 ### Ciclo por funcionalidad (agentes)
 
-Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le pasa a cada agente lo que necesita, le muestra los resultados al usuario y **no escribe código**. Cada agente arranca sin la conversación, así que el pedido tiene que incluir la funcionalidad y lo que dejó el paso anterior (el plan o los hallazgos).
+Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le pasa a cada agente lo que necesita, le muestra los resultados al usuario y no escribe la lógica (sí los cambios de texto, pantalla o docs, ver abajo). Cada agente arranca sin la conversación, así que el pedido tiene que incluir la funcionalidad y lo que dejó el paso anterior (el plan o los hallazgos).
 
 | Paso | Agente | Herramientas | Qué hace |
 |---|---|---|---|
 | 1 | `planner` | Lectura y documentación web | Arma el plan de implementación. Si encuentra una contradicción con el spec o algo que necesita una decisión del usuario, el ciclo se frena hasta que conteste. |
 | 2 | `implementer` | Lectura, escritura y `Bash` solo para comandos locales | Implementa el plan, escribe los tests que pide el spec, anota las decisiones en el spec y el plan, y deja pasando los chequeos. |
-| 3 | `tester` | Lectura, escritura de tests y `Bash` | Corre todos los chequeos, agrega casos borde, rompe el código a propósito para comprobar que los tests lo detectan y arma la lista de verificación manual (iPhone, paneles). |
+| 3 | `tester` | Lectura, escritura de tests y `Bash` | Solo si se toca el cálculo o la base. Corre los chequeos, agrega los pocos casos borde que falten y arma la lista de verificación manual (iPhone, paneles). |
 | 4 | `reviewer` | Lectura y `Bash` solo para git de lectura | Revisa los cambios contra el spec, las reglas de este archivo y la documentación. Responde "Sin hallazgos" o una lista de problemas. |
 
-- **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos, y después pasa otra vez por el tester y el reviewer. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
+- **El ciclo es proporcional al cambio.** El tiempo y los tokens importan: no se usan cuatro agentes para lo que resuelve uno.
+  - **Cálculo de HC o de dosis (`src/domain/dose/`), migraciones o RLS**: ciclo completo.
+  - **Lógica de un feature sin cuentas** (queries, guardado, validación de un formulario): planner solo si hay decisiones abiertas; implementer y reviewer; sin tester.
+  - **Textos, pantallas o docs**: los hace la sesión principal, o un implementer si son muchos archivos. Sin planner, tester ni reviewer.
+  - Los tests se escriben para lo que tiene riesgo (el cálculo, la base, el guardado). No se testean textos uno por uno ni se hacen barridos masivos ni mutaciones fuera del cálculo.
+- **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos importantes, y después otra vez al reviewer (y al tester, si correspondía). Los detalles menores de docs los arregla la sesión principal sin otra vuelta. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
 - **Migraciones**: el implementer las crea, pero no las aplica. Antes del tester, la sesión principal las aplica en `dev` (`npx supabase db push --remote`), con el OK del usuario, o le pide que corra el comando.
 - **Los agentes nunca** hacen commit, push ni PR, ni corren `db push`, `secrets set` o `config push`, ni cambian la configuración de Supabase o Vercel. Eso lo hace la sesión principal, con el OK del usuario (punto 4 del flujo).
 - Las restricciones de `Bash` del implementer y del reviewer están escritas en sus definiciones. La herramienta no permite limitar `Bash` a ciertos comandos.
@@ -95,6 +100,7 @@ node --env-file=.env.local scripts/rls-check/check.ts                 # aislamie
 node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-flash-lite
 node scripts/gemini-probe/summarize.ts <corrida>
 node scripts/pwa/generate-icons.ts                                    # regenera los íconos desde public/icon.svg
+node scripts/usda-seed/build.ts <carpeta con los CSV> <migración nueva y vacía>   # seed USDA; nunca pisa una migración con contenido
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.
@@ -119,7 +125,8 @@ Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests
 src/
   domain/            # lógica pura, sin dependencias: dose/, label/
   lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts,
-                     # y lo que comparten varios features: foods.ts, settings.ts, search.ts
+                     # y lo que comparten varios features: foods.ts, settings.ts, search.ts,
+                     # foodText.ts (textos de un alimento sin Supabase, para que los tests no lo carguen)
   components/        # UI reutilizable, sin lógica de negocio
   features/
     foods/

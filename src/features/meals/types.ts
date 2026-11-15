@@ -3,6 +3,39 @@ import type { QuantityMode } from '../../domain/dose/index.ts'
 import type { Tables, TablesInsert } from '../../lib/database.types.ts'
 import type { Food } from '../../lib/foods.ts'
 
+type ReferenceFoodRow = Pick<
+  Tables<'reference_foods'>,
+  | 'reference_db'
+  | 'reference_code'
+  | 'description_original'
+  | 'name_es'
+  | 'state'
+  | 'carbs_per_100g'
+>
+
+/**
+ * A food of the reference table (spec §5.2), as the meal screen reads it.
+ * Only the USDA rows of foods eaten as they are (`as_eaten`) are read: a
+ * `raw_cooked` one would need a cooking factor the table does not have
+ * (spec §6.2, §14 #51).
+ */
+export const referenceFoodSchema = z.object({
+  reference_db: z.literal('usda_fdc'),
+  reference_code: z.string(),
+  description_original: z.string(),
+  name_es: z.string(),
+  state: z.literal('as_eaten'),
+  carbs_per_100g: z.number(),
+}) satisfies z.ZodType<ReferenceFoodRow>
+
+export type ReferenceFood = z.infer<typeof referenceFoodSchema>
+
+/**
+ * A food that can go in a meal: a food of the catalog, or a food of the
+ * reference table not copied to the catalog yet (`id === null`, spec §6.2).
+ */
+export type MealFood = Omit<Food, 'id'> & { id: string | null }
+
 /**
  * One item of the meal being entered, as the form holds it.
  * - `key`: stable id of the item in the form (React key and field id). Its
@@ -14,10 +47,39 @@ import type { Food } from '../../lib/foods.ts'
  */
 export type MealItemDraft = {
   key: number
-  food: Food
+  food: MealFood
   quantityMode: QuantityMode
   quantityText: string
 }
+
+/**
+ * The copy of a reference table food that createMeal looks for in the
+ * catalog, or inserts if there is none (spec §6.2). Without user_id (column
+ * default, auth.uid()).
+ */
+export type NewTableFood = Required<
+  Pick<
+    TablesInsert<'foods'>,
+    | 'name'
+    | 'brand'
+    | 'source'
+    | 'state'
+    | 'carbs_per_100g'
+    | 'reference_db'
+    | 'reference_code'
+    | 'reference_description'
+  >
+> & {
+  source: 'reference'
+  reference_db: 'usda_fdc'
+  reference_code: string
+}
+
+/**
+ * The food an item points to: a food of the catalog (its id), or the copy
+ * of a reference table food that createMeal resolves before the meal.
+ */
+export type MealItemFood = { id: string } | { copy: NewTableFood }
 
 /**
  * A meal to insert (spec §7.1): the calculation result and the values that
@@ -38,12 +100,14 @@ export type NewMeal = Required<
 
 /**
  * An item of a meal to insert: a copy of the food values used and the
- * result of its calculation (spec §6.7). meal_id is added by createMeal
- * once the meal exists; id and user_id come from the column defaults.
+ * result of its calculation (spec §6.7), and the food it points to.
+ * createMeal turns `food` into food_id (resolving the copy of a reference
+ * table food first) and adds meal_id once the meal exists; id and user_id
+ * come from the column defaults.
  */
 export type NewMealItem = Required<
-  Omit<TablesInsert<'meal_items'>, 'id' | 'user_id' | 'meal_id'>
->
+  Omit<TablesInsert<'meal_items'>, 'id' | 'user_id' | 'meal_id' | 'food_id'>
+> & { food: MealItemFood }
 
 /** What createMeal inserts: the meal and its items, in order. */
 export type NewMealRecord = {

@@ -44,8 +44,10 @@ export type UpdateFoodInput = {
 
 /**
  * Updates the editable columns of a food (spec §6.5). The payload never has
- * source, reference_db, photo_path, label_transcription, archived_at,
- * user_id or the timestamps (updated_at is set by a trigger). .single()
+ * source, reference_db, reference_code, reference_description, photo_path,
+ * label_transcription, archived_at, user_id or the timestamps (updated_at is
+ * set by a trigger): editing a reference food keeps its source, base, code
+ * and description, so foods_reference_requires_source still holds. .single()
  * fails if no row was updated, so "saved" is shown only when the server
  * returns the row.
  */
@@ -64,8 +66,6 @@ export async function updateFood({
       unit_weight_g: values.unit_weight_g,
       unit_label: values.unit_label,
       notes: values.notes,
-      reference_code: values.reference_code,
-      reference_description: values.reference_description,
     })
     .eq('id', id)
     .select(FOOD_COLUMNS)

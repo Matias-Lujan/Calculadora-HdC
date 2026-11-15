@@ -1,3 +1,4 @@
+import { InfoTip } from '../../../components/InfoTip.tsx'
 import {
   foodFieldErrorMessage,
   type FoodFieldError,
@@ -82,6 +83,8 @@ export function TextField({
 type RadioGroupProps<T extends string> = {
   name: string
   legend: string
+  /** Explanation behind an ⓘ next to the legend, if any. */
+  info?: string
   options: readonly { value: T; label: string }[]
   value: T | null
   onChange: (value: T) => void
@@ -91,22 +94,30 @@ type RadioGroupProps<T extends string> = {
 export function RadioGroup<T extends string>({
   name,
   legend,
+  info,
   options,
   value,
   onChange,
   error,
 }: RadioGroupProps<T>) {
   const errorId = `${name}-error`
+  const legendId = `${name}-legend`
   const invalid = error !== undefined
   return (
+    // Named with aria-labelledby instead of a <legend>, so the ⓘ can sit
+    // next to the text without becoming part of the group's name.
     <fieldset
       className="flex flex-col gap-1"
+      aria-labelledby={legendId}
       aria-invalid={invalid}
       aria-describedby={invalid ? errorId : undefined}
     >
-      <legend className="mb-1 text-sm font-medium text-slate-700">
-        {legend}
-      </legend>
+      <div className="flex min-h-11 flex-wrap items-center gap-x-1">
+        <span id={legendId} className="text-sm font-medium text-slate-700">
+          {legend}
+        </span>
+        {info !== undefined && <InfoTip text={info} />}
+      </div>
       {options.map((option) => (
         <label
           key={option.value}

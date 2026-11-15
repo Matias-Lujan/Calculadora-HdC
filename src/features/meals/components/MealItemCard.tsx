@@ -1,3 +1,4 @@
+import { InfoTip } from '../../../components/InfoTip.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
   formatUserNumber,
@@ -10,9 +11,11 @@ import {
   mealItemErrorMessage,
   positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
-import { foodCarbsLine, itemCalculationLines } from '../breakdown.ts'
+import { TABLE_VALUE_INFO, isFromTable } from '../../../lib/foodText.ts'
+import { foodLines, itemCalculationLines, itemCarbsText } from '../breakdown.ts'
 import { canUseUnits, foodErrors } from '../mealDraft.ts'
 import type { MealItemDraft } from '../types.ts'
+import { CalculationDetails } from './CalculationDetails.tsx'
 
 type Props = {
   item: MealItemDraft
@@ -52,14 +55,23 @@ export function MealItemCard({
   const errorId = `${inputId}-error`
   const showError = shownError !== null
   const errors = result === undefined ? [] : foodErrors(result)
-  const lines =
-    result !== undefined && result.ok ? itemCalculationLines(input, result) : []
+  const valid = result !== undefined && result.ok ? result : null
+  const carbsText = valid === null ? null : itemCarbsText(valid.carbsG)
+  const lines = [
+    ...foodLines(food),
+    ...(valid === null ? [] : itemCalculationLines(input, valid)),
+  ]
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col">
-          <span className="font-medium">{food.name}</span>
+        <div className="flex min-w-0 flex-col">
+          {/* The ⓘ of a table food goes next to its name, always in sight
+              (spec §14 #51 (8)). */}
+          <div className="flex flex-wrap items-center">
+            <span className="font-medium">{food.name}</span>
+            {isFromTable(food) && <InfoTip text={TABLE_VALUE_INFO} />}
+          </div>
           {food.brand !== null && (
             <span className="text-sm text-slate-500">{food.brand}</span>
           )}
@@ -123,12 +135,10 @@ export function MealItemCard({
         </p>
       ))}
 
-      <div className="flex flex-col gap-0.5 text-sm text-slate-700">
-        <p>{foodCarbsLine(food)}</p>
-        {lines.map((line, index) => (
-          <p key={index}>{line}</p>
-        ))}
-      </div>
+      {/* In sight, the carbs of the item; the calculation goes folded under
+          "Ver la cuenta" (spec §14 #52). */}
+      {carbsText !== null && <p className="font-medium">{carbsText}</p>}
+      <CalculationDetails lines={lines} />
     </li>
   )
 }

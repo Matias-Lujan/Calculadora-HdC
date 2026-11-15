@@ -9,6 +9,7 @@ import {
 } from './mealDraft.ts'
 import {
   mealSummarySchema,
+  referenceFoodSchema,
   savedMealItemSchema,
   savedMealSchema,
   type MealItemDraft,
@@ -368,5 +369,46 @@ describe('savedMealSchema', () => {
     expect(parsed.meal_items.map((item) => item.carbs_g)).toEqual(
       result.items.map((item) => item.carbsG),
     )
+  })
+})
+
+describe('referenceFoodSchema', () => {
+  // Invented code and values, as PostgREST would return them.
+  const refRow = {
+    reference_db: 'usda_fdc',
+    reference_code: '900001',
+    description_original: 'Invented banana, raw',
+    name_es: 'Banana',
+    state: 'as_eaten',
+    carbs_per_100g: 20.229999999999997,
+  }
+
+  it('accepts a USDA row, with its values exact', () => {
+    expect(referenceFoodSchema.parse(refRow)).toEqual(refRow)
+  })
+
+  it('accepts 0 g of HC', () => {
+    expect(
+      referenceFoodSchema.safeParse({ ...refRow, carbs_per_100g: 0 }).success,
+    ).toBe(true)
+  })
+
+  it('drops unknown columns', () => {
+    expect(referenceFoodSchema.parse({ ...refRow, id: 'x' })).toEqual(refRow)
+  })
+
+  it.each([
+    ['an ARGENFOODS row', { reference_db: 'argenfoods' }],
+    ['a raw_cooked row (it has no cooking factor)', { state: 'raw_cooked' }],
+    ['an unknown state', { state: 'frozen' }],
+    ['HC as text', { carbs_per_100g: '20.2' }],
+    ['HC null', { carbs_per_100g: null }],
+    ['HC NaN', { carbs_per_100g: Number.NaN }],
+    ['no code', { reference_code: undefined }],
+    ['no name', { name_es: null }],
+  ])('rejects %s', (_, change) => {
+    expect(
+      referenceFoodSchema.safeParse({ ...refRow, ...change }).success,
+    ).toBe(false)
   })
 })

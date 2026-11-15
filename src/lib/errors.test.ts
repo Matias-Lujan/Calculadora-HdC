@@ -330,7 +330,7 @@ describe('foodFieldErrorMessage', () => {
     ],
     [
       'FACTOR_NOT_COMPUTABLE',
-      'Con estos pesos no se puede calcular el factor. Revisalos.',
+      'Con estos pesos no se puede calcular cuánto rinde. Revisalos.',
     ],
   ])('%s', (code, message) => {
     expect(foodFieldErrorMessage(code)).toBe(message)
@@ -345,11 +345,11 @@ describe('foodFieldErrorMessage', () => {
 })
 
 describe('cookingFactorUnusualMessage', () => {
-  it('includes the formatted factor', () => {
-    const message = cookingFactorUnusualMessage('0,90')
-    expect(message).toContain('0,90')
+  it('says how much 100 g raw yield, with the formatted grams', () => {
+    const message = cookingFactorUnusualMessage('90')
+    expect(message).toContain('90 g cocido')
     expect(message).toBe(
-      'El factor de cocción da 0,90, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?',
+      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
   })
 })
@@ -377,10 +377,33 @@ describe('mealItemErrorMessage', () => {
     expect(new Set(messages).size).toBe(messages.length)
   })
 
-  it('MISSING_COOKING_FACTOR asks to load the factor in the catalog', () => {
-    expect(mealItemErrorMessage('MISSING_COOKING_FACTOR')).toBe(
-      'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
-    )
+  it.each([
+    [
+      'INVALID_CARBS',
+      'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+    ],
+    [
+      'MISSING_COOKING_FACTOR',
+      'Falta cuánto rinde al cocinarlo. Cargalo en el catálogo para usar este alimento.',
+    ],
+    [
+      'INVALID_COOKING_FACTOR',
+      'Lo que rinde al cocinarlo no es válido. Revisalo en el catálogo.',
+    ],
+    [
+      'MISSING_UNIT_WEIGHT',
+      'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
+    ],
+    [
+      'UNITS_NOT_ALLOWED_FOR_RAW_COOKED',
+      'Este alimento se carga en gramos cocidos, no en unidades.',
+    ],
+    [
+      'EFFECTIVE_CARBS_OVER_100',
+      'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en el catálogo cuánto rinde.',
+    ],
+  ] as const)('%s says %j', (code, message) => {
+    expect(mealItemErrorMessage(code)).toBe(message)
   })
 })
 
@@ -404,15 +427,27 @@ describe('mealSaveWarningMessage', () => {
     ).toBe('Alfajor de prueba: 550 g, más que tu alerta de 500 g por alimento.')
   })
 
-  it('an unusual cooking factor', () => {
+  it('an unusual cooking factor, said as how much 100 g raw yield', () => {
     expect(
       mealSaveWarningMessage({
         code: 'COOKING_FACTOR_UNUSUAL',
         foodName: 'Arroz de prueba',
-        factor: '4,50',
+        cookedGrams: '450',
       }),
     ).toBe(
-      'Arroz de prueba: el factor de cocción es 4,50, fuera de lo habitual (entre 1 y 4).',
+      'Arroz de prueba: 100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
+    )
+  })
+
+  it('an unusual cooking factor whose yield cannot be shown', () => {
+    expect(
+      mealSaveWarningMessage({
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        cookedGrams: null,
+      }),
+    ).toBe(
+      'Arroz de prueba: lo que rinde al cocinarlo está muy lejos de lo habitual.',
     )
   })
 
@@ -434,7 +469,8 @@ describe('mealSaveWarningMessage', () => {
         grams: '1',
         threshold: '1',
       },
-      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', factor: '1' },
+      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', cookedGrams: '1' },
+      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', cookedGrams: null },
       { code: 'DOSE_ABOVE_THRESHOLD', dose: '1', threshold: '1' },
     ]
     for (const warning of warnings) {

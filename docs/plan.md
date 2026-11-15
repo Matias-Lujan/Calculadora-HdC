@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7 y #8 mergeados; la etapa 5, rama `etapa-5-comidas`, con su PR por mergear). La próxima es la etapa 6b. Orden de lo que falta: 6b, 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-14.
+**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7, #8 y #10 mergeados). Etapa 6b terminada en la rama `etapa-6b-tabla-referencia`, con su PR por mergear. La próxima es la etapa 6. Orden de lo que falta: 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-15.
 
 ---
 
@@ -32,8 +32,8 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
 | 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
-| 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR por mergear |
-| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | |
+| 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
+| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR por mergear |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
@@ -233,7 +233,7 @@ Probado en el iPhone (2026-11-14), en Safari con el *preview* de la rama: comida
 
 Incluye:
 - La pantalla de confirmación de la foto usa el formulario simple de la etapa 6b (spec §14 #41 y #48).
-- **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta el factor". Se decide en la etapa si además sugiere la entrada cocida de la tabla.
+- **Lo que se cocina**: por defecto se usa la variante cocida de la tabla (etapa 6b, spec §14 #42). Si el usuario igual carga un producto que se cocina desde la foto, la confirmación ofrece medir el factor (crudo y cocido) en ese momento o después; mientras tanto queda "Falta cuánto rinde" (spec §14 #52). Se decide en la etapa si además sugiere la entrada cocida de la tabla.
 - Edge Function `transcribe-label`: `index.ts`, `prompt.ts`, `schema.ts` y `provider.ts` (§9.2). Las instrucciones y el esquema parten de los de la etapa 1b.
 - Secrets `GEMINI_API_KEY` y `GEMINI_MODEL` en `dev`.
 - Tope diario propio en `vision_requests`.
@@ -277,11 +277,15 @@ Incluye:
 - **Búsqueda en `reference_foods`** (§6.2), con las mismas reglas que la búsqueda del catálogo (sin mayúsculas ni tildes, por palabras).
 - Atribución a USDA FoodData Central en la app y en el README.
 
+Decidido: `reference_db = 'argenfoods'` se mantiene en el esquema (sin migración); los alimentos ya cargados así se conservan (spec §14 #49).
+
+Funcionalidades (ciclo de agentes): 1) formulario simple — implementada: a la vista nombre, "¿Se cocina antes de comer?" (Sí / No, obligatoria) y "HC cada 100 g" (", en crudo" con "Sí"), con ⓘ (`src/components/InfoTip.tsx`); en "Más opciones", cuánto rinde (peso crudo y cocido, sin modo; vacíos conservan el factor guardado; "100 g crudo rinden X g cocido" con `cookedGramsPer100gRaw` en `src/domain/dose/`), la unidad, la marca y la nota opcional; sin fuente, ARGENFOODS, código ni descripción (el alta es siempre `manual` y la edición no envía las columnas de referencia); migración `foods_note_optional` (saca `foods_manual_requires_note`) y su caso en `scripts/rls-check/` (spec §6.3, §6.4 y §14 #49); 2) seed USDA — implementada: SR Legacy (abril 2018, CSV; los CSV van en `scripts/usda-seed/data/`, que no se commitea), lista curada de 185 alimentos en `scripts/usda-seed/selection.json`, script `scripts/usda-seed/build.ts` (funciones puras en `seed.ts`, con tests) que arma la migración `20261115032505_reference_foods_usda_seed.sql` (`delete` + `insert`, todo `as_eaten`), `carbsWithoutFiber` en `src/domain/dose/` y tres casos nuevos de `reference_foods` en `scripts/rls-check/` (spec §5.2, §7.1 y §14 #50). La migración la aplica la sesión principal en `dev`. 3) elegir de la tabla desde la comida — implementada: el buscador de Inicio busca también en las 185 filas de `reference_foods`, solo las que se comen tal cual (`as_eaten`, todo el seed) (`useReferenceFoods`, una sola lectura con `staleTime: Infinity`), con los grupos "Tus alimentos" y "Tabla de alimentos" (`pickerResults` en `src/features/meals/tableFoods.ts`; una entrada se oculta si su copia está entre los resultados del catálogo); al tocar una se agrega a la comida sin pedido al servidor, y al guardar `createMeal` busca la copia en el catálogo o la crea (`findOrCreateTableFood`) antes de insertar el `meal`; ⓘ con el aviso del valor de tabla en la línea de HC de cada ítem que viene de la tabla; se borró el estado "Todavía no cargaste alimentos." de la comida; sin migración (spec §6.2, §6.6, §7.2 y §14 #51). El "Terminada cuando" de la banana y el arroz se marca al probarlo en el iPhone. 4) palabras claras — implementada: ninguna pantalla dice "factor", "Estado", "Fuente", "Tabla de referencia", USDA, el código ni la descripción en inglés; cuánto rinde se dice "100 g crudo rinden X g cocido" (comida, historial, catálogo y advertencias; `cookedPer100gText`, `isFromTable` y `TABLE_VALUE_INFO` pasaron a `src/lib/foodText.ts`); el detalle del alimento muestra "De la tabla de alimentos" + ⓘ solo en las copias de la tabla, "¿Se cocina antes de comer?", el rótulo del HC del formulario y "Cuánto rinde al cocinarlo"; "Falta cuánto rinde"; Configuración con "Alerta de gramos por alimento (g)" y ⓘ en las dos alertas (`src/features/settings/fields.ts`); en la comida y el historial, a la vista los HC de cada ítem, "HC total" y "Dosis", y la cuenta en "Ver la cuenta" (`CalculationDetails`, cerrado por defecto; decisión del usuario), con la cuenta del cocido "Cocido: 78,0 × 100 ÷ 260 = 30,0 g de HC cada 100 g" y en el total solo la línea de la dosis (la suma de los ítems se sacó en la revisión porque no siempre cerraba por el redondeo); el ⓘ de la tabla, junto al nombre del alimento; se borraron `formatCookingFactor` y `REFERENCE_DB_LABELS`; test de protección `src/plainWords.test.ts`; sin migración (spec §6.5–§6.8, §8.1–§8.3, §8.6 y §14 #52); 5) atribución a USDA — implementada: texto con link al pie de Configuración y cita en el README (spec §14 #52 (10)). Al terminar la funcionalidad 4 el usuario pidió que el ciclo de agentes sea proporcional al cambio: `CLAUDE.md` y `.claude/agents/tester.md` se ajustaron. Probado en el iPhone (2026-11-15), en la versión de prueba de la rama: alta a mano, banana y arroz hervido desde la tabla, "Ver la cuenta" y la atribución a USDA. `scripts/rls-check/` pasó entero contra `dev`, con los cuatro casos nuevos. Ajustes tras la prueba: con ítems, botón «Agregar alimento» que despliega el buscador (sin ítems se ve abierto, como antes), HC sin ruido binario en la edición y texto de cuánto rinde más claro (spec §14 #53).
+
 **Terminada cuando**:
-- [ ] El seed está cargado: el usuario no tiene que cargar a mano la fruta, la verdura, el pan ni lo que se cocina.
-- [ ] Desde Inicio, una banana y un arroz hervido se buscan, se eligen de la tabla y se usan en una comida, sin darlos de alta antes, desde el iPhone.
-- [ ] El alta a mano muestra solo nombre, HC cada 100 g y "¿Se cocina antes de comer?", sin ARGENFOODS, código ni nota obligatoria.
-- [ ] La atribución a USDA está visible.
+- [x] El seed está cargado: el usuario no tiene que cargar a mano la fruta, la verdura, el pan ni lo que se cocina (185 alimentos, migración aplicada en `dev` el 2026-11-15).
+- [x] Desde Inicio, una banana y un arroz hervido se buscan, se eligen de la tabla y se usan en una comida, sin darlos de alta antes, desde el iPhone.
+- [x] El alta a mano muestra solo nombre, HC cada 100 g y "¿Se cocina antes de comer?", sin ARGENFOODS, código ni nota obligatoria.
+- [x] La atribución a USDA está visible: al pie de Configuración (con link a FoodData Central) y en el README, "Fuentes de datos".
 
 ## Etapa 7 — `create_meal`, pulido y paso a producción
 
@@ -290,6 +294,7 @@ Incluye:
 Incluye:
 - **`create_meal(payload jsonb)`** (spec §7.2): inserción atómica, `security invoker`, verificación de que los totales y la dosis coincidan con la suma de los ítems. El cliente pasa a usarla y se elimina el guardado provisorio de la etapa 5.
 - Pulido: estados vacíos, mensajes de error y revisión general de la UI en el iPhone.
+- Salir de Inicio pierde la comida en curso (también los links «Cargar cuánto rinde» e «Ir a Configuración», spec §14 #52): conservarla al salir, por ejemplo en `sessionStorage`.
 - **Cambio a prod**:
   - aplicar todas las migraciones en `prod`: `npx supabase link --project-ref zoxlvutjqolwfjcsbtog`, `npx supabase db push --remote`, y después volver a vincular `dev` (`npx supabase link --project-ref xyolhiklqqoejkapqbxt`), porque la CLI queda vinculada a un solo proyecto;
   - correr la prueba de aislamiento contra `prod`, con dos usuarios de prueba creados ahí y borrados al terminar;

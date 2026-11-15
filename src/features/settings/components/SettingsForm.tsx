@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { InfoTip } from '../../../components/InfoTip.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
   formatUserNumber,
@@ -11,16 +12,11 @@ import {
   positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
 import type { Settings } from '../../../lib/settings.ts'
+import { SETTINGS_FIELDS } from '../fields.ts'
 import { useUpdateSettings } from '../queries.ts'
 import type { SettingsValues } from '../types.ts'
 
 type FieldName = keyof SettingsValues
-
-const FIELDS: { name: FieldName; label: string }[] = [
-  { name: 'carb_ratio_g_per_unit', label: 'Ratio (g de HC por unidad)' },
-  { name: 'max_dose_warning_units', label: 'Alerta de dosis máxima (U)' },
-  { name: 'max_item_grams_warning', label: 'Alerta de gramos por ítem (g)' },
-]
 
 type FieldTexts = Record<FieldName, string>
 
@@ -101,19 +97,22 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         </p>
       )}
 
-      {FIELDS.map(({ name, label }) => {
+      {SETTINGS_FIELDS.map(({ name, label, info }) => {
         const shownError = shownErrors[name]
         const showError = shownError !== null
         const inputId = `settings-${name}`
         const errorId = `${inputId}-error`
         return (
           <div key={name} className="flex flex-col gap-1">
-            <label
-              htmlFor={inputId}
-              className="text-sm font-medium text-slate-700"
-            >
-              {label}
-            </label>
+            <div className="flex flex-wrap items-center">
+              <label
+                htmlFor={inputId}
+                className="text-sm font-medium text-slate-700"
+              >
+                {label}
+              </label>
+              {info !== undefined && <InfoTip text={info} />}
+            </div>
             <NumberInput
               id={inputId}
               name={name}
