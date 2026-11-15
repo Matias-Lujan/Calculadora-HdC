@@ -52,6 +52,20 @@ export function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* USDA attribution for the table of foods (spec §5.2, §14 #50). */}
+      <p className="text-sm text-slate-500">
+        Los valores de la tabla de alimentos son de{' '}
+        <a
+          href="https://fdc.nal.usda.gov/"
+          target="_blank"
+          rel="noreferrer"
+          className="underline"
+        >
+          USDA FoodData Central
+        </a>
+        , del Departamento de Agricultura de EE. UU. (dominio público).
+      </p>
     </section>
   )
 }

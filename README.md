@@ -53,7 +53,7 @@ Las variables van en `.env.local`, a partir de [.env.example](.env.example): las
 
 ## Fuentes de datos
 
-- **USDA FoodData Central** (dominio público, CC0): https://fdc.nal.usda.gov/
+- **USDA FoodData Central** (dominio público, CC0): https://fdc.nal.usda.gov/. La tabla de alimentos de la app (185 alimentos, en `reference_foods`) sale de SR Legacy (abril de 2018), con los HC sin fibra; la lista elegida y el script que arma la migración están en `scripts/usda-seed/`. Cita: U.S. Department of Agriculture, Agricultural Research Service, Beltsville Human Nutrition Research Center. FoodData Central. Available from https://fdc.nal.usda.gov/.
 - **ARGENFOODS**, Universidad Nacional de Luján: https://www.argenfood.unlu.edu.ar/. Sus datos **no se incluyen** en este repositorio ni se redistribuyen: no tienen una licencia de redistribución publicada. Cada usuario los consulta y los carga en su propia base.
 
 ## Licencia
