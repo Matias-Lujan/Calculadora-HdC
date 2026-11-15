@@ -8,6 +8,7 @@ export { CALC_VERSION, calculateMeal } from './calculate.ts'
 export { isValidCarbsPer100g, parseCarbsPer100g } from './carbsPer100g.ts'
 export type { CarbsPer100gError, CarbsPer100gResult } from './carbsPer100g.ts'
 export {
+  cookedGramsPer100gRaw,
   cookingFactorFromWeights,
   isCookingFactorUnusual,
   needsCookingFactor,

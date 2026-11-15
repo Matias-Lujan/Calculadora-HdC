@@ -8,8 +8,12 @@ function roundHalfUp(value: number, decimals: number): number {
   return shiftDecimal(Math.round(shiftDecimal(value, decimals)), -decimals)
 }
 
-/** Multiplies by 10^places by moving the decimal exponent of the string form. */
-function shiftDecimal(value: number, places: number): number {
+/**
+ * Multiplies by 10^places by moving the decimal exponent of the string form,
+ * so 1.1 shifted by 2 is exactly 110 (1.1 * 100 is 110.00000000000001).
+ * Shared with cookingFactor.ts; not exported from index.ts.
+ */
+export function shiftDecimal(value: number, places: number): number {
   const [mantissa, exponent = '0'] = String(value).split('e')
   return Number(`${mantissa}e${Number(exponent) + places}`)
 }

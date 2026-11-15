@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7 y #8 mergeados; la etapa 5, rama `etapa-5-comidas`, con su PR por mergear). La próxima es la etapa 6b. Orden de lo que falta: 6b, 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-14.
+**Estado: etapas 0 a 5 terminadas (PR #1 a #4, #7, #8 y #10 mergeados). Etapa 6b en curso, en la rama `etapa-6b-tabla-referencia`. Orden de lo que falta: 6b, 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-14.
 
 ---
 
@@ -32,8 +32,8 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 2 | Supabase: esquema, RLS y storage | La prueba con dos usuarios confirma el aislamiento | ✅ PR #4 |
 | 3 | Login, sesión, configuración, app instalable | Login en el iPhone desde la pantalla de inicio, y la sesión sobrevive al cerrar la app | ✅ PR #7 |
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
-| 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR por mergear |
-| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | |
+| 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
+| 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | En curso |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
@@ -276,6 +276,10 @@ Incluye:
 - Un script en `scripts/` que arma la migración del seed desde los archivos de USDA (sin API en la app), con la lista de `fdc_id` elegidos y sus nombres en español versionados en el repo.
 - **Búsqueda en `reference_foods`** (§6.2), con las mismas reglas que la búsqueda del catálogo (sin mayúsculas ni tildes, por palabras).
 - Atribución a USDA FoodData Central en la app y en el README.
+
+Decidido: `reference_db = 'argenfoods'` se mantiene en el esquema (sin migración); los alimentos ya cargados así se conservan (spec §14 #49).
+
+Funcionalidades (ciclo de agentes): 1) formulario simple — implementada: a la vista nombre, "¿Se cocina antes de comer?" (Sí / No, obligatoria) y "HC cada 100 g" (", en crudo" con "Sí"), con ⓘ (`src/components/InfoTip.tsx`); en "Más opciones", cuánto rinde (peso crudo y cocido, sin modo; vacíos conservan el factor guardado; "100 g crudo rinden X g cocido" con `cookedGramsPer100gRaw` en `src/domain/dose/`), la unidad, la marca y la nota opcional; sin fuente, ARGENFOODS, código ni descripción (el alta es siempre `manual` y la edición no envía las columnas de referencia); migración `foods_note_optional` (saca `foods_manual_requires_note`) y su caso en `scripts/rls-check/` (spec §6.3, §6.4 y §14 #49). **Pendiente antes de cerrar la etapa**: correr `scripts/rls-check/` con los usuarios de prueba para el caso nuevo "foods: acepta un alimento manual sin nota"; no corrió porque las credenciales de `.env.local` no inician sesión en `dev`.
 
 **Terminada cuando**:
 - [ ] El seed está cargado: el usuario no tiene que cargar a mano la fruta, la verdura, el pan ni lo que se cocina.

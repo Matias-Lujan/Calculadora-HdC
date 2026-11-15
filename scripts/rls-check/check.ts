@@ -502,6 +502,19 @@ console.log('\nControles de la base (red de seguridad)')
     'foods: rechaza más de 100 g de HC por 100 g',
     carbsOver100.error !== null,
   )
+  // Positive case (spec §14 #49): the note of a manual food is optional.
+  // The row is removed with the test user, like the rest of A's data.
+  const manualWithoutNote = await a.supabase.from('foods').insert({
+    name: 'x',
+    source: 'manual',
+    state: 'as_eaten',
+    carbs_per_100g: 10,
+  })
+  check(
+    'foods: acepta un alimento manual sin nota',
+    manualWithoutNote.error === null,
+    manualWithoutNote.error?.message,
+  )
 }
 
 // --- Cleanup: files are not deleted with the users -------------------------------

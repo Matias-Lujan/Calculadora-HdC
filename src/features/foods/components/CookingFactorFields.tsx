@@ -1,47 +1,45 @@
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
-  measuredFactorLine,
-  type FactorMode,
+  cookedPer100gText,
+  yieldLine,
   type FoodFormErrors,
   type FoodFormTexts,
 } from '../foodForm.ts'
-import { FieldError, RadioGroup } from './FormControls.tsx'
+import { FieldError } from './FormControls.tsx'
 
-type FactorField = 'rawWeight' | 'cookedWeight' | 'cookingFactor'
+type WeightField = 'rawWeight' | 'cookedWeight'
 
 type Props = {
-  texts: Pick<
-    FoodFormTexts,
-    'factorMode' | 'rawWeight' | 'cookedWeight' | 'cookingFactor'
-  >
+  texts: Pick<FoodFormTexts, 'rawWeight' | 'cookedWeight'>
   errors: FoodFormErrors
+  /** The factor of the food being edited; null for a new food. */
+  savedCookingFactor: number | null
   onChange: (patch: Partial<FoodFormTexts>) => void
-  onBlur: (field: FactorField) => void
+  onBlur: (field: WeightField) => void
 }
 
-const MODE_OPTIONS: readonly { value: FactorMode; label: string }[] = [
-  { value: 'measure', label: 'Medirlo (pesos)' },
-  { value: 'direct', label: 'Escribirlo' },
-]
-
-/** Cooking factor of a raw_cooked food: measured with weights or typed. */
+/**
+ * How much a raw_cooked food yields when cooked (spec §6.4): the raw and
+ * cooked weights. Both empty keep the saved cooking factor.
+ */
 export function CookingFactorFields({
   texts,
   errors,
+  savedCookingFactor,
   onChange,
   onBlur,
 }: Props) {
-  const measuredText = measuredFactorLine(texts)
+  const liveText = yieldLine(texts)
+  const savedText =
+    savedCookingFactor === null ? null : cookedPer100gText(savedCookingFactor)
   const measuredErrorId = 'food-measured-factor-error'
 
-  function numberField(field: FactorField, label: string) {
+  function weightField(field: WeightField, label: string) {
     const id = `food-${field}`
     const error = errors[field]
     const describedBy = [
       error !== undefined ? `${id}-error` : null,
-      field !== 'cookingFactor' && errors.measuredFactor !== undefined
-        ? measuredErrorId
-        : null,
+      errors.measuredFactor !== undefined ? measuredErrorId : null,
     ]
       .filter((value) => value !== null)
       .join(' ')
@@ -66,32 +64,28 @@ export function CookingFactorFields({
 
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3">
-      <h2 className="text-base font-semibold">Factor de cocción</h2>
-      <RadioGroup
-        name="food-factor-mode"
-        legend="¿Cómo lo cargás?"
-        options={MODE_OPTIONS}
-        value={texts.factorMode}
-        onChange={(factorMode) => onChange({ factorMode })}
-      />
-
-      {texts.factorMode === 'measure' ? (
-        <>
-          {numberField('rawWeight', 'Peso crudo (g)')}
-          {numberField('cookedWeight', 'Peso cocido (g)')}
-          <FieldError id={measuredErrorId} error={errors.measuredFactor} />
-          <p aria-live="polite" className="text-base">
-            {measuredText}
-          </p>
-        </>
-      ) : (
-        numberField('cookingFactor', 'Factor (cocido ÷ crudo)')
-      )}
-
+      <h2 className="text-base font-semibold">Cuánto rinde al cocinarlo</h2>
       <p className="text-sm text-slate-600">
-        Si lo dejás vacío, podés cargarlo después. Sin factor no se puede usar
-        en una comida.
+        Pesalo crudo, cocinalo y volvé a pesarlo. Si ya sabés cuánto rinde, poné
+        100 en el peso crudo.
       </p>
+      {savedText !== null && (
+        <p className="text-base">
+          Ahora: {savedText}. Para cambiarlo, completá los dos pesos.
+        </p>
+      )}
+      {weightField('rawWeight', 'Peso crudo (g)')}
+      {weightField('cookedWeight', 'Peso cocido (g)')}
+      <FieldError id={measuredErrorId} error={errors.measuredFactor} />
+      <p aria-live="polite" className="text-base">
+        {liveText}
+      </p>
+      {savedText === null && (
+        <p className="text-sm text-slate-600">
+          Si lo dejás vacío, lo podés cargar después, pero hasta entonces no se
+          puede usar en una comida.
+        </p>
+      )}
     </section>
   )
 }

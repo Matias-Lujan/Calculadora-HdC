@@ -1,25 +1,21 @@
 import {
+  cookedGramsPer100gRaw,
   cookingFactorFromWeights,
-  formatCookingFactor,
+  formatGrams,
   formatUserNumber,
   isCookingFactorUnusual,
   parseCarbsPer100g,
   parsePositiveUserNumber,
 } from '../../domain/dose/index.ts'
-import type { FoodFieldError } from '../../lib/errors.ts'
-import type { Food } from '../../lib/foods.ts'
 import {
-  REFERENCE_DB_LABELS,
-  type FoodFormValues,
-  type FormSource,
-  type NewFood,
-} from './types.ts'
+  cookingFactorUnusualMessage,
+  type FoodFieldError,
+} from '../../lib/errors.ts'
+import type { Food } from '../../lib/foods.ts'
+import type { FoodFormValues, NewFood } from './types.ts'
 
-// Pure logic of the food form (create and edit, spec §6.2–§6.5). It does no
+// Pure logic of the food form (create and edit, spec §6.3–§6.5). It does no
 // math of its own: numbers go through src/domain/dose.
-
-/** How the cooking factor is entered: measured with weights or typed. */
-export type FactorMode = 'measure' | 'direct'
 
 /** What the form fields hold, as typed. */
 export type FoodFormTexts = {
@@ -27,20 +23,16 @@ export type FoodFormTexts = {
   brand: string
   state: Food['state'] | null
   carbsPer100g: string
-  factorMode: FactorMode
   rawWeight: string
   cookedWeight: string
-  cookingFactor: string
   unitWeight: string
   unitLabel: string
   notes: string
-  referenceCode: string
-  referenceDescription: string
 }
 
 /**
  * The error of each field, by field name. `measuredFactor` is the error of
- * the factor measured with both weights.
+ * the cooking factor measured with both weights.
  */
 export type FoodFormErrors = Partial<
   Record<keyof FoodFormTexts | 'measuredFactor', FoodFieldError>
@@ -57,8 +49,9 @@ function numberText(value: number | null): string {
 }
 
 /**
- * The texts the form starts with: empty for a new food (no state chosen,
- * factor measured), or the food's values, exact, when editing.
+ * The texts the form starts with: empty for a new food (no state chosen),
+ * or the food's values, exact, when editing. The weights always start
+ * empty: empty means "the saved cooking factor does not change" (§6.4).
  */
 export function initialFoodFormTexts(food?: Food): FoodFormTexts {
   if (food === undefined) {
@@ -67,15 +60,11 @@ export function initialFoodFormTexts(food?: Food): FoodFormTexts {
       brand: '',
       state: null,
       carbsPer100g: '',
-      factorMode: 'measure',
       rawWeight: '',
       cookedWeight: '',
-      cookingFactor: '',
       unitWeight: '',
       unitLabel: '',
       notes: '',
-      referenceCode: '',
-      referenceDescription: '',
     }
   }
   return {
@@ -83,15 +72,11 @@ export function initialFoodFormTexts(food?: Food): FoodFormTexts {
     brand: food.brand ?? '',
     state: food.state,
     carbsPer100g: formatUserNumber(food.carbs_per_100g),
-    factorMode: food.cooking_factor === null ? 'measure' : 'direct',
     rawWeight: '',
     cookedWeight: '',
-    cookingFactor: numberText(food.cooking_factor),
     unitWeight: numberText(food.unit_weight_g),
     unitLabel: food.unit_label ?? '',
     notes: food.notes ?? '',
-    referenceCode: food.reference_code ?? '',
-    referenceDescription: food.reference_description ?? '',
   }
 }
 
@@ -102,12 +87,22 @@ function optionalText(text: string): string | null {
 }
 
 /**
- * The live line of the measured factor (spec §6.4), "Factor = 260 ÷ 100 =
- * 2,60": the weights exact, the factor with 2 decimals. null when a weight
- * is missing or not valid, or the quotient is not computable. It does not
- * depend on the factor mode.
+ * How much 100 g raw yield cooked, "100 g crudo rinden 260 g cocido" (spec
+ * §6.4), with the grams formatted by formatGrams. Only for display. null
+ * when the factor is not valid.
  */
-export function measuredFactorLine(
+export function cookedPer100gText(factor: number): string | null {
+  const grams = cookedGramsPer100gRaw(factor)
+  if (grams === null) return null
+  return `100 g crudo rinden ${formatGrams(grams)} g cocido`
+}
+
+/**
+ * The live line of the weights (spec §6.4), "Con estos pesos, 100 g crudo
+ * rinden 261,1 g cocido.". null when a weight is missing or not valid, or
+ * the quotient is not computable.
+ */
+export function yieldLine(
   texts: Pick<FoodFormTexts, 'rawWeight' | 'cookedWeight'>,
 ): string | null {
   const raw = parsePositiveUserNumber(texts.rawWeight)
@@ -115,7 +110,8 @@ export function measuredFactorLine(
   if ('error' in raw || 'error' in cooked) return null
   const factor = cookingFactorFromWeights(raw.value, cooked.value)
   if (factor === null) return null
-  return `Factor = ${formatUserNumber(cooked.value)} ÷ ${formatUserNumber(raw.value)} = ${formatCookingFactor(factor)}`
+  const text = cookedPer100gText(factor)
+  return text === null ? null : `Con estos pesos, ${text}.`
 }
 
 /**
@@ -131,55 +127,49 @@ export function unitLine(
   return `1 ${label} = ${formatUserNumber(weight.value)} g`
 }
 
-type ReferenceDb = Food['reference_db']
-
-/** The source shown when editing (it is not editable). */
-export function sourceText(
-  source: Food['source'],
-  referenceDb: ReferenceDb,
-): string {
-  if (source === 'manual') return 'Manual'
-  if (source === 'label') return 'Etiqueta'
-  return referenceDb === null
-    ? 'Tabla de referencia'
-    : `Tabla de referencia (${REFERENCE_DB_LABELS[referenceDb]})`
+/** The label of the carbs field: "en crudo" when the food is cooked. */
+export function carbsLabel(state: Food['state'] | null): string {
+  return state === 'raw_cooked' ? 'HC cada 100 g, en crudo' : 'HC cada 100 g'
 }
 
-/** The label of the reference code field. */
-export function referenceCodeLabel(referenceDb: ReferenceDb): string {
-  return referenceDb === null
-    ? 'Código de referencia'
-    : `Código ${REFERENCE_DB_LABELS[referenceDb]}`
+/**
+ * Whether "Más opciones" starts open: closed for a new food; when editing,
+ * open if something inside it is loaded (brand, unit or note) or the food
+ * is cooked (how much it yields is inside).
+ */
+export function startsWithMoreOptionsOpen(food?: Food): boolean {
+  if (food === undefined) return false
+  return (
+    food.brand !== null ||
+    food.unit_weight_g !== null ||
+    food.unit_label !== null ||
+    food.notes !== null ||
+    food.state === 'raw_cooked'
+  )
 }
 
-/** "HC asimilables" is ARGENFOODS's name for carbs without fiber (§6.2). */
-export function carbsLabel(
-  referenceDb: ReferenceDb,
-  state: Food['state'] | null,
-): string {
-  const raw = state === 'raw_cooked' ? ', en crudo' : ''
-  if (referenceDb === 'argenfoods') return `HC asimilables cada 100 g${raw}`
-  return `HC cada 100 g${raw} (sin fibra)`
+/** Whether a field inside "Más opciones" has an error. */
+export function hasMoreOptionsErrors(errors: FoodFormErrors): boolean {
+  return (
+    errors.unitWeight !== undefined ||
+    errors.rawWeight !== undefined ||
+    errors.cookedWeight !== undefined ||
+    errors.measuredFactor !== undefined
+  )
 }
 
-/** Cooking factor of a raw_cooked food: null is a valid "not loaded yet". */
+/**
+ * Cooking factor of a raw_cooked food. Both weights empty keep the saved
+ * factor as it is (null for a new food: a valid "not loaded yet").
+ */
 function validateCookingFactor(
   texts: FoodFormTexts,
+  savedCookingFactor: number | null,
   errors: FoodFormErrors,
 ): number | null {
-  if (texts.factorMode === 'direct') {
-    if (texts.cookingFactor.trim() === '') return null
-    const result = parsePositiveUserNumber(texts.cookingFactor)
-    if ('error' in result) {
-      errors.cookingFactor = result.error
-      return null
-    }
-    return result.value
-  }
-
   const rawEmpty = texts.rawWeight.trim() === ''
   const cookedEmpty = texts.cookedWeight.trim() === ''
-  if (rawEmpty && cookedEmpty) return null
+  if (rawEmpty && cookedEmpty) return savedCookingFactor
 
   const raw = parsePositiveUserNumber(texts.rawWeight)
   const cooked = parsePositiveUserNumber(texts.cookedWeight)
@@ -187,8 +177,13 @@ function validateCookingFactor(
   if ('error' in cooked) errors.cookedWeight = cooked.error
   if ('error' in raw || 'error' in cooked) return null
 
+  // A factor whose yield cannot be shown (it overflows when moved to grams
+  // per 100 g) is not computable either: the form could not say it.
   const factor = cookingFactorFromWeights(raw.value, cooked.value)
-  if (factor === null) errors.measuredFactor = 'FACTOR_NOT_COMPUTABLE'
+  if (factor === null || cookedGramsPer100gRaw(factor) === null) {
+    errors.measuredFactor = 'FACTOR_NOT_COMPUTABLE'
+    return null
+  }
   return factor
 }
 
@@ -212,29 +207,19 @@ function validateUnit(
 
 /**
  * Validates the form and returns what to save, or the error of each field.
- * Hidden fields (the factor of an as_eaten food, the unit of a raw_cooked
- * one, the inactive factor mode, the reference fields of another source)
- * are neither validated nor saved, even if they still hold text.
+ * `savedCookingFactor` is the factor of the food being edited (null for a
+ * new food): it is kept when both weights are empty. Hidden fields (the
+ * weights of an as_eaten food, the unit of a raw_cooked one) are neither
+ * validated nor saved, even if they still hold text.
  */
 export function validateFoodForm(
   texts: FoodFormTexts,
-  source: Food['source'],
+  savedCookingFactor: number | null,
 ): FoodFormResult {
   const errors: FoodFormErrors = {}
 
   const name = texts.name.trim()
   if (name === '') errors.name = 'REQUIRED'
-
-  const notes = optionalText(texts.notes)
-  if (source === 'manual' && notes === null) errors.notes = 'REQUIRED'
-
-  let referenceCode: string | null = null
-  let referenceDescription: string | null = null
-  if (source === 'reference') {
-    referenceCode = optionalText(texts.referenceCode)
-    if (referenceCode === null) errors.referenceCode = 'REQUIRED'
-    referenceDescription = optionalText(texts.referenceDescription)
-  }
 
   const carbs = parseCarbsPer100g(texts.carbsPer100g)
   if ('error' in carbs) errors.carbsPer100g = carbs.error
@@ -247,7 +232,7 @@ export function validateFoodForm(
   if (texts.state === null) {
     errors.state = 'STATE_REQUIRED'
   } else if (texts.state === 'raw_cooked') {
-    cookingFactor = validateCookingFactor(texts, errors)
+    cookingFactor = validateCookingFactor(texts, savedCookingFactor, errors)
   } else {
     unit = validateUnit(texts, errors)
   }
@@ -269,9 +254,7 @@ export function validateFoodForm(
       cooking_factor: cookingFactor,
       unit_weight_g: unit.unit_weight_g,
       unit_label: unit.unit_label,
-      notes,
-      reference_code: referenceCode,
-      reference_description: referenceDescription,
+      notes: optionalText(texts.notes),
     },
     errors,
   }
@@ -288,18 +271,17 @@ export function needsFactorConfirmation(values: FoodFormValues): boolean {
   )
 }
 
-/** The reference base a new food gets: from the form, only ARGENFOODS. */
-export function newFoodReferenceDb(
-  source: FormSource,
-): NewFood['reference_db'] {
-  return source === 'reference' ? 'argenfoods' : null
+/**
+ * The text of the unusual-factor confirmation, said as how much 100 g raw
+ * yield. null when the factor is not valid.
+ */
+export function unusualYieldText(factor: number): string | null {
+  const grams = cookedGramsPer100gRaw(factor)
+  if (grams === null) return null
+  return cookingFactorUnusualMessage(formatGrams(grams))
 }
 
-/** The row to insert for a new food. */
-export function toNewFood(source: FormSource, values: FoodFormValues): NewFood {
-  return {
-    ...values,
-    source,
-    reference_db: newFoodReferenceDb(source),
-  }
+/** The row to insert for a new food: always manual (spec §6.3). */
+export function toNewFood(values: FoodFormValues): NewFood {
+  return { ...values, source: 'manual' }
 }

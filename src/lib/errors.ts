@@ -104,17 +104,18 @@ const FOOD_FIELD_ERRORS: Record<FoodFieldError, string> = {
   STATE_REQUIRED: 'Elegí una opción.',
   UNIT_WEIGHT_REQUIRED: 'Completá el peso de la unidad, o borrá el nombre.',
   FACTOR_NOT_COMPUTABLE:
-    'Con estos pesos no se puede calcular el factor. Revisalos.',
+    'Con estos pesos no se puede calcular cuánto rinde. Revisalos.',
 }
 
 export function foodFieldErrorMessage(code: FoodFieldError): string {
   return FOOD_FIELD_ERRORS[code]
 }
 
-// Confirmation asked before saving a cooking factor outside 1–4 (spec §6.4).
-// Receives the factor already formatted with formatCookingFactor.
-export function cookingFactorUnusualMessage(formattedFactor: string): string {
-  return `El factor de cocción da ${formattedFactor}, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?`
+// Confirmation asked before saving a cooking factor outside 1–4 (spec §6.4),
+// said as how much 100 g raw yield. Receives the cooked grams already
+// formatted (foodForm.ts, unusualYieldText).
+export function cookingFactorUnusualMessage(cookedGrams: string): string {
+  return `Con estos datos, 100 g crudo rinden ${cookedGrams} g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?`
 }
 
 /**

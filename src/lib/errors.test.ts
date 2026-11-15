@@ -330,7 +330,7 @@ describe('foodFieldErrorMessage', () => {
     ],
     [
       'FACTOR_NOT_COMPUTABLE',
-      'Con estos pesos no se puede calcular el factor. Revisalos.',
+      'Con estos pesos no se puede calcular cuánto rinde. Revisalos.',
     ],
   ])('%s', (code, message) => {
     expect(foodFieldErrorMessage(code)).toBe(message)
@@ -345,12 +345,33 @@ describe('foodFieldErrorMessage', () => {
 })
 
 describe('cookingFactorUnusualMessage', () => {
-  it('includes the formatted factor', () => {
-    const message = cookingFactorUnusualMessage('0,90')
-    expect(message).toContain('0,90')
+  it('says how much 100 g raw yield, with the formatted grams', () => {
+    const message = cookingFactorUnusualMessage('90')
+    expect(message).toContain('90 g cocido')
     expect(message).toBe(
-      'El factor de cocción da 0,90, fuera de lo habitual (entre 1 y 4). Puede ser un error de tipeo. ¿Lo guardás igual?',
+      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
+  })
+})
+
+describe('food form texts, plain words (spec §14 #48)', () => {
+  const codes: FoodFieldError[] = [
+    'REQUIRED',
+    'INVALID_NUMBER',
+    'NOT_POSITIVE',
+    'ABOVE_100',
+    'STATE_REQUIRED',
+    'UNIT_WEIGHT_REQUIRED',
+    'FACTOR_NOT_COMPUTABLE',
+  ]
+  const messages = [
+    ...codes.map(foodFieldErrorMessage),
+    cookingFactorUnusualMessage('90'),
+    cookingFactorUnusualMessage('450'),
+  ]
+
+  it.each(messages)('%j has no technical terms', (message) => {
+    expect(message).not.toMatch(/factor|estado|asimilables/i)
   })
 })
 
