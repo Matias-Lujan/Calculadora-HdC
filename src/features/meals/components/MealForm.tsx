@@ -281,42 +281,47 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         </ul>
       )}
 
-      {/* Without items there is no total box: "Agregar alimento" is the
-          first thing of the meal (§14 #53). */}
-      {items.length > 0 && (
-        <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
-          {result.ok ? (
-            <>
-              <p className="text-slate-700">
-                {totalCarbsText(result.totalCarbsG)}
-              </p>
-              <p className="text-xl font-semibold">
-                {doseText(result.doseUnits)}
-              </p>
-              <CalculationDetails
-                lines={[
-                  doseLine(
-                    result.totalCarbsG,
-                    settings.carb_ratio_g_per_unit,
-                    result.doseUnits,
-                  ),
-                ]}
-              />
-            </>
-          ) : result.errors.includes('INVALID_RATIO') ? (
-            <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
-          ) : result.errors.includes('INVALID_QUANTITY') ? (
-            <p className="text-red-700">{MEAL_OUT_OF_RANGE_MESSAGE}</p>
-          ) : (
+      <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
+        {items.length === 0 ? (
+          <p className="text-slate-700">
+            Agregá alimentos para ver los HC y la dosis.
+          </p>
+        ) : result.ok ? (
+          <>
             <p className="text-slate-700">
-              Para ver el total y la dosis, completá o corregí los alimentos de
-              arriba.
+              {totalCarbsText(result.totalCarbsG)}
             </p>
-          )}
-        </div>
-      )}
+            <p className="text-xl font-semibold">
+              {doseText(result.doseUnits)}
+            </p>
+            <CalculationDetails
+              lines={[
+                doseLine(
+                  result.totalCarbsG,
+                  settings.carb_ratio_g_per_unit,
+                  result.doseUnits,
+                ),
+              ]}
+            />
+          </>
+        ) : result.errors.includes('INVALID_RATIO') ? (
+          <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
+        ) : result.errors.includes('INVALID_QUANTITY') ? (
+          <p className="text-red-700">{MEAL_OUT_OF_RANGE_MESSAGE}</p>
+        ) : (
+          <p className="text-slate-700">
+            Para ver el total y la dosis, completá o corregí los alimentos de
+            arriba.
+          </p>
+        )}
+      </div>
 
-      <FoodPicker foods={foods} tableFoods={tableFoods} onPick={handlePick} />
+      <FoodPicker
+        foods={foods}
+        tableFoods={tableFoods}
+        onPick={handlePick}
+        alwaysOpen={items.length === 0}
+      />
 
       {items.length > 0 && (
         <div className="flex flex-col gap-4">

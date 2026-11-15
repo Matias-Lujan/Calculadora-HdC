@@ -13,18 +13,21 @@ type Props = {
   /** The reference table foods, not copied yet (spec §6.2). */
   tableFoods: MealFood[]
   onPick: (food: MealFood) => void
+  /** The meal has no items: the search is shown open, without the button. */
+  alwaysOpen: boolean
 }
 
 /**
- * "Agregar alimento" (spec §6.6, §14 #53): a button that unfolds the search
- * box, with the same search as the catalog (spec §6.5), over the user's
- * foods and the reference table (spec §6.6, §14 #51). Results are shown only
+ * "Agregar alimento" (spec §6.6, §14 #53). With an empty meal the search box
+ * is shown open; once the meal has items, a button unfolds it. It uses the same
+ * search as the catalog (spec §6.5), over the user's foods and the reference table (spec §6.6, §14 #51). Results are shown only
  * while the search has text. A food eaten cooked without a factor is listed
  * but cannot be picked (spec §6.4). Picking a food folds and empties the
  * search; the same button folds it without picking.
  */
-export function FoodPicker({ foods, tableFoods, onPick }: Props) {
+export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
   const [open, setOpen] = useState(false)
+  const expanded = alwaysOpen || open
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
   const hasQuery = query.trim() !== ''
@@ -57,23 +60,34 @@ export function FoodPicker({ foods, tableFoods, onPick }: Props) {
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="meal-food-picker"
-        className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
-        onClick={toggle}
-      >
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
-        Agregar alimento
-      </button>
+      {!alwaysOpen && (
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="meal-food-picker"
+          className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+          onClick={toggle}
+        >
+          <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+          Agregar alimento
+        </button>
+      )}
 
-      {open && (
+      {expanded && (
         <div id="meal-food-picker" className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">
-            <label htmlFor="meal-food-search" className="sr-only">
-              Buscar alimento
-            </label>
+            {alwaysOpen ? (
+              <label
+                htmlFor="meal-food-search"
+                className="text-sm font-medium text-slate-700"
+              >
+                Agregar alimento
+              </label>
+            ) : (
+              <label htmlFor="meal-food-search" className="sr-only">
+                Buscar alimento
+              </label>
+            )}
             <input
               ref={inputRef}
               id="meal-food-search"
