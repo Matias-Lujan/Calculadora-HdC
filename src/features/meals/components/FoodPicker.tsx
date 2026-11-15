@@ -77,14 +77,14 @@ export function FoodPicker({ foods, tableFoods, onPick }: Props) {
                         <FoodName food={food} />
                         <MissingFactorBadge />
                         <span className="text-sm text-slate-700">
-                          Cargá el factor en el catálogo para usar este
-                          alimento.
+                          Para usarlo en una comida, cargá cuánto rinde al
+                          cocinarlo.
                         </span>
                         <Link
                           to={`/foods/${food.id}/edit`}
                           className="flex min-h-11 items-center text-base font-medium underline"
                         >
-                          Cargar el factor
+                          Cargar cuánto rinde
                         </Link>
                       </div>
                     ) : (

@@ -801,14 +801,27 @@ describe('saveWarnings', () => {
     ])
   })
 
-  it('a rice with factor 4,5 warns about the factor', () => {
+  it('a rice with factor 4,5 warns: 100 g raw yield 450 g cooked', () => {
     const food = { ...rice, cooking_factor: 4.5 }
     const items = [draft(food, '250')]
     expect(saveWarnings(items, calcOk(items), row)).toEqual([
       {
         code: 'COOKING_FACTOR_UNUSUAL',
         foodName: 'Arroz de prueba',
-        factor: '4,50',
+        cookedGrams: '450',
+      },
+    ])
+  })
+
+  it('a factor whose yield cannot be shown warns without the grams', () => {
+    // 50 ÷ 1e307 is a valid item; factor × 100 overflows.
+    const food = { ...rice, carbs_per_100g: 50, cooking_factor: 1e307 }
+    const items = [draft(food, '250')]
+    expect(saveWarnings(items, calcOk(items), row)).toEqual([
+      {
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        cookedGrams: null,
       },
     ])
   })
@@ -892,7 +905,7 @@ describe('saveWarnings', () => {
     expect(warnings[1]).toEqual({
       code: 'COOKING_FACTOR_UNUSUAL',
       foodName: 'Arroz de prueba',
-      factor: '0,90',
+      cookedGrams: '90',
     })
     expect(warnings[2]).toEqual({
       code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
@@ -1595,9 +1608,14 @@ describe('saveWarnings, edge cases', () => {
       const items = [draft({ ...rice, cooking_factor: factor }, '100')]
       expect(saveWarnings(items, calcOk(items, s), s)).toEqual([])
     }
+    // 4,0004 is unusual but is shown as "400", inside the usual range said
+    // in the message (accepted, spec §14 #52).
     const unusual: [number, string][] = [
-      [0.99, '0,99'],
-      [4.01, '4,01'],
+      [0.99, '99'],
+      [4.01, '401'],
+      [0.9, '90'],
+      [4.5, '450'],
+      [4.0004, '400'],
     ]
     for (const [factor, shown] of unusual) {
       const items = [draft({ ...rice, cooking_factor: factor }, '100')]
@@ -1605,7 +1623,7 @@ describe('saveWarnings, edge cases', () => {
         {
           code: 'COOKING_FACTOR_UNUSUAL',
           foodName: 'Arroz de prueba',
-          factor: shown,
+          cookedGrams: shown,
         },
       ])
     }
@@ -1645,7 +1663,7 @@ describe('saveWarnings, edge cases', () => {
       {
         code: 'COOKING_FACTOR_UNUSUAL',
         foodName: 'Arroz de prueba',
-        factor: '0,90',
+        cookedGrams: '90',
       },
     ])
   })

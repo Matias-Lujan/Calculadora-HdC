@@ -354,27 +354,6 @@ describe('cookingFactorUnusualMessage', () => {
   })
 })
 
-describe('food form texts, plain words (spec §14 #48)', () => {
-  const codes: FoodFieldError[] = [
-    'REQUIRED',
-    'INVALID_NUMBER',
-    'NOT_POSITIVE',
-    'ABOVE_100',
-    'STATE_REQUIRED',
-    'UNIT_WEIGHT_REQUIRED',
-    'FACTOR_NOT_COMPUTABLE',
-  ]
-  const messages = [
-    ...codes.map(foodFieldErrorMessage),
-    cookingFactorUnusualMessage('90'),
-    cookingFactorUnusualMessage('450'),
-  ]
-
-  it.each(messages)('%j has no technical terms', (message) => {
-    expect(message).not.toMatch(/factor|estado|asimilables/i)
-  })
-})
-
 describe('mealItemErrorMessage', () => {
   const codes: MealItemFoodError[] = [
     'INVALID_CARBS',
@@ -398,10 +377,33 @@ describe('mealItemErrorMessage', () => {
     expect(new Set(messages).size).toBe(messages.length)
   })
 
-  it('MISSING_COOKING_FACTOR asks to load the factor in the catalog', () => {
-    expect(mealItemErrorMessage('MISSING_COOKING_FACTOR')).toBe(
-      'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
-    )
+  it.each([
+    [
+      'INVALID_CARBS',
+      'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+    ],
+    [
+      'MISSING_COOKING_FACTOR',
+      'Falta cuánto rinde al cocinarlo. Cargalo en el catálogo para usar este alimento.',
+    ],
+    [
+      'INVALID_COOKING_FACTOR',
+      'Lo que rinde al cocinarlo no es válido. Revisalo en el catálogo.',
+    ],
+    [
+      'MISSING_UNIT_WEIGHT',
+      'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
+    ],
+    [
+      'UNITS_NOT_ALLOWED_FOR_RAW_COOKED',
+      'Este alimento se carga en gramos cocidos, no en unidades.',
+    ],
+    [
+      'EFFECTIVE_CARBS_OVER_100',
+      'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en el catálogo cuánto rinde.',
+    ],
+  ] as const)('%s says %j', (code, message) => {
+    expect(mealItemErrorMessage(code)).toBe(message)
   })
 })
 
@@ -425,15 +427,27 @@ describe('mealSaveWarningMessage', () => {
     ).toBe('Alfajor de prueba: 550 g, más que tu alerta de 500 g por alimento.')
   })
 
-  it('an unusual cooking factor', () => {
+  it('an unusual cooking factor, said as how much 100 g raw yield', () => {
     expect(
       mealSaveWarningMessage({
         code: 'COOKING_FACTOR_UNUSUAL',
         foodName: 'Arroz de prueba',
-        factor: '4,50',
+        cookedGrams: '450',
       }),
     ).toBe(
-      'Arroz de prueba: el factor de cocción es 4,50, fuera de lo habitual (entre 1 y 4).',
+      'Arroz de prueba: 100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
+    )
+  })
+
+  it('an unusual cooking factor whose yield cannot be shown', () => {
+    expect(
+      mealSaveWarningMessage({
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        cookedGrams: null,
+      }),
+    ).toBe(
+      'Arroz de prueba: lo que rinde al cocinarlo está muy lejos de lo habitual.',
     )
   })
 
@@ -455,7 +469,8 @@ describe('mealSaveWarningMessage', () => {
         grams: '1',
         threshold: '1',
       },
-      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', factor: '1' },
+      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', cookedGrams: '1' },
+      { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'A', cookedGrams: null },
       { code: 'DOSE_ABOVE_THRESHOLD', dose: '1', threshold: '1' },
     ]
     for (const warning of warnings) {

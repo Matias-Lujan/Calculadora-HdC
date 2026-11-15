@@ -1,6 +1,6 @@
 import {
   CALC_VERSION,
-  formatCookingFactor,
+  cookedGramsPer100gRaw,
   formatDose,
   formatGrams,
   formatUserNumber,
@@ -182,11 +182,13 @@ export function saveWarnings(
           threshold: formatUserNumber(settings.max_item_grams_warning),
         })
       } else if (item.food.cooking_factor !== null) {
-        // COOKING_FACTOR_UNUSUAL only comes with a factor.
+        // COOKING_FACTOR_UNUSUAL only comes with a factor. It is said as
+        // how much 100 g raw yield (null if that cannot be shown).
+        const cookedGrams = cookedGramsPer100gRaw(item.food.cooking_factor)
         warnings.push({
           code,
           foodName: item.food.name,
-          factor: formatCookingFactor(item.food.cooking_factor),
+          cookedGrams: cookedGrams === null ? null : formatGrams(cookedGrams),
         })
       }
     }

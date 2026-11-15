@@ -32,11 +32,6 @@ export function formatDose(units: number): string {
   return formatFixed(units, 2)
 }
 
-/** Cooking factor for display: 2 decimals, decimal comma (8/3 → "2,67"). */
-export function formatCookingFactor(factor: number): string {
-  return formatFixed(factor, 2)
-}
-
 /**
  * Grams for display (the meal breakdown): up to 1 decimal, without a
  * trailing ",0", decimal comma and no thousands separator (22.5 → "22,5",

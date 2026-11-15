@@ -1,14 +1,11 @@
 import type { Food } from '../../lib/foods.ts'
+import { isFromTable } from '../../lib/foodText.ts'
 import { searchFoods } from '../../lib/search.ts'
 import type { MealFood, NewTableFood, ReferenceFood } from './types.ts'
 
 // The reference table in the meal screen (spec §6.2, §6.6, §14 #51): its
 // foods are picked directly, and copied to the catalog only when the meal
 // is saved (createMeal).
-
-/** The ⓘ of an item whose food came from the reference table (spec §5.1). */
-export const TABLE_VALUE_INFO =
-  'Es el valor promedio de una tabla de alimentos. En lo que se cocina, como el arroz o los fideos, depende de cuánta agua absorbió: para más precisión, cargá el paquete en el catálogo y pesalo crudo y cocido.'
 
 /**
  * A reference table food as a food of the meal, not copied yet (`id`
@@ -31,17 +28,6 @@ export function tableFoodAsMealFood(ref: ReferenceFood): MealFood {
     notes: null,
     archived_at: null,
   }
-}
-
-/**
- * Whether a food came from the reference table: picked from it, or its
- * copy in the catalog. ARGENFOODS foods were typed by the user, so they
- * do not count.
- */
-export function isFromTable(
-  food: Pick<MealFood, 'source' | 'reference_db'>,
-): boolean {
-  return food.source === 'reference' && food.reference_db === 'usda_fdc'
 }
 
 /**

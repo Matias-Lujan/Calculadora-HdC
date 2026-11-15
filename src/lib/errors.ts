@@ -129,15 +129,15 @@ const MEAL_ITEM_ERRORS: Record<MealItemFoodError, string> = {
   INVALID_CARBS:
     'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
   MISSING_COOKING_FACTOR:
-    'Falta el factor de cocción. Cargalo en el catálogo para usar este alimento.',
+    'Falta cuánto rinde al cocinarlo. Cargalo en el catálogo para usar este alimento.',
   INVALID_COOKING_FACTOR:
-    'El factor de cocción de este alimento no es válido. Revisalo en el catálogo.',
+    'Lo que rinde al cocinarlo no es válido. Revisalo en el catálogo.',
   MISSING_UNIT_WEIGHT:
     'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
   UNITS_NOT_ALLOWED_FOR_RAW_COOKED:
     'Este alimento se carga en gramos cocidos, no en unidades.',
   EFFECTIVE_CARBS_OVER_100:
-    'Con su factor de cocción, este alimento da más de 100 g de HC cada 100 g. Revisá el factor en el catálogo.',
+    'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en el catálogo cuánto rinde.',
 }
 
 export function mealItemErrorMessage(code: MealItemFoodError): string {
@@ -157,7 +157,12 @@ export type MealSaveWarning =
       grams: string
       threshold: string
     }
-  | { code: 'COOKING_FACTOR_UNUSUAL'; foodName: string; factor: string }
+  | {
+      code: 'COOKING_FACTOR_UNUSUAL'
+      foodName: string
+      /** How much 100 g raw yield, formatted; null if it cannot be shown. */
+      cookedGrams: string | null
+    }
   | { code: 'DOSE_ABOVE_THRESHOLD'; dose: string; threshold: string }
 
 export function mealSaveWarningMessage(warning: MealSaveWarning): string {
@@ -165,7 +170,9 @@ export function mealSaveWarningMessage(warning: MealSaveWarning): string {
     case 'ITEM_GRAMS_ABOVE_THRESHOLD':
       return `${warning.foodName}: ${warning.grams} g, más que tu alerta de ${warning.threshold} g por alimento.`
     case 'COOKING_FACTOR_UNUSUAL':
-      return `${warning.foodName}: el factor de cocción es ${warning.factor}, fuera de lo habitual (entre 1 y 4).`
+      return warning.cookedGrams === null
+        ? `${warning.foodName}: lo que rinde al cocinarlo está muy lejos de lo habitual.`
+        : `${warning.foodName}: 100 g crudo rinden ${warning.cookedGrams} g cocido, y lo habitual es entre 100 y 400 g.`
     case 'DOSE_ABOVE_THRESHOLD':
       return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
   }

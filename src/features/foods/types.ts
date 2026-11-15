@@ -1,14 +1,5 @@
 import type { Food } from '../../lib/foods.ts'
 
-/** Name shown for each reference base (food detail). */
-export const REFERENCE_DB_LABELS: Record<
-  NonNullable<Food['reference_db']>,
-  string
-> = {
-  argenfoods: 'ARGENFOODS',
-  usda_fdc: 'USDA FoodData Central',
-}
-
 /**
  * What the food form saves (spec §6.5): the columns the user can edit.
  * source, reference_db, reference_code, reference_description, photo_path,

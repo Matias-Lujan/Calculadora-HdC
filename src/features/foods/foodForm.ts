@@ -12,6 +12,7 @@ import {
   type FoodFieldError,
 } from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
+import { cookedPer100gText } from '../../lib/foodText.ts'
 import type { FoodFormValues, NewFood } from './types.ts'
 
 // Pure logic of the food form (create and edit, spec §6.3–§6.5). It does no
@@ -84,17 +85,6 @@ export function initialFoodFormTexts(food?: Food): FoodFormTexts {
 function optionalText(text: string): string | null {
   const trimmed = text.trim()
   return trimmed === '' ? null : trimmed
-}
-
-/**
- * How much 100 g raw yield cooked, "100 g crudo rinden 260 g cocido" (spec
- * §6.4), with the grams formatted by formatGrams. Only for display. null
- * when the factor is not valid.
- */
-export function cookedPer100gText(factor: number): string | null {
-  const grams = cookedGramsPer100gRaw(factor)
-  if (grams === null) return null
-  return `100 g crudo rinden ${formatGrams(grams)} g cocido`
 }
 
 /**

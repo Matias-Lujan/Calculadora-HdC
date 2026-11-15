@@ -1,30 +1,35 @@
 import { Link } from 'react-router'
+import { InfoTip } from '../../../components/InfoTip.tsx'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import {
   formatCarbs,
-  formatCookingFactor,
   formatUserNumber,
   needsCookingFactor,
 } from '../../../domain/dose/index.ts'
 import type { Food } from '../../../lib/foods.ts'
-import { REFERENCE_DB_LABELS } from '../types.ts'
+import {
+  TABLE_VALUE_INFO,
+  cookedPer100gText,
+  isFromTable,
+} from '../../../lib/foodText.ts'
+import { carbsLabel } from '../foodForm.ts'
 import { ArchiveFoodSection } from './ArchiveFoodSection.tsx'
 
-const SOURCE_LABELS: Record<Food['source'], string> = {
-  label: 'Etiqueta',
-  reference: 'Tabla de referencia',
-  manual: 'Manual',
-}
-
-const STATE_LABELS: Record<Food['state'], string> = {
-  as_eaten: 'Tal como se come',
-  raw_cooked: 'Crudo, se come cocido',
+// The answer to "¿Se cocina antes de comer?", as in the form.
+const COOKED_ANSWERS: Record<Food['state'], string> = {
+  as_eaten: 'No',
+  raw_cooked: 'Sí',
 }
 
 type Props = {
   food: Food
 }
 
+/**
+ * The detail of a food (spec §6.5), in plain words (§14 #52): it does not
+ * show the source, the reference code or the original description. Only a
+ * copy from the reference table says where it came from.
+ */
 export function FoodDetail({ food }: Props) {
   const isRawCooked = food.state === 'raw_cooked'
 
@@ -38,62 +43,44 @@ export function FoodDetail({ food }: Props) {
             Archivado
           </span>
         )}
+        {isFromTable(food) && (
+          <div className="flex flex-wrap items-center">
+            <p className="text-sm text-slate-700">De la tabla de alimentos</p>
+            <InfoTip text={TABLE_VALUE_INFO} />
+          </div>
+        )}
       </header>
 
       <dl className="flex flex-col gap-3">
         <div>
-          <dt className="text-sm text-slate-500">Fuente</dt>
-          <dd>{SOURCE_LABELS[food.source]}</dd>
-          {food.source === 'reference' && (
-            <>
-              {food.reference_db !== null && (
-                <dd className="text-sm text-slate-700">
-                  {REFERENCE_DB_LABELS[food.reference_db]}
-                </dd>
-              )}
-              {food.reference_code !== null && (
-                <dd className="text-sm text-slate-700">
-                  Código: {food.reference_code}
-                </dd>
-              )}
-              {food.reference_description !== null && (
-                <dd className="text-sm text-slate-700">
-                  Descripción original: {food.reference_description}
-                </dd>
-              )}
-            </>
-          )}
-          {food.notes !== null && (
-            <dd className="text-sm text-slate-700">Nota: {food.notes}</dd>
-          )}
+          <dt className="text-sm text-slate-500">¿Se cocina antes de comer?</dt>
+          <dd>{COOKED_ANSWERS[food.state]}</dd>
         </div>
 
         <div>
-          <dt className="text-sm text-slate-500">Estado</dt>
-          <dd>{STATE_LABELS[food.state]}</dd>
-        </div>
-
-        <div>
-          <dt className="text-sm text-slate-500">HC cada 100 g</dt>
-          <dd>
-            {formatCarbs(food.carbs_per_100g)} g{isRawCooked && ' (crudo)'}
-          </dd>
+          <dt className="text-sm text-slate-500">{carbsLabel(food.state)}</dt>
+          <dd>{formatCarbs(food.carbs_per_100g)} g</dd>
         </div>
 
         {isRawCooked && (
           <div>
-            <dt className="text-sm text-slate-500">Factor de cocción</dt>
+            <dt className="text-sm text-slate-500">
+              Cuánto rinde al cocinarlo
+            </dt>
             {needsCookingFactor(food.state, food.cooking_factor) ? (
               <dd className="flex flex-col items-start gap-1">
                 <MissingFactorBadge />
                 <span className="text-sm text-slate-700">
-                  Cargalo antes de usar este alimento en una comida.
+                  Cargalo con «Editar» para poder usarlo en una comida.
                 </span>
               </dd>
             ) : (
               // Not missing here means not null: the check only narrows.
               food.cooking_factor !== null && (
-                <dd>{formatCookingFactor(food.cooking_factor)}</dd>
+                <dd>
+                  {cookedPer100gText(food.cooking_factor) ??
+                    'No se puede mostrar. Revisalo con «Editar».'}
+                </dd>
               )
             )}
           </div>
@@ -105,6 +92,13 @@ export function FoodDetail({ food }: Props) {
             <dd>
               {`1 ${food.unit_label ?? 'unidad'} = ${formatUserNumber(food.unit_weight_g)} g`}
             </dd>
+          </div>
+        )}
+
+        {food.notes !== null && (
+          <div>
+            <dt className="text-sm text-slate-500">Nota</dt>
+            <dd>{food.notes}</dd>
           </div>
         )}
       </dl>

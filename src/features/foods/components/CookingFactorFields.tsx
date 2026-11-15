@@ -1,6 +1,6 @@
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { cookedPer100gText } from '../../../lib/foodText.ts'
 import {
-  cookedPer100gText,
   yieldLine,
   type FoodFormErrors,
   type FoodFormTexts,

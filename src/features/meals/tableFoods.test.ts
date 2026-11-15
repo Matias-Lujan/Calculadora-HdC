@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Food } from '../../lib/foods.ts'
 import {
-  TABLE_VALUE_INFO,
-  isFromTable,
   pickerResults,
   tableFoodAsMealFood,
   tableFoodCopy,
@@ -95,23 +93,6 @@ describe('tableFoodAsMealFood', () => {
     const before = structuredClone(entry)
     tableFoodAsMealFood(entry)
     expect(entry).toEqual(before)
-  })
-})
-
-describe('isFromTable', () => {
-  it('a USDA food, picked or copied, is from the table', () => {
-    expect(isFromTable({ source: 'reference', reference_db: 'usda_fdc' })).toBe(
-      true,
-    )
-  })
-
-  it.each([
-    ['reference', 'argenfoods'],
-    ['manual', null],
-    ['label', null],
-    ['manual', 'usda_fdc'],
-  ] as const)('%s with %s is not', (source, referenceDb) => {
-    expect(isFromTable({ source, reference_db: referenceDb })).toBe(false)
   })
 })
 
@@ -268,12 +249,6 @@ describe('tableFoodCopy', () => {
   })
 })
 
-describe('TABLE_VALUE_INFO', () => {
-  it('is plain text without technical terms', () => {
-    expect(TABLE_VALUE_INFO).not.toMatch(/factor|estado|asimilable/i)
-  })
-})
-
 describe('pickerResults, more edge cases (tester)', () => {
   const extra: MealFood[] = [
     ref('900020', 'Ñoquis de papa hervidos'),
@@ -356,17 +331,5 @@ describe('pickerResults, more edge cases (tester)', () => {
     expect(names(pickerResults([noCode], table, 'banana').table)).toEqual([
       'Banana',
     ])
-  })
-})
-
-describe('isFromTable, more cases (tester)', () => {
-  it('a label food with usda_fdc is not from the table', () => {
-    expect(isFromTable({ source: 'label', reference_db: 'usda_fdc' })).toBe(
-      false,
-    )
-  })
-
-  it('a reference food without a database is not', () => {
-    expect(isFromTable({ source: 'reference', reference_db: null })).toBe(false)
   })
 })

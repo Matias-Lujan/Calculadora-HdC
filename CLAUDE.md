@@ -120,7 +120,8 @@ Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests
 src/
   domain/            # lógica pura, sin dependencias: dose/, label/
   lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts,
-                     # y lo que comparten varios features: foods.ts, settings.ts, search.ts
+                     # y lo que comparten varios features: foods.ts, settings.ts, search.ts,
+                     # foodText.ts (textos de un alimento sin Supabase, para que los tests no lo carguen)
   components/        # UI reutilizable, sin lógica de negocio
   features/
     foods/

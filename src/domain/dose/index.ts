@@ -17,12 +17,7 @@ export {
   isCookingFactorUnusual,
   needsCookingFactor,
 } from './cookingFactor.ts'
-export {
-  formatCarbs,
-  formatCookingFactor,
-  formatDose,
-  formatGrams,
-} from './format.ts'
+export { formatCarbs, formatDose, formatGrams } from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
 export { parseNonNegativeUserNumber } from './parseNonNegativeUserNumber.ts'
 export type {

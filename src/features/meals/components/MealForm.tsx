@@ -20,7 +20,7 @@ import {
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import type { Settings } from '../../../lib/settings.ts'
-import { doseLine, totalCarbsLine } from '../breakdown.ts'
+import { doseLine, doseText, totalCarbsText } from '../breakdown.ts'
 import { dateTimeInputValue, eatenAtFromInput } from '../eatenAt.ts'
 import {
   appliedDose,
@@ -35,6 +35,7 @@ import {
 import { useCreateMeal } from '../queries.ts'
 import { tableFoodAsMealFood } from '../tableFoods.ts'
 import type { MealFood, MealItemDraft, ReferenceFood } from '../types.ts'
+import { CalculationDetails } from './CalculationDetails.tsx'
 import { FoodPicker } from './FoodPicker.tsx'
 import { MealItemCard } from './MealItemCard.tsx'
 
@@ -288,15 +289,20 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         ) : result.ok ? (
           <>
             <p className="text-slate-700">
-              {totalCarbsLine(result.totalCarbsG)}
+              {totalCarbsText(result.totalCarbsG)}
             </p>
             <p className="text-xl font-semibold">
-              {doseLine(
-                result.totalCarbsG,
-                settings.carb_ratio_g_per_unit,
-                result.doseUnits,
-              )}
+              {doseText(result.doseUnits)}
             </p>
+            <CalculationDetails
+              lines={[
+                doseLine(
+                  result.totalCarbsG,
+                  settings.carb_ratio_g_per_unit,
+                  result.doseUnits,
+                ),
+              ]}
+            />
           </>
         ) : result.errors.includes('INVALID_RATIO') ? (
           <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
