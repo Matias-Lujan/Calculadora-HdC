@@ -67,7 +67,7 @@ export function FoodForm(props: Props) {
   // The unusual-factor confirmation is open (spec §6.4).
   const [confirmingFactor, setConfirmingFactor] = useState(false)
 
-  const result = validateFoodForm(texts, savedCookingFactor)
+  const result = validateFoodForm(texts, savedCookingFactor, food ?? undefined)
 
   function update(patch: Partial<FoodFormTexts>) {
     setTexts((current) => ({ ...current, ...patch }))

@@ -19,6 +19,7 @@ export {
 } from './cookingFactor.ts'
 export { formatCarbs, formatDose, formatGrams } from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
+export { normalizeForDisplay } from './normalizeForDisplay.ts'
 export { parseNonNegativeUserNumber } from './parseNonNegativeUserNumber.ts'
 export type {
   NonNegativeNumberError,

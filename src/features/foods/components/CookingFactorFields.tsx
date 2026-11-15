@@ -82,8 +82,8 @@ export function CookingFactorFields({
       </p>
       {savedText === null && (
         <p className="text-sm text-slate-600">
-          Si lo dejás vacío, lo podés cargar después, pero hasta entonces no se
-          puede usar en una comida.
+          Si no sabés cuánto rinde, dejalo vacío y completalo después. Mientras
+          tanto, este alimento no se puede usar en una comida.
         </p>
       )}
     </section>

@@ -91,17 +91,79 @@ describe('initialFoodFormTexts', () => {
     })
   })
 
-  it('with a food, numbers are exact and round-trip', () => {
+  it('with a food, numbers start without binary noise (§14 #53)', () => {
     const initial = initialFoodFormTexts(savedFood)
-    expect(initial.carbsPer100g).toBe('0,30000000000000004')
+    expect(initial.carbsPer100g).toBe('0,3')
     expect(initial.unitWeight).toBe('9,5')
     expect(initial.unitLabel).toBe('galletita')
     expect(initial.brand).toBe('Marca Inventada')
     expect(initial.state).toBe('as_eaten')
 
-    const result = validateFoodForm(initial, savedFood.cooking_factor)
+    // Saving without touching the field saves the exact saved value.
+    const result = validateFoodForm(
+      initial,
+      savedFood.cooking_factor,
+      savedFood,
+    )
     expect(result.values?.carbs_per_100g).toBe(0.1 + 0.2)
     expect(result.values?.unit_weight_g).toBe(9.5)
+  })
+
+  const tableCopy: Food = {
+    ...savedFood,
+    name: 'Arroz blanco hervido',
+    brand: null,
+    source: 'reference',
+    reference_db: 'usda_fdc',
+    reference_code: '000000',
+    reference_description: 'Invented description',
+    carbs_per_100g: 28.17 - 0.4,
+    unit_weight_g: 12.76 - 1.3,
+  }
+
+  it('a copy of the table shows its carbs without binary noise', () => {
+    const initial = initialFoodFormTexts(tableCopy)
+    expect(initial.carbsPer100g).toBe('27,77')
+    expect(initial.unitWeight).toBe('11,46')
+  })
+
+  it('saving without touching the field saves the exact value (§14 #53)', () => {
+    const initial = initialFoodFormTexts(tableCopy)
+    expect(initial.carbsPer100g).toBe('27,77')
+    const result = validateFoodForm(initial, null, tableCopy)
+    expect(result.values?.carbs_per_100g).toBe(27.770000000000003)
+    expect(result.values?.unit_weight_g).toBe(11.459999999999999)
+  })
+
+  it('a field the user changed saves what was typed', () => {
+    const initial = initialFoodFormTexts(tableCopy)
+    const result = validateFoodForm(
+      { ...initial, carbsPer100g: '27,8', unitWeight: '11,5' },
+      null,
+      tableCopy,
+    )
+    expect(result.values?.carbs_per_100g).toBe(27.8)
+    expect(result.values?.unit_weight_g).toBe(11.5)
+  })
+
+  it('typing back the same text it started with saves the exact value', () => {
+    const initial = initialFoodFormTexts(tableCopy)
+    const result = validateFoodForm(
+      { ...initial, carbsPer100g: '27,77' },
+      null,
+      tableCopy,
+    )
+    expect(result.values?.carbs_per_100g).toBe(27.770000000000003)
+  })
+
+  it('a value with few decimals starts as it is', () => {
+    const initial = initialFoodFormTexts({
+      ...savedFood,
+      carbs_per_100g: 12.345,
+      unit_weight_g: 100,
+    })
+    expect(initial.carbsPer100g).toBe('12,345')
+    expect(initial.unitWeight).toBe('100')
   })
 
   it('nulls become empty texts', () => {
@@ -239,7 +301,8 @@ describe('validateFoodForm, no reference fields', () => {
       name: food.name,
       brand: null,
       state: food.state,
-      carbs_per_100g: food.carbs_per_100g,
+      // 0.1 + 0.2, normalized when the field starts (§14 #53).
+      carbs_per_100g: 0.3,
       cooking_factor: null,
       unit_weight_g: null,
       unit_label: null,

@@ -1,4 +1,5 @@
 import { shiftDecimal } from './format.ts'
+import { normalizeForDisplay } from './normalizeForDisplay.ts'
 import type { FoodState } from './types.ts'
 
 const USUAL_COOKING_FACTOR_MIN = 1
@@ -26,14 +27,6 @@ export function cookingFactorFromWeights(
 }
 
 /**
- * Significant digits the factor is normalized to before moving the decimal
- * point. A double has 15 to 17; 15 drops the binary noise of the quotient
- * (100.35 / 100 is 1.0034999999999998) without touching any digit a person
- * typed.
- */
-const DISPLAY_SIGNIFICANT_DIGITS = 15
-
-/**
  * Cooked grams that 100 g raw yield: factor × 100 (spec §6.4), shown as
  * "100 g crudo rinden 260 g cocido". The factor is first normalized to 15
  * significant digits, so a quotient like 100.35 / 100 = 1.0034999999999998
@@ -47,8 +40,7 @@ const DISPLAY_SIGNIFICANT_DIGITS = 15
  */
 export function cookedGramsPer100gRaw(factor: number): number | null {
   if (!isPositiveFinite(factor)) return null
-  const normalized = Number(factor.toPrecision(DISPLAY_SIGNIFICANT_DIGITS))
-  const grams = shiftDecimal(normalized, 2)
+  const grams = shiftDecimal(normalizeForDisplay(factor), 2)
   return isPositiveFinite(grams) ? grams : null
 }
 

@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from 'react-router'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import { needsCookingFactor } from '../../../domain/dose/index.ts'
@@ -15,13 +16,17 @@ type Props = {
 }
 
 /**
- * Search box to add a food to the meal, with the same search as the catalog
- * (spec §6.5), over the user's foods and the reference table (spec §6.6,
- * §14 #51). Results are shown only while the search has text. A food eaten
- * cooked without a factor is listed but cannot be picked (spec §6.4).
+ * "Agregar alimento" (spec §6.6, §14 #53): a button that unfolds the search
+ * box, with the same search as the catalog (spec §6.5), over the user's
+ * foods and the reference table (spec §6.6, §14 #51). Results are shown only
+ * while the search has text. A food eaten cooked without a factor is listed
+ * but cannot be picked (spec §6.4). Picking a food folds and empties the
+ * search; the same button folds it without picking.
  */
 export function FoodPicker({ foods, tableFoods, onPick }: Props) {
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const hasQuery = query.trim() !== ''
   const results = useMemo(
     () => pickerResults(foods, tableFoods, query),
@@ -29,82 +34,111 @@ export function FoodPicker({ foods, tableFoods, onPick }: Props) {
   )
   const noResults = results.catalog.length === 0 && results.table.length === 0
 
+  function toggle() {
+    if (open) {
+      setOpen(false)
+      setQuery('')
+      return
+    }
+    // The field has to be in the DOM before focusing it, and the focus has
+    // to happen inside the tap: iOS only opens the keyboard that way (#44).
+    flushSync(() => {
+      setOpen(true)
+    })
+    inputRef.current?.focus()
+  }
+
+  // The parent's flushSync (to focus the new item) also applies these.
   function pick(food: MealFood) {
+    setOpen(false)
     setQuery('')
     onPick(food)
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-1">
-        <label
-          htmlFor="meal-food-search"
-          className="text-sm font-medium text-slate-700"
-        >
-          Agregar alimento
-        </label>
-        <input
-          id="meal-food-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          enterKeyHint="search"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="none"
-          spellCheck={false}
-          aria-describedby="meal-food-search-help"
-          className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
-        />
-        <p id="meal-food-search-help" className="text-sm text-slate-500">
-          Buscá por nombre o marca, por ejemplo «banana» o «arroz».
-        </p>
-      </div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="meal-food-picker"
+        className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+        onClick={toggle}
+      >
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+        Agregar alimento
+      </button>
 
-      {hasQuery &&
-        (noResults ? (
-          <p className="text-slate-700">
-            {`No hay alimentos que coincidan con "${query.trim()}".`}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {results.catalog.length > 0 && (
-              <ResultGroup title="Tus alimentos">
-                {results.catalog.map((food) => (
-                  <li key={food.id}>
-                    {needsCookingFactor(food.state, food.cooking_factor) ? (
-                      <div className="flex flex-col items-start gap-1 py-2">
-                        <FoodName food={food} />
-                        <MissingFactorBadge />
-                        <span className="text-sm text-slate-700">
-                          Para usarlo en una comida, cargá cuánto rinde al
-                          cocinarlo.
-                        </span>
-                        <Link
-                          to={`/foods/${food.id}/edit`}
-                          className="flex min-h-11 items-center text-base font-medium underline"
-                        >
-                          Cargar cuánto rinde
-                        </Link>
-                      </div>
-                    ) : (
-                      <PickButton food={food} onPick={pick} />
-                    )}
-                  </li>
-                ))}
-              </ResultGroup>
-            )}
-            {results.table.length > 0 && (
-              <ResultGroup title="Tabla de alimentos">
-                {results.table.map((food) => (
-                  <li key={`table-${food.reference_code ?? food.name}`}>
-                    <PickButton food={food} onPick={pick} />
-                  </li>
-                ))}
-              </ResultGroup>
-            )}
+      {open && (
+        <div id="meal-food-picker" className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="meal-food-search" className="sr-only">
+              Buscar alimento
+            </label>
+            <input
+              ref={inputRef}
+              id="meal-food-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              enterKeyHint="search"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-describedby="meal-food-search-help"
+              className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
+            />
+            <p id="meal-food-search-help" className="text-sm text-slate-500">
+              Buscá por nombre o marca, por ejemplo «banana» o «arroz».
+            </p>
           </div>
-        ))}
+
+          {hasQuery &&
+            (noResults ? (
+              <p className="text-slate-700">
+                {`No hay alimentos que coincidan con "${query.trim()}".`}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {results.catalog.length > 0 && (
+                  <ResultGroup title="Tus alimentos">
+                    {results.catalog.map((food) => (
+                      <li key={food.id}>
+                        {needsCookingFactor(food.state, food.cooking_factor) ? (
+                          <div className="flex flex-col items-start gap-1 py-2">
+                            <FoodName food={food} />
+                            <MissingFactorBadge />
+                            <span className="text-sm text-slate-700">
+                              Para usarlo en una comida, cargá cuánto rinde al
+                              cocinarlo.
+                            </span>
+                            <Link
+                              to={`/foods/${food.id}/edit`}
+                              className="flex min-h-11 items-center text-base font-medium underline"
+                            >
+                              Cargar cuánto rinde
+                            </Link>
+                          </div>
+                        ) : (
+                          <PickButton food={food} onPick={pick} />
+                        )}
+                      </li>
+                    ))}
+                  </ResultGroup>
+                )}
+                {results.table.length > 0 && (
+                  <ResultGroup title="Tabla de alimentos">
+                    {results.table.map((food) => (
+                      <li key={`table-${food.reference_code ?? food.name}`}>
+                        <PickButton food={food} onPick={pick} />
+                      </li>
+                    ))}
+                  </ResultGroup>
+                )}
+              </div>
+            ))}
+        </div>
+      )}
     </div>
   )
 }

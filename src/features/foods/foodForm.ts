@@ -4,6 +4,7 @@ import {
   formatGrams,
   formatUserNumber,
   isCookingFactorUnusual,
+  normalizeForDisplay,
   parseCarbsPer100g,
   parsePositiveUserNumber,
 } from '../../domain/dose/index.ts'
@@ -45,14 +46,21 @@ export type FoodFormResult = {
   errors: FoodFormErrors
 }
 
+/**
+ * A saved number as the field starts with it: without binary noise (a copy
+ * of the table holds 27.770000000000003 and the field shows "27,77", spec
+ * §14 #53). While the field still holds this text, saving keeps the exact
+ * saved value (see validateFoodForm).
+ */
 function numberText(value: number | null): string {
-  return value === null ? '' : formatUserNumber(value)
+  return value === null ? '' : formatUserNumber(normalizeForDisplay(value))
 }
 
 /**
  * The texts the form starts with: empty for a new food (no state chosen),
- * or the food's values, exact, when editing. The weights always start
- * empty: empty means "the saved cooking factor does not change" (§6.4).
+ * or the food's values when editing, at 15 significant digits. The weights
+ * always start empty: empty means "the saved cooking factor does not
+ * change" (§6.4).
  */
 export function initialFoodFormTexts(food?: Food): FoodFormTexts {
   if (food === undefined) {
@@ -72,7 +80,7 @@ export function initialFoodFormTexts(food?: Food): FoodFormTexts {
     name: food.name,
     brand: food.brand ?? '',
     state: food.state,
-    carbsPer100g: formatUserNumber(food.carbs_per_100g),
+    carbsPer100g: numberText(food.carbs_per_100g),
     rawWeight: '',
     cookedWeight: '',
     unitWeight: numberText(food.unit_weight_g),
@@ -177,9 +185,23 @@ function validateCookingFactor(
   return factor
 }
 
+/**
+ * The exact saved value when the field still holds the text it started with
+ * (nothing is rounded on save, spec §14 #53); otherwise what was typed.
+ */
+function untouchedOr(
+  text: string,
+  saved: number | null | undefined,
+  typed: number,
+): number {
+  if (saved === null || saved === undefined) return typed
+  return text === numberText(saved) ? saved : typed
+}
+
 /** Weight and name of one unit of an as_eaten food (both optional). */
 function validateUnit(
   texts: FoodFormTexts,
+  savedUnitWeight: number | null | undefined,
   errors: FoodFormErrors,
 ): { unit_weight_g: number | null; unit_label: string | null } {
   const unitLabel = optionalText(texts.unitLabel)
@@ -192,7 +214,10 @@ function validateUnit(
     errors.unitWeight = result.error
     return { unit_weight_g: null, unit_label: null }
   }
-  return { unit_weight_g: result.value, unit_label: unitLabel }
+  return {
+    unit_weight_g: untouchedOr(texts.unitWeight, savedUnitWeight, result.value),
+    unit_label: unitLabel,
+  }
 }
 
 /**
@@ -200,11 +225,15 @@ function validateUnit(
  * `savedCookingFactor` is the factor of the food being edited (null for a
  * new food): it is kept when both weights are empty. Hidden fields (the
  * weights of an as_eaten food, the unit of a raw_cooked one) are neither
- * validated nor saved, even if they still hold text.
+ * validated nor saved, even if they still hold text. `savedFood` holds the
+ * saved carbs and unit weight of the food being edited: a field that still
+ * holds the text it started with saves that exact value, not the parsed
+ * text (spec §14 #53).
  */
 export function validateFoodForm(
   texts: FoodFormTexts,
   savedCookingFactor: number | null,
+  savedFood?: Pick<Food, 'carbs_per_100g' | 'unit_weight_g'>,
 ): FoodFormResult {
   const errors: FoodFormErrors = {}
 
@@ -224,7 +253,7 @@ export function validateFoodForm(
   } else if (texts.state === 'raw_cooked') {
     cookingFactor = validateCookingFactor(texts, savedCookingFactor, errors)
   } else {
-    unit = validateUnit(texts, errors)
+    unit = validateUnit(texts, savedFood?.unit_weight_g, errors)
   }
 
   if (
@@ -240,7 +269,11 @@ export function validateFoodForm(
       name,
       brand: optionalText(texts.brand),
       state: texts.state,
-      carbs_per_100g: carbs.value,
+      carbs_per_100g: untouchedOr(
+        texts.carbsPer100g,
+        savedFood?.carbs_per_100g,
+        carbs.value,
+      ),
       cooking_factor: cookingFactor,
       unit_weight_g: unit.unit_weight_g,
       unit_label: unit.unit_label,
