@@ -37,3 +37,22 @@ export function parseCarbsPer100g(text: string): CarbsPer100gResult {
   if (!isValidCarbsPer100g(value)) return { error: 'ABOVE_100' }
   return { value }
 }
+
+/**
+ * Available carbs per 100 g from the total carbs and the fiber of a
+ * reference table (spec §5.2, §14 #50): `total − fiber`, not rounded (the
+ * binary noise of the subtraction, like 28.17 − 0.4 = 27.770000000000003, is kept). Null
+ * if either value is not finite or is negative, if the total is more than
+ * 100 (impossible in 100 g) or if the fiber is more than the total.
+ */
+export function carbsWithoutFiber(
+  totalCarbsPer100g: number,
+  fiberPer100g: number,
+): number | null {
+  if (!isValidCarbsPer100g(totalCarbsPer100g)) return null
+  if (!Number.isFinite(fiberPer100g) || fiberPer100g < 0) return null
+  if (fiberPer100g > totalCarbsPer100g) return null
+  const carbs = totalCarbsPer100g - fiberPer100g
+  // Always true with the checks above; kept as a guard for the range.
+  return isValidCarbsPer100g(carbs) ? carbs : null
+}

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_CARBS_PER_100G,
+  carbsWithoutFiber,
   isValidCarbsPer100g,
   parseCarbsPer100g,
 } from './carbsPer100g.ts'
+import * as dose from './index.ts'
 
 describe('parseCarbsPer100g', () => {
   it.each(['', '   ', ' ', '   ', '\t'])('%j → REQUIRED', (text) => {
@@ -84,5 +86,87 @@ describe('isValidCarbsPer100g', () => {
 
   it('the upper bound is 100', () => {
     expect(MAX_CARBS_PER_100G).toBe(100)
+  })
+})
+
+describe('carbsWithoutFiber', () => {
+  it('subtracts the fiber without rounding', () => {
+    expect(carbsWithoutFiber(12.76, 1.3)).toBe(11.459999999999999)
+    expect(carbsWithoutFiber(0.3, 0.1)).toBe(0.19999999999999998)
+  })
+
+  it.each([
+    [12.5, 0, 12.5],
+    [3.2, 3.2, 0],
+    [0, 0, 0],
+    [100, 0, 100],
+    [100, 100, 0],
+  ])('(%s, %s) → %s', (total, fiber, carbs) => {
+    expect(carbsWithoutFiber(total, fiber)).toBe(carbs)
+  })
+
+  it('more fiber than total carbs is null', () => {
+    expect(carbsWithoutFiber(2, 2.1)).toBeNull()
+    expect(carbsWithoutFiber(0, 0.1)).toBeNull()
+    expect(carbsWithoutFiber(2, 2 + Number.EPSILON * 2)).toBeNull()
+  })
+
+  it.each([
+    [-1, 0],
+    [10, -0.1],
+    [-0.1, -0.2],
+    [-0.1, 0],
+    [NaN, 0],
+    [10, NaN],
+    [NaN, NaN],
+    [Infinity, 0],
+    [10, Infinity],
+    [-Infinity, 0],
+    [10, -Infinity],
+    [Infinity, Infinity],
+  ])('(%s, %s) is null', (total, fiber) => {
+    expect(carbsWithoutFiber(total, fiber)).toBeNull()
+  })
+
+  it('a total above 100 is null, even if the subtraction would be in range', () => {
+    expect(carbsWithoutFiber(100.1, 0)).toBeNull()
+    expect(carbsWithoutFiber(120, 30)).toBeNull()
+  })
+
+  it('keeps the binary noise of the subtraction (white rice of the seed)', () => {
+    expect(carbsWithoutFiber(28.17, 0.4)).toBe(27.770000000000003)
+  })
+
+  it('fiber above 100 is null even with a total of 100', () => {
+    expect(carbsWithoutFiber(100, 100.5)).toBeNull()
+  })
+
+  it('both values above 100 are null', () => {
+    expect(carbsWithoutFiber(150, 120)).toBeNull()
+    expect(carbsWithoutFiber(Number.MAX_VALUE, Number.MAX_VALUE)).toBeNull()
+  })
+
+  it('negative zero is a valid zero, not a negative number', () => {
+    expect(carbsWithoutFiber(-0, 0) === 0).toBe(true)
+    expect(carbsWithoutFiber(0, -0) === 0).toBe(true)
+  })
+
+  it('the result never exceeds the total nor goes below 0', () => {
+    for (const [total, fiber] of [
+      [0.1, 0.05],
+      [99.99, 0.01],
+      [50, 49.9],
+      [1e-7, 1e-8],
+    ] as const) {
+      const carbs = carbsWithoutFiber(total, fiber)
+      expect(carbs).not.toBeNull()
+      expect(carbs!).toBeLessThanOrEqual(total)
+      expect(carbs!).toBeGreaterThanOrEqual(0)
+      expect(carbs).toBe(total - fiber)
+    }
+  })
+
+  it('is exported from the dose module', () => {
+    expect(dose.carbsWithoutFiber).toBe(carbsWithoutFiber)
   })
 })

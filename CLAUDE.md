@@ -7,7 +7,7 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 - **[docs/plan.md](docs/plan.md)**: en qué orden se construye y **en qué etapa estamos** (encabezado y tabla de resumen). Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
 - **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1; las decisiones tomadas, en §14.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
-- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real.
+- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real; `usda-seed/` arma la migración del seed de `reference_foods` desde SR Legacy de USDA (la lista curada es `selection.json`; los CSV van en `scripts/usda-seed/data/`, que no se commitea). Si cambia la lista, se genera una migración nueva (spec §14 #50).
 - **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer). Ver "Flujo de trabajo".
 
 Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
@@ -95,6 +95,7 @@ node --env-file=.env.local scripts/rls-check/check.ts                 # aislamie
 node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-flash-lite
 node scripts/gemini-probe/summarize.ts <corrida>
 node scripts/pwa/generate-icons.ts                                    # regenera los íconos desde public/icon.svg
+node scripts/usda-seed/build.ts <carpeta con los CSV> <migración nueva y vacía>   # seed USDA; nunca pisa una migración con contenido
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.

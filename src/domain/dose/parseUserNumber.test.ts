@@ -108,7 +108,7 @@ describe('parseUserNumber: casos borde', () => {
     ['1.000', 1000],
     [' 12,5 ', 12.5],
     ['\n12\r\n', 12],
-    ['﻿12', 12],
+    ['\uFEFF12', 12],
     // The largest numbers that still fit are accepted.
     ['1' + '0'.repeat(308), 1e308],
   ])('%j → %s', (text, expected) => {

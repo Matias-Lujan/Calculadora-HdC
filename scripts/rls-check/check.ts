@@ -344,6 +344,50 @@ console.log('\nreference_foods')
     fiber_per_100g: 0,
   })
   check('Nadie puede escribir en reference_foods', write.error !== null)
+
+  // USDA seed (spec §14 #50). Without a grant PostgREST answers with an
+  // error; with a grant but no policy, with 0 rows. Either way nothing may
+  // change, so the checks look at the data afterwards too.
+  const countSeed = async () =>
+    b.supabase
+      .from('reference_foods')
+      .select('id', { count: 'exact', head: true })
+      .eq('reference_db', 'usda_fdc')
+  const seeded = await countSeed()
+  check(
+    'reference_foods: tiene el seed de USDA',
+    seeded.error === null && (seeded.count ?? 0) > 0,
+    seeded.error?.message ?? `${seeded.count} filas`,
+  )
+  const update = await b.supabase
+    .from('reference_foods')
+    .update({ name_es: 'rls-check' })
+    .eq('reference_db', 'usda_fdc')
+    .select('id')
+  const renamed = await b.supabase
+    .from('reference_foods')
+    .select('id', { count: 'exact', head: true })
+    .eq('name_es', 'rls-check')
+  check(
+    'Nadie puede modificar reference_foods',
+    (update.error !== null || (update.data?.length ?? 0) === 0) &&
+      renamed.error === null &&
+      renamed.count === 0,
+    update.error ? undefined : `${update.data?.length} filas cambiadas`,
+  )
+  const remove = await b.supabase
+    .from('reference_foods')
+    .delete()
+    .eq('reference_db', 'usda_fdc')
+    .select('id')
+  const afterDelete = await countSeed()
+  check(
+    'Nadie puede borrar reference_foods',
+    (remove.error !== null || (remove.data?.length ?? 0) === 0) &&
+      afterDelete.error === null &&
+      afterDelete.count === seeded.count,
+    `${seeded.count} filas antes, ${afterDelete.count} después`,
+  )
 }
 
 // --- Column privileges: records are not edited ---------------------------------
