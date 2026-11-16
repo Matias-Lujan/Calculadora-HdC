@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { Link } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import {
   calculateMeal,
@@ -19,6 +19,12 @@ import {
   positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
+import {
+  clearMealDraft,
+  readMealDraft,
+  writeMealDraft,
+} from '../../../lib/mealDraftStorage.ts'
+import { FROM_MEAL_STATE, foodToAddToMeal } from '../../../lib/mealHandoff.ts'
 import type { Settings } from '../../../lib/settings.ts'
 import { doseLine, doseText, totalCarbsText } from '../breakdown.ts'
 import { dateTimeInputValue, eatenAtFromInput } from '../eatenAt.ts'
@@ -33,6 +39,11 @@ import {
   toNewMealRecord,
 } from '../mealDraft.ts'
 import { useCreateMeal } from '../queries.ts'
+import {
+  initialMealForm,
+  parseStoredMealDraft,
+  type StoredMealDraft,
+} from '../storedDraft.ts'
 import { tableFoodAsMealFood } from '../tableFoods.ts'
 import type { MealFood, MealItemDraft, ReferenceFood } from '../types.ts'
 import { CalculationDetails } from './CalculationDetails.tsx'
@@ -64,21 +75,35 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     () => referenceFoods.map(tableFoodAsMealFood),
     [referenceFoods],
   )
-  const [items, setItems] = useState<MealItemDraft[]>([])
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The meal kept while the app is open, and the food the photo screen sent
+  // back, if any (spec §6.6, §14 #61). Read once, when Inicio opens.
+  const [initial] = useState(() =>
+    initialMealForm(
+      parseStoredMealDraft(readMealDraft()),
+      foodToAddToMeal(location.state),
+    ),
+  )
+  const [items, setItems] = useState<MealItemDraft[]>(initial.items)
   // The quantity error each item shows: the one found on its last blur or
   // on the last "Guardar". It does not change while the user types
   // (CLAUDE.md).
   const [shownErrors, setShownErrors] = useState<
     Record<number, PositiveNumberError | null>
   >({})
-  const nextKey = useRef(0)
+  const nextKey = useRef(initial.nextKey)
 
   // null: the field follows the calculated dose (spec §14 #46).
-  const [appliedDoseText, setAppliedDoseText] = useState<string | null>(null)
+  const [appliedDoseText, setAppliedDoseText] = useState<string | null>(
+    initial.appliedDoseText,
+  )
   const [appliedDoseShownError, setAppliedDoseShownError] =
     useState<NonNegativeNumberError | null>(null)
   // null: "Ahora", the moment "Guardar" is tapped.
-  const [eatenAtText, setEatenAtText] = useState<string | null>(null)
+  const [eatenAtText, setEatenAtText] = useState<string | null>(
+    initial.eatenAtText,
+  )
   const [eatenAtShownError, setEatenAtShownError] = useState(false)
   // The warnings confirmation is open (spec §8.5).
   const [confirming, setConfirming] = useState(false)
@@ -92,6 +117,36 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
   // next render, so a second tap in the same tick ("Guardar" or "Guardar
   // igual") would create a second meal without this (spec §14 #46).
   const savingRef = useRef(false)
+  // A food saved from the photo that could not be added (it still needs how
+  // much it yields), until the next change.
+  const [notUsableFood, setNotUsableFood] = useState(initial.notUsableFood)
+
+  // The food sent back from the photo is added once: the navigation state
+  // that carried it is removed (it would survive a reload), and its
+  // quantity gets the focus, as when a food is picked in the search.
+  const addedFromPhoto =
+    initial.focusKey !== null || initial.notUsableFood !== null
+  useEffect(() => {
+    if (!addedFromPhoto) return
+    // preventScrollReset: the new history entry would scroll to the top and
+    // hide the item that just got the focus.
+    void navigate('/', { replace: true, state: null, preventScrollReset: true })
+    if (initial.focusKey !== null) {
+      document.getElementById(`meal-item-${initial.focusKey}-quantity`)?.focus()
+    }
+  }, [addedFromPhoto, initial.focusKey, navigate])
+
+  // Every change is kept while the app is open; a meal without items (also
+  // after saving it) is not kept. Only what the user entered: the
+  // calculation is derived again in the render.
+  useEffect(() => {
+    if (items.length === 0) {
+      clearMealDraft()
+      return
+    }
+    const draft: StoredMealDraft = { items, appliedDoseText, eatenAtText }
+    writeMealDraft(draft)
+  }, [items, appliedDoseText, eatenAtText])
 
   const inputs = useMemo(() => items.map(toMealItemInput), [items])
   const result = useMemo(
@@ -105,6 +160,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     setConfirming(false)
     setBlocked(false)
     setSavedMealId(null)
+    setNotUsableFood(null)
   }
 
   function handlePick(food: MealFood) {
@@ -256,6 +312,20 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         </div>
       )}
 
+      {notUsableFood !== null && (
+        <div className="flex flex-col gap-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+          <p role="status">
+            {`Guardaste "${notUsableFood.name}". Para usarlo en una comida, cargá cuánto rinde al cocinarlo.`}
+          </p>
+          <Link
+            to={`/foods/${notUsableFood.id}/edit`}
+            className="flex min-h-11 items-center self-start font-medium underline"
+          >
+            Cargar cuánto rinde
+          </Link>
+        </div>
+      )}
+
       {items.length > 0 && (
         <ul className="flex flex-col gap-3">
           {items.map((item, index) => (
@@ -281,47 +351,65 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         </ul>
       )}
 
-      <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
-        {items.length === 0 ? (
-          <p className="text-slate-700">
-            Agregá alimentos para ver los HC y la dosis.
-          </p>
-        ) : result.ok ? (
-          <>
+      {/* Without items there is no total box: the search comes first. */}
+      {items.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
+          {result.ok ? (
+            <>
+              <p className="text-slate-700">
+                {totalCarbsText(result.totalCarbsG)}
+              </p>
+              <p className="text-xl font-semibold">
+                {doseText(result.doseUnits)}
+              </p>
+              <CalculationDetails
+                lines={[
+                  doseLine(
+                    result.totalCarbsG,
+                    settings.carb_ratio_g_per_unit,
+                    result.doseUnits,
+                  ),
+                ]}
+              />
+            </>
+          ) : result.errors.includes('INVALID_RATIO') ? (
+            <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
+          ) : result.errors.includes('INVALID_QUANTITY') ? (
+            <p className="text-red-700">{MEAL_OUT_OF_RANGE_MESSAGE}</p>
+          ) : (
             <p className="text-slate-700">
-              {totalCarbsText(result.totalCarbsG)}
+              Para ver el total y la dosis, completá o corregí los alimentos de
+              arriba.
             </p>
-            <p className="text-xl font-semibold">
-              {doseText(result.doseUnits)}
-            </p>
-            <CalculationDetails
-              lines={[
-                doseLine(
-                  result.totalCarbsG,
-                  settings.carb_ratio_g_per_unit,
-                  result.doseUnits,
-                ),
-              ]}
-            />
-          </>
-        ) : result.errors.includes('INVALID_RATIO') ? (
-          <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
-        ) : result.errors.includes('INVALID_QUANTITY') ? (
-          <p className="text-red-700">{MEAL_OUT_OF_RANGE_MESSAGE}</p>
-        ) : (
-          <p className="text-slate-700">
-            Para ver el total y la dosis, completá o corregí los alimentos de
-            arriba.
-          </p>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      <FoodPicker
-        foods={foods}
-        tableFoods={tableFoods}
-        onPick={handlePick}
-        alwaysOpen={items.length === 0}
-      />
+      <div className="flex flex-col gap-3">
+        <FoodPicker
+          foods={foods}
+          tableFoods={tableFoods}
+          onPick={handlePick}
+          alwaysOpen={items.length === 0}
+        />
+        {/* The photo screen comes back here after saving, and the food is
+            added to the meal (spec §6.1, §14 #61). A link is not disabled
+            by the fieldset: while saving it is made inert by hand (also for
+            the keyboard and VoiceOver, which skip pointer-events). */}
+        <Link
+          to="/foods/label"
+          state={FROM_MEAL_STATE}
+          aria-disabled={createMeal.isPending || undefined}
+          tabIndex={createMeal.isPending ? -1 : undefined}
+          onClick={(event) => {
+            if (savingRef.current || createMeal.isPending)
+              event.preventDefault()
+          }}
+          className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base aria-disabled:pointer-events-none aria-disabled:opacity-60"
+        >
+          Agregar con una foto
+        </Link>
+      </div>
 
       {items.length > 0 && (
         <div className="flex flex-col gap-4">

@@ -2,7 +2,7 @@ import { NavLink, Outlet, ScrollRestoration } from 'react-router'
 
 const sections = [
   { to: '/', label: 'Inicio' },
-  { to: '/foods', label: 'Catálogo' },
+  { to: '/foods', label: 'Alimentos' },
   { to: '/history', label: 'Historial' },
   { to: '/settings', label: 'Configuración' },
 ]

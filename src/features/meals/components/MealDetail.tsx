@@ -54,6 +54,9 @@ export function MealDetail({ meal }: Props) {
         <p className="text-xl font-semibold">
           {doseText(meal.calculated_dose_units)}
         </p>
+        <p className="text-slate-700">
+          Dosis aplicada: {appliedDoseText(meal.applied_dose_units)}
+        </p>
         <CalculationDetails
           lines={[
             doseLine(
@@ -64,8 +67,6 @@ export function MealDetail({ meal }: Props) {
           ]}
         />
       </div>
-
-      <p>Dosis aplicada: {appliedDoseText(meal.applied_dose_units)}</p>
 
       <DeleteMealSection meal={meal} />
     </article>

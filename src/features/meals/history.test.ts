@@ -7,23 +7,29 @@ import { createMemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import {
   appliedDoseText,
+  daySummaryText,
+  groupMealsByDay,
   isFromHistoryList,
   isPlainLeftClick,
+  mealFoodsText,
   mealSummaryText,
   nextMealsOffset,
+  openDaysFromState,
+  toggledDays,
   withoutMeal,
 } from './history.ts'
-import type { MealSummary, MealsPage } from './types.ts'
+import type { ListedMeal, MealsPage } from './types.ts'
 
 // Invented data.
 
-function meal(n: number, overrides: Partial<MealSummary> = {}): MealSummary {
+function meal(n: number, overrides: Partial<ListedMeal> = {}): ListedMeal {
   return {
     id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
     eaten_at: '2026-11-14T16:05:00+00:00',
     total_carbs_g: 30,
     calculated_dose_units: 2,
     applied_dose_units: 2,
+    meal_items: [{ position: 0, food_name: 'Arroz de prueba' }],
     ...overrides,
   }
 }
@@ -514,4 +520,394 @@ describe('mealSummaryText', () => {
       /^HC 1234,5 g · /,
     )
   })
+})
+
+// --- The days of the list (spec §6.7, §14 #62) ---
+
+describe('mealFoodsText', () => {
+  it('the names in the order they were entered, not the order they came in', () => {
+    expect(
+      mealFoodsText(
+        meal(0, {
+          meal_items: [
+            { position: 2, food_name: 'Manzana' },
+            { position: 0, food_name: 'Arroz' },
+            { position: 1, food_name: 'Pollo' },
+          ],
+        }),
+      ),
+    ).toBe('Arroz, Pollo, Manzana')
+  })
+
+  it('one food: only its name', () => {
+    expect(mealFoodsText(meal(0))).toBe('Arroz de prueba')
+  })
+
+  it('the same food twice shows twice; names are shown as saved', () => {
+    expect(
+      mealFoodsText(
+        meal(0, {
+          meal_items: [
+            { position: 0, food_name: 'Alfajor Marca, triple' },
+            { position: 1, food_name: 'Alfajor Marca, triple' },
+          ],
+        }),
+      ),
+    ).toBe('Alfajor Marca, triple, Alfajor Marca, triple')
+  })
+
+  it('does not modify the meal', () => {
+    const m = meal(0, {
+      meal_items: [
+        { position: 1, food_name: 'B' },
+        { position: 0, food_name: 'A' },
+      ],
+    })
+    const before = structuredClone(m)
+    mealFoodsText(m)
+    expect(m).toEqual(before)
+  })
+})
+
+describe('groupMealsByDay', () => {
+  function days(meals: ListedMeal[], hasMore: boolean) {
+    return groupMealsByDay(meals, hasMore).map((d) => ({
+      day: d.day,
+      ids: d.meals.map((m) => m.id),
+      complete: d.complete,
+    }))
+  }
+
+  it('no meals: no days', () => {
+    expect(groupMealsByDay([], false)).toEqual([])
+    expect(groupMealsByDay([], true)).toEqual([])
+  })
+
+  it('around midnight of Buenos Aires (03:00 UTC)', () => {
+    const meals = [
+      meal(0, { eaten_at: '2026-11-15T03:00:00+00:00' }), // 15/11 00:00
+      meal(1, { eaten_at: '2026-11-15T02:59:59.999+00:00' }), // 14/11 23:59
+      meal(2, { eaten_at: '2026-11-14T03:00:00Z' }), // 14/11 00:00
+      meal(3, { eaten_at: '2026-11-14T02:59:00Z' }), // 13/11 23:59
+    ]
+    expect(days(meals, false)).toEqual([
+      { day: '2026-11-15', ids: [meal(0).id], complete: true },
+      { day: '2026-11-14', ids: [meal(1).id, meal(2).id], complete: true },
+      { day: '2026-11-13', ids: [meal(3).id], complete: true },
+    ])
+  })
+
+  it('a UTC date of the next day is still the day before in Buenos Aires', () => {
+    // 21:30 of the 14th in Buenos Aires is 00:30 UTC of the 15th.
+    const meals = [meal(0, { eaten_at: '2026-11-15T00:30:00Z' })]
+    expect(days(meals, false)[0]?.day).toBe('2026-11-14')
+  })
+
+  it('an offset other than UTC', () => {
+    const meals = [
+      meal(0, { eaten_at: '2026-11-14T23:30:00-03:00' }),
+      meal(1, { eaten_at: '2026-11-15T01:30:00+01:00' }), // 14/11 21:30
+    ]
+    expect(days(meals, false)).toEqual([
+      { day: '2026-11-14', ids: [meal(0).id, meal(1).id], complete: true },
+    ])
+  })
+
+  it('across the change of year', () => {
+    const meals = [
+      meal(0, { eaten_at: '2027-01-01T03:00:00Z' }), // 01/01/2027 00:00
+      meal(1, { eaten_at: '2027-01-01T02:30:00Z' }), // 31/12/2026 23:30
+    ]
+    expect(days(meals, false)).toEqual([
+      { day: '2027-01-01', ids: [meal(0).id], complete: true },
+      { day: '2026-12-31', ids: [meal(1).id], complete: true },
+    ])
+  })
+
+  it('keeps the order of the list inside each day', () => {
+    const meals = [
+      meal(5, { eaten_at: '2026-11-14T20:00:00Z' }),
+      meal(3, { eaten_at: '2026-11-14T16:00:00Z' }),
+      meal(9, { eaten_at: '2026-11-14T16:00:00Z' }),
+    ]
+    expect(days(meals, false)[0]?.ids).toEqual([
+      meal(5).id,
+      meal(3).id,
+      meal(9).id,
+    ])
+  })
+
+  it('with a next page, only the day of the last meal is not complete', () => {
+    const meals = [
+      meal(0, { eaten_at: '2026-11-15T15:00:00Z' }),
+      meal(1, { eaten_at: '2026-11-14T15:00:00Z' }),
+      meal(2, { eaten_at: '2026-11-14T12:00:00Z' }),
+    ]
+    expect(days(meals, true).map((d) => [d.day, d.complete])).toEqual([
+      ['2026-11-15', true],
+      ['2026-11-14', false],
+    ])
+  })
+
+  it('with a next page and a single day: that day is not complete', () => {
+    const meals = Array.from({ length: 50 }, (_, i) =>
+      meal(i, { eaten_at: '2026-11-14T15:00:00Z' }),
+    )
+    expect(days(meals, true)).toEqual([
+      { day: '2026-11-14', ids: meals.map((m) => m.id), complete: false },
+    ])
+  })
+
+  it('"Ver más" completes the day: the meals of the next page join it', () => {
+    const first = [
+      meal(0, { eaten_at: '2026-11-15T15:00:00Z' }),
+      meal(1, { eaten_at: '2026-11-14T15:00:00Z' }),
+    ]
+    const second = [
+      meal(2, { eaten_at: '2026-11-14T12:00:00Z' }),
+      meal(3, { eaten_at: '2026-11-13T12:00:00Z' }),
+    ]
+    expect(days([...first, ...second], false)).toEqual([
+      { day: '2026-11-15', ids: [meal(0).id], complete: true },
+      { day: '2026-11-14', ids: [meal(1).id, meal(2).id], complete: true },
+      { day: '2026-11-13', ids: [meal(3).id], complete: true },
+    ])
+    // With yet another page, the 13th is the one that waits.
+    expect(days([...first, ...second], true).map((d) => d.complete)).toEqual([
+      true,
+      true,
+      false,
+    ])
+  })
+
+  it('does not modify the input', () => {
+    const meals = [meal(0), meal(1)]
+    const before = structuredClone(meals)
+    groupMealsByDay(meals, true)
+    expect(meals).toEqual(before)
+  })
+})
+
+describe('daySummaryText', () => {
+  function day(meals: ListedMeal[], complete = true) {
+    return { day: '2026-11-14', meals, complete }
+  }
+
+  it('one meal', () => {
+    expect(daySummaryText(day([meal(0, { total_carbs_g: 30 })]))).toBe(
+      '1 comida · 30,0 g de HC',
+    )
+  })
+
+  it('several meals: the total of the day, rounded once', () => {
+    expect(
+      daySummaryText(
+        day([
+          meal(0, { total_carbs_g: 0.1 }),
+          meal(1, { total_carbs_g: 0.2 }),
+          meal(2, { total_carbs_g: 184.7 }),
+        ]),
+      ),
+    ).toBe('3 comidas · 185,0 g de HC')
+    // Each 1,05 alone shows "1,1"; the day shows 2,1 and not 2,2.
+    expect(
+      daySummaryText(
+        day([
+          meal(0, { total_carbs_g: 1.05 }),
+          meal(1, { total_carbs_g: 1.05 }),
+        ]),
+      ),
+    ).toBe('2 comidas · 2,1 g de HC')
+  })
+
+  it('a day with 0 carbs', () => {
+    expect(daySummaryText(day([meal(0, { total_carbs_g: 0 })]))).toBe(
+      '1 comida · 0,0 g de HC',
+    )
+  })
+
+  it('a day that is not complete shows nothing', () => {
+    expect(daySummaryText(day([meal(0), meal(1)], false))).toBeNull()
+  })
+
+  it('a total that overflows: only the count', () => {
+    expect(
+      daySummaryText(
+        day([
+          meal(0, { total_carbs_g: Number.MAX_VALUE }),
+          meal(1, { total_carbs_g: Number.MAX_VALUE }),
+        ]),
+      ),
+    ).toBe('2 comidas')
+  })
+})
+
+describe('openDaysFromState', () => {
+  it('the open days of the entry', () => {
+    expect(
+      openDaysFromState({ openDays: ['2026-11-14', '2026-11-12'] }),
+    ).toEqual(['2026-11-14', '2026-11-12'])
+  })
+
+  it('after the browser history clones it', () => {
+    expect(
+      openDaysFromState(structuredClone({ openDays: ['2026-11-14'] })),
+    ).toEqual(['2026-11-14'])
+  })
+
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+    ['{}', {}],
+    ['the state of a row', { fromHistory: true }],
+    ['openDays as text', { openDays: '2026-11-14' }],
+    ['openDays with a number', { openDays: [1] }],
+    ['an array', ['2026-11-14']],
+  ])('%s: none open', (_, state) => {
+    expect(openDaysFromState(state)).toEqual([])
+  })
+})
+
+describe('toggledDays', () => {
+  it('opens a folded day, at the end', () => {
+    expect(toggledDays(['2026-11-14'], '2026-11-12')).toEqual([
+      '2026-11-14',
+      '2026-11-12',
+    ])
+  })
+
+  it('folds an open day', () => {
+    expect(toggledDays(['2026-11-14', '2026-11-12'], '2026-11-14')).toEqual([
+      '2026-11-12',
+    ])
+  })
+
+  it('does not modify the input', () => {
+    const open = ['2026-11-14']
+    toggledDays(open, '2026-11-12')
+    toggledDays(open, '2026-11-14')
+    expect(open).toEqual(['2026-11-14'])
+  })
+})
+
+// The open days and the scroll restoration, as HistoryPage does it: a toggle
+// replaces the entry of the list with the new state and preventScrollReset.
+describe('the open days with the scroll restoration of react-router', () => {
+  function setup() {
+    const router = createMemoryRouter(
+      [{ path: '/' }, { path: '/history' }, { path: '/history/:mealId' }],
+      { initialEntries: ['/', '/history'] },
+    )
+    const scroll = { y: 0 }
+    router.enableScrollRestoration({}, () => scroll.y)
+    return { router, scroll }
+  }
+
+  type Router = ReturnType<typeof setup>['router']
+
+  function toggle(router: Router, day: string) {
+    const open = openDaysFromState(router.state.location.state)
+    return router.navigate('/history', {
+      replace: true,
+      state: { openDays: toggledDays(open, day) },
+      preventScrollReset: true,
+    })
+  }
+
+  it('a toggle does not move the list nor add an entry', async () => {
+    const { router, scroll } = setup()
+    scroll.y = 800
+    await toggle(router, '2026-11-14')
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(router.state.preventScrollReset).toBe(true)
+    expect(openDaysFromState(router.state.location.state)).toEqual([
+      '2026-11-14',
+    ])
+    // Back leaves /history: no entry was added.
+    await router.navigate(-1)
+    expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('back from a meal: the same days open and the same scroll', async () => {
+    const { router, scroll } = setup()
+    await toggle(router, '2026-11-14')
+    await toggle(router, '2026-11-12')
+    scroll.y = 2400
+    await router.navigate('/history/x', { state: { fromHistory: true } })
+    scroll.y = 0
+    await router.navigate(-1)
+    expect(router.state.location.pathname).toBe('/history')
+    expect(openDaysFromState(router.state.location.state)).toEqual([
+      '2026-11-14',
+      '2026-11-12',
+    ])
+    expect(router.state.restoreScrollPosition).toBe(2400)
+  })
+
+  it('"Historial" in the bar: every day folded, at the top', async () => {
+    const { router } = setup()
+    await toggle(router, '2026-11-14')
+    await router.navigate('/history/x', { state: { fromHistory: true } })
+    await router.navigate('/history') // the NavLink
+    expect(openDaysFromState(router.state.location.state)).toEqual([])
+    expect(router.state.restoreScrollPosition).toBeNull()
+  })
+})
+
+// --- Added by the tester ---
+
+describe('groupMealsByDay and daySummaryText: bordes', () => {
+  it('the next page starts on another day: the day stays as it was, now complete', () => {
+    // The first page ends at 14/11 00:00 (Buenos Aires); the next one starts
+    // at 13/11 23:59:59,999, one millisecond before.
+    const first = [
+      meal(0, { eaten_at: '2026-11-14T15:00:00Z', total_carbs_g: 40 }),
+      meal(1, { eaten_at: '2026-11-14T03:00:00Z', total_carbs_g: 20 }),
+    ]
+    const second = [
+      meal(2, { eaten_at: '2026-11-14T02:59:59.999Z', total_carbs_g: 10 }),
+    ]
+    // Before "Ver más": the 14th waits, with no count nor total.
+    const before = groupMealsByDay(first, true)
+    expect(before.map((d) => [d.day, d.complete])).toEqual([
+      ['2026-11-14', false],
+    ])
+    expect(before.map(daySummaryText)).toEqual([null])
+    // After it: the 14th has the same two meals and shows them; the 13th
+    // waits if there is yet another page.
+    const after = groupMealsByDay([...first, ...second], true)
+    expect(after.map((d) => [d.day, d.meals.length, d.complete])).toEqual([
+      ['2026-11-14', 2, true],
+      ['2026-11-13', 1, false],
+    ])
+    expect(after.map(daySummaryText)).toEqual([
+      '2 comidas · 60,0 g de HC',
+      null,
+    ])
+    const last = groupMealsByDay([...first, ...second], false)
+    expect(last.map(daySummaryText)).toEqual([
+      '2 comidas · 60,0 g de HC',
+      '1 comida · 10,0 g de HC',
+    ])
+  })
+
+  it.each([
+    ['a negative value', -1],
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+  ])(
+    'the total comes only from sumCarbs: %s shows only the count',
+    (_, bad) => {
+      expect(
+        daySummaryText({
+          day: '2026-11-14',
+          meals: [
+            meal(0, { total_carbs_g: 30 }),
+            meal(1, { total_carbs_g: bad }),
+          ],
+          complete: true,
+        }),
+      ).toBe('2 comidas')
+    },
+  )
 })

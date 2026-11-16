@@ -153,9 +153,29 @@ export const mealSummarySchema = z.object({
 
 export type MealSummary = z.infer<typeof mealSummarySchema>
 
+/**
+ * A meal in the history list, with the names of its foods (spec §6.7). The
+ * `meal_items!inner` embed keeps only meals with at least one item, so a
+ * meal without items is not valid.
+ */
+export const listedMealSchema = mealSummarySchema.extend({
+  meal_items: z
+    .array(
+      z.object({
+        position: z.number(),
+        food_name: z.string(),
+      }) satisfies z.ZodType<
+        Pick<Tables<'meal_items'>, 'position' | 'food_name'>
+      >,
+    )
+    .min(1),
+})
+
+export type ListedMeal = z.infer<typeof listedMealSchema>
+
 /** One page of the history list; `hasMore` says whether there is a next one. */
 export type MealsPage = {
-  meals: MealSummary[]
+  meals: ListedMeal[]
   hasMore: boolean
 }
 

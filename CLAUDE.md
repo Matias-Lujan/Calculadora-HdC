@@ -129,7 +129,9 @@ src/
   domain/            # lógica pura, sin dependencias: dose/, label/
   lib/               # supabase.ts, database.types.ts, queryClient.ts, errors.ts,
                      # y lo que comparten varios features: foods.ts, settings.ts, search.ts,
-                     # foodText.ts (textos de un alimento sin Supabase, para que los tests no lo carguen)
+                     # foodText.ts (textos de un alimento sin Supabase, para que los tests no lo carguen),
+                     # mealDraftStorage.ts (la comida en curso en sessionStorage; la borra también el cierre de sesión)
+                     # y mealHandoff.ts (el alimento que vuelve de la foto a Inicio, por el estado de navegación)
   components/        # UI reutilizable, sin lógica de negocio
   features/
     foods/

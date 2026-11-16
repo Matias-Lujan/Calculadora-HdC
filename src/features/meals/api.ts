@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { supabase } from '../../lib/supabase.ts'
 import {
-  mealSummarySchema,
+  listedMealSchema,
   referenceFoodSchema,
   savedMealSchema,
   type CreateMealPayload,
@@ -121,15 +121,15 @@ export async function fetchMealsPage(offset: number): Promise<MealsPage> {
   const { data, error } = await supabase
     .from('meals')
     .select(
-      'id, eaten_at, total_carbs_g, calculated_dose_units, applied_dose_units, meal_items!inner(id)',
+      'id, eaten_at, total_carbs_g, calculated_dose_units, applied_dose_units, meal_items!inner(position, food_name)',
     )
     .is('deleted_at', null)
     .order('eaten_at', { ascending: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + MEALS_PAGE_SIZE)
   if (error) throw error
-  // zod drops the meal_items embed, which is only used to filter.
-  const rows = z.array(mealSummarySchema).parse(data as unknown)
+  // The items come in any order: the list sorts the names by position.
+  const rows = z.array(listedMealSchema).parse(data as unknown)
   return {
     meals: rows.slice(0, MEALS_PAGE_SIZE),
     hasMore: rows.length > MEALS_PAGE_SIZE,

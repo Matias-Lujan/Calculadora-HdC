@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import {
   NOT_A_LABEL_MESSAGE,
   PHOTO_OPEN_ERROR_MESSAGE,
@@ -8,6 +8,8 @@ import {
   VisionError,
   visionErrorMessage,
 } from '../../../lib/errors.ts'
+import type { Food } from '../../../lib/foods.ts'
+import { addToMealState, isFromMeal } from '../../../lib/mealHandoff.ts'
 import { LabelFoodForm } from '../components/LabelFoodForm.tsx'
 import { LabelReadError } from '../components/LabelReadError.tsx'
 import { PhotoPickerButton } from '../components/PhotoPickerButton.tsx'
@@ -42,9 +44,16 @@ function uploadedPath(step: Step): string | null {
  * New food from the photo of its label (spec §6.1, §9.4): take or pick the
  * photo, resize it, upload it, read it, and confirm. Reading errors offer
  * loading the data by hand, with the photo in sight.
+ *
+ * Opened from Inicio (spec §6.6, §14 #61), going back and cancelling return
+ * to Inicio, and saving returns there with the food, which Inicio adds to
+ * the meal. Opened from the catalog, they return to the catalog and saving
+ * shows the food.
  */
 export function NewLabelFoodPage() {
   const navigate = useNavigate()
+  const fromMeal = isFromMeal(useLocation().state)
+  const backTo = fromMeal ? '/' : '/foods'
   const uploadPhoto = useUploadLabelPhoto()
   const transcribe = useTranscribeLabel()
   const deletePhoto = useDeleteLabelPhoto()
@@ -130,15 +139,23 @@ export function NewLabelFoodPage() {
     const path = uploadedPath(step)
     if (path !== null) deletePhoto.mutate(path)
     attemptRef.current += 1
-    void navigate('/foods')
+    void navigate(backTo)
+  }
+
+  function saved(food: Food) {
+    if (fromMeal) {
+      void navigate('/', { replace: true, state: addToMealState(food) })
+    } else {
+      void navigate(`/foods/${food.id}`, { replace: true })
+    }
   }
 
   const back = (
     <Link
-      to="/foods"
+      to={backTo}
       className="flex min-h-11 items-center self-start text-slate-700"
     >
-      ← Catálogo
+      {fromMeal ? '← Inicio' : '← Mis alimentos'}
     </Link>
   )
 
@@ -151,6 +168,7 @@ export function NewLabelFoodPage() {
           photoPath={step.path}
           transcription={step.transcription}
           onCancel={cancel}
+          onSaved={saved}
         />
       </section>
     )

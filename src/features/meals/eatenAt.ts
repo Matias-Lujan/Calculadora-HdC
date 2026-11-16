@@ -107,3 +107,58 @@ export function eatenAtFromInput(text: string): string | null {
   if (dateTimeInputValue(new Date(instant)) !== text.slice(0, 16)) return null
   return new Date(instant).toISOString()
 }
+
+// The days of the history (spec §6.7): a meal belongs to the calendar day of
+// Buenos Aires it was eaten in. A day is identified by "YYYY-MM-DD".
+
+/** The day of Buenos Aires of an instant, "YYYY-MM-DD". */
+function dayAt(time: number): string {
+  const c = wallClockAt(time)
+  return `${pad(c.year, 4)}-${pad(c.month, 2)}-${pad(c.day, 2)}`
+}
+
+/** The day of Buenos Aires a saved meal was eaten in: "YYYY-MM-DD". */
+export function eatenDay(iso: string): string {
+  return dayAt(Date.parse(iso))
+}
+
+/** The time of a saved meal, for the history: "HH:mm", Buenos Aires, 24 h. */
+export function formatEatenTime(iso: string): string {
+  const c = wallClockAt(Date.parse(iso))
+  return `${pad(c.hour, 2)}:${pad(c.minute, 2)}`
+}
+
+const WEEKDAYS = [
+  'domingo',
+  'lunes',
+  'martes',
+  'miércoles',
+  'jueves',
+  'viernes',
+  'sábado',
+]
+
+/**
+ * The title of a day of the history: "Hoy", "Ayer", or the day of the week
+ * and the date ("lunes 09/11"), with the year if it is not the current one
+ * ("viernes 31/12/2027"). `day` is "YYYY-MM-DD" (eatenDay); today is the day
+ * of Buenos Aires at `now`. A future day is shown with its date.
+ */
+export function formatDayTitle(day: string, now: Date): string {
+  const today = dayAt(now.getTime())
+  if (day === today) return 'Hoy'
+  const [year = NaN, month = NaN, dayOfMonth = NaN] = day.split('-').map(Number)
+  const [todayYear = NaN, todayMonth = NaN, todayDay = NaN] = today
+    .split('-')
+    .map(Number)
+  // Calendar arithmetic in UTC (no time zone): the day before today.
+  const yesterday = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - 1))
+  if (day === yesterday.toISOString().slice(0, 10)) return 'Ayer'
+
+  const weekday =
+    WEEKDAYS[new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay()] ?? ''
+  const date = `${pad(dayOfMonth, 2)}/${pad(month, 2)}`
+  return year === todayYear
+    ? `${weekday} ${date}`
+    : `${weekday} ${date}/${pad(year, 4)}`
+}

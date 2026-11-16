@@ -8,6 +8,7 @@ import {
   type InfiniteData,
 } from '@tanstack/react-query'
 import { foodsKeys } from '../../lib/foods.ts'
+import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
 import {
   createMeal,
   deleteMeal,
@@ -45,16 +46,20 @@ export function useReferenceFoods() {
 // No optimistic updates (CLAUDE.md): "Comida guardada." is shown only when
 // the server confirms. A 401 is handled by the global MutationCache. Saving
 // can copy reference table foods to the catalog (spec §6.2), so the catalog
-// list is read again too.
+// list is read again too. The meal kept while the app is open is cleared
+// here, and not only by the form: this runs even if the user left Inicio
+// while saving, so a saved meal is never restored (spec §6.6, §14 #61).
 export function useCreateMeal() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createMeal,
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: () => {
+      clearMealDraft()
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: mealsKeys.all }),
         queryClient.invalidateQueries({ queryKey: foodsKeys.list }),
-      ]),
+      ])
+    },
   })
 }
 

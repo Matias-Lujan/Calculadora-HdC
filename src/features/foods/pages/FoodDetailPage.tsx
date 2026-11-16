@@ -13,7 +13,7 @@ export function FoodDetailPage() {
         to="/foods"
         className="flex min-h-11 items-center self-start text-slate-700"
       >
-        ← Catálogo
+        ← Mis alimentos
       </Link>
 
       {food.data === null ? (
@@ -23,7 +23,7 @@ export function FoodDetailPage() {
             to="/foods"
             className="flex min-h-11 items-center self-start rounded-lg border border-slate-300 px-4 text-base"
           >
-            Ir al catálogo
+            Ir a mis alimentos
           </Link>
         </div>
       ) : food.data !== undefined ? (

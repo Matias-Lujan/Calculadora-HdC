@@ -19,7 +19,7 @@ export function cookedPer100gText(factor: number): string | null {
 
 /** The ⓘ of a food that came from the reference table (spec §5.1). */
 export const TABLE_VALUE_INFO =
-  'Es el valor promedio de una tabla de alimentos. En lo que se cocina, como el arroz o los fideos, depende de cuánta agua absorbió: para más precisión, cargá el paquete en el catálogo y pesalo crudo y cocido.'
+  'Es el valor promedio de una tabla de alimentos. En lo que se cocina, como el arroz o los fideos, depende de cuánta agua absorbió: para más precisión, cargá el paquete en «Mis alimentos» y pesalo crudo y cocido.'
 
 /**
  * Whether a food came from the reference table: picked from it, or its

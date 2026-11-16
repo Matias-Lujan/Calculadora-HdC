@@ -149,17 +149,17 @@ export type MealItemFoodError = Exclude<ItemErrorCode, 'INVALID_QUANTITY'>
 
 const MEAL_ITEM_ERRORS: Record<MealItemFoodError, string> = {
   INVALID_CARBS:
-    'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+    'Los HC cada 100 g de este alimento no son válidos. Revisalo en «Mis alimentos».',
   MISSING_COOKING_FACTOR:
-    'Falta cuánto rinde al cocinarlo. Cargalo en el catálogo para usar este alimento.',
+    'Falta cuánto rinde al cocinarlo. Cargalo en «Mis alimentos» para usar este alimento.',
   INVALID_COOKING_FACTOR:
-    'Lo que rinde al cocinarlo no es válido. Revisalo en el catálogo.',
+    'Lo que rinde al cocinarlo no es válido. Revisalo en «Mis alimentos».',
   MISSING_UNIT_WEIGHT:
     'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
   UNITS_NOT_ALLOWED_FOR_RAW_COOKED:
     'Este alimento se carga en gramos cocidos, no en unidades.',
   EFFECTIVE_CARBS_OVER_100:
-    'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en el catálogo cuánto rinde.',
+    'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en «Mis alimentos» cuánto rinde.',
 }
 
 export function mealItemErrorMessage(code: MealItemFoodError): string {

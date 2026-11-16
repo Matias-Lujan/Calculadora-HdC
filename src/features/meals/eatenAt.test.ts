@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   dateTimeInputValue,
   eatenAtFromInput,
+  eatenDay,
+  formatDayTitle,
   formatEatenAt,
+  formatEatenTime,
 } from './eatenAt.ts'
 
 // The time zone of the process when the file loads. vi.unstubAllEnvs()
@@ -393,6 +396,130 @@ describe('formatEatenAt does not depend on the time zone of the device', () => {
     expect(formatEatenAt('2026-11-15T03:00:00+00:00')).toBe('15/11/2026 00:00')
     expect(formatEatenAt('2027-01-01T02:30:00Z')).toBe('31/12/2026 23:30')
     expect(formatEatenAt('2008-01-15T15:00:00Z')).toBe('15/01/2008 13:00')
+  })
+})
+
+// The days of the history (spec §6.7, §14 #62).
+
+describe('eatenDay', () => {
+  it.each([
+    ['2026-11-14T16:05:00+00:00', '2026-11-14'],
+    ['2026-11-15T02:59:59.999Z', '2026-11-14'],
+    ['2026-11-15T03:00:00+00:00', '2026-11-15'],
+    ['2026-11-14T23:59:00-03:00', '2026-11-14'],
+    ['2026-11-15T01:00:00+02:00', '2026-11-14'],
+    ['2027-01-01T02:59:00Z', '2026-12-31'],
+    ['2027-01-01T03:00:00Z', '2027-01-01'],
+    ['2028-03-01T02:00:00Z', '2028-02-29'],
+  ])('%s → %s', (iso, day) => {
+    expect(eatenDay(iso)).toBe(day)
+  })
+
+  it('matches the date of formatEatenAt for every hour of a day', () => {
+    for (let hour = 0; hour < 24; hour++) {
+      const iso = new Date(Date.UTC(2026, 11, 31, hour, 30)).toISOString()
+      const [day = '', month = '', year = ''] = formatEatenAt(iso)
+        .slice(0, 10)
+        .split('/')
+      expect(eatenDay(iso)).toBe(`${year}-${month}-${day}`)
+    }
+  })
+})
+
+describe('formatEatenTime', () => {
+  it.each([
+    ['2026-11-14T16:05:00+00:00', '13:05'],
+    ['2026-11-14T16:05:59.999Z', '13:05'],
+    ['2026-11-15T03:00:00Z', '00:00'],
+    ['2026-11-15T02:59:00Z', '23:59'],
+    ['2026-11-14T09:07:00-03:00', '09:07'],
+  ])('%s → %s', (iso, time) => {
+    expect(formatEatenTime(iso)).toBe(time)
+  })
+})
+
+describe('formatDayTitle', () => {
+  // Monday 16/11/2026, 10:00 in Buenos Aires.
+  const now = new Date('2026-11-16T13:00:00Z')
+
+  it('today and yesterday', () => {
+    expect(formatDayTitle('2026-11-16', now)).toBe('Hoy')
+    expect(formatDayTitle('2026-11-15', now)).toBe('Ayer')
+  })
+
+  it('another day of this year: the day of the week and the date', () => {
+    expect(formatDayTitle('2026-11-14', now)).toBe('sábado 14/11')
+    expect(formatDayTitle('2026-11-09', now)).toBe('lunes 09/11')
+    expect(formatDayTitle('2026-01-01', now)).toBe('jueves 01/01')
+    expect(formatDayTitle('2026-11-11', now)).toBe('miércoles 11/11')
+  })
+
+  it('another year: with the year', () => {
+    expect(formatDayTitle('2025-12-31', now)).toBe('miércoles 31/12/2025')
+    expect(formatDayTitle('2024-02-29', now)).toBe('jueves 29/02/2024')
+  })
+
+  it('a future day: its date, also tomorrow', () => {
+    expect(formatDayTitle('2026-11-17', now)).toBe('martes 17/11')
+    expect(formatDayTitle('2027-01-01', now)).toBe('viernes 01/01/2027')
+  })
+
+  it('today is the day of Buenos Aires, not the one of UTC', () => {
+    // 23:30 of the 16th in Buenos Aires is 02:30 UTC of the 17th.
+    const late = new Date('2026-11-17T02:30:00Z')
+    expect(formatDayTitle('2026-11-16', late)).toBe('Hoy')
+    expect(formatDayTitle('2026-11-15', late)).toBe('Ayer')
+    expect(formatDayTitle('2026-11-17', late)).toBe('martes 17/11')
+    // And 00:00 of the 17th.
+    const midnight = new Date('2026-11-17T03:00:00Z')
+    expect(formatDayTitle('2026-11-17', midnight)).toBe('Hoy')
+    expect(formatDayTitle('2026-11-16', midnight)).toBe('Ayer')
+  })
+
+  it('across the change of month and year', () => {
+    const newYear = new Date('2027-01-01T12:00:00Z')
+    expect(formatDayTitle('2027-01-01', newYear)).toBe('Hoy')
+    expect(formatDayTitle('2026-12-31', newYear)).toBe('Ayer')
+    expect(formatDayTitle('2026-12-30', newYear)).toBe('miércoles 30/12/2026')
+    const march = new Date('2028-03-01T12:00:00Z')
+    expect(formatDayTitle('2028-02-29', march)).toBe('Ayer')
+    expect(formatDayTitle('2028-02-28', march)).toBe('lunes 28/02')
+  })
+})
+
+describe('the days do not depend on the time zone of the device', () => {
+  afterEach(restoreTimeZone)
+
+  it.each(['UTC', 'Asia/Tokyo', 'America/Los_Angeles', 'Pacific/Kiritimati'])(
+    'TZ=%s',
+    (zone) => {
+      vi.stubEnv('TZ', zone)
+      expect(eatenDay('2026-11-15T02:59:59.999Z')).toBe('2026-11-14')
+      expect(eatenDay('2026-11-15T03:00:00Z')).toBe('2026-11-15')
+      expect(formatEatenTime('2026-11-15T02:59:00Z')).toBe('23:59')
+      const late = new Date('2026-11-17T02:30:00Z')
+      expect(formatDayTitle('2026-11-16', late)).toBe('Hoy')
+      expect(formatDayTitle('2026-11-15', late)).toBe('Ayer')
+      expect(formatDayTitle('2026-11-14', late)).toBe('sábado 14/11')
+    },
+  )
+})
+
+describe('formatDayTitle: bordes (added by the tester)', () => {
+  it('"Ayer" on 1 January at 00:00 of Buenos Aires is 31 December', () => {
+    // 00:00 of 01/01/2027 in Buenos Aires is 03:00 UTC; one ms before, still 2026.
+    const midnight = new Date('2027-01-01T03:00:00Z')
+    expect(formatDayTitle('2027-01-01', midnight)).toBe('Hoy')
+    expect(formatDayTitle('2026-12-31', midnight)).toBe('Ayer')
+    const lastMs = new Date('2027-01-01T02:59:59.999Z')
+    expect(formatDayTitle('2026-12-31', lastMs)).toBe('Hoy')
+    expect(formatDayTitle('2026-12-30', lastMs)).toBe('Ayer')
+    expect(formatDayTitle('2027-01-01', lastMs)).toBe('viernes 01/01/2027')
+  })
+
+  it('"Ayer" on 1 March of a year that is not leap is 28 February', () => {
+    const march = new Date('2027-03-01T12:00:00Z')
+    expect(formatDayTitle('2027-02-28', march)).toBe('Ayer')
   })
 })
 

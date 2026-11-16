@@ -1,5 +1,4 @@
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router'
 import { NumberInput } from '../../../components/NumberInput.tsx'
 import type { FoodFieldError } from '../../../lib/errors.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
@@ -45,6 +44,8 @@ type Props = {
   /** null when loaded by hand (the reading failed, spec §9.4). */
   transcription: Transcription | null
   onCancel: () => void
+  /** Where to go once the food is saved (it depends on where the screen was opened from). */
+  onSaved: (food: Food) => void
 }
 
 type NumberField = 'portion' | 'labelCarbs' | 'fiber'
@@ -64,8 +65,8 @@ export function LabelFoodForm({
   photoPath,
   transcription,
   onCancel,
+  onSaved,
 }: Props) {
-  const navigate = useNavigate()
   const createFood = useCreateFood()
 
   const form = useFoodFormState({
@@ -87,8 +88,7 @@ export function LabelFoodForm({
   function save(values: FoodFormValues) {
     form.setConfirmingFactor(false)
     createFood.mutate(toNewLabelFood(values, photoPath, transcription), {
-      onSuccess: (saved: Food) =>
-        void navigate(`/foods/${saved.id}`, { replace: true }),
+      onSuccess: onSaved,
     })
   }
 

@@ -309,7 +309,10 @@ function listRow(n: number): Record<string, unknown> {
     total_carbs_g: 30,
     calculated_dose_units: 2,
     applied_dose_units: 2,
-    meal_items: [{ id: '00000000-0000-4000-8000-0000000000ee' }],
+    meal_items: [
+      { position: 1, food_name: 'Pollo de prueba' },
+      { position: 0, food_name: 'Arroz de prueba' },
+    ],
   }
 }
 
@@ -326,14 +329,9 @@ describe('fetchMealsPage', () => {
     expect(fake.state.chains[0]?.table).toBe('meals')
     expect(methods(0)).toEqual(['select', 'is', 'order', 'order', 'range'])
     const columns = argsOf(0, 'select')?.[0] as string
-    expect(columns.split(',').map((c) => c.trim())).toEqual([
-      'id',
-      'eaten_at',
-      'total_carbs_g',
-      'calculated_dose_units',
-      'applied_dose_units',
-      'meal_items!inner(id)',
-    ])
+    expect(columns).toBe(
+      'id, eaten_at, total_carbs_g, calculated_dose_units, applied_dose_units, meal_items!inner(position, food_name)',
+    )
     expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
     expect(callsOf(0, 'order')).toEqual([
       ['eaten_at', { ascending: false }],
@@ -376,10 +374,44 @@ describe('fetchMealsPage', () => {
     })
   })
 
-  it('drops the meal_items embed', async () => {
+  it('keeps the names of the foods, as the base returns them', async () => {
     fake.state.results = [{ data: [listRow(0)], error: null }]
     const page = await fetchMealsPage(0)
-    expect(Object.keys(page.meals[0] ?? {})).not.toContain('meal_items')
+    expect(page.meals[0]?.meal_items).toEqual([
+      { position: 1, food_name: 'Pollo de prueba' },
+      { position: 0, food_name: 'Arroz de prueba' },
+    ])
+  })
+
+  it('drops unknown columns of the items', async () => {
+    fake.state.results = [
+      {
+        data: [
+          {
+            ...listRow(0),
+            meal_items: [{ position: 0, food_name: 'Arroz', id: 'x' }],
+          },
+        ],
+        error: null,
+      },
+    ]
+    const page = await fetchMealsPage(0)
+    expect(page.meals[0]?.meal_items).toEqual([
+      { position: 0, food_name: 'Arroz' },
+    ])
+  })
+
+  it.each([
+    ['without items', []],
+    ['without the embed', undefined],
+    ['a name that is not text', [{ position: 0, food_name: null }]],
+    ['without a name', [{ position: 0 }]],
+    ['a position that is not a number', [{ position: '0', food_name: 'A' }]],
+  ])('a meal %s throws', async (_, items) => {
+    fake.state.results = [
+      { data: [{ ...listRow(0), meal_items: items }], error: null },
+    ]
+    await expect(fetchMealsPage(0)).rejects.toThrow()
   })
 
   it('data null throws', async () => {
