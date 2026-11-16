@@ -10,8 +10,11 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
-import { INSTRUCTIONS } from './prompt.ts'
-import { transcriptionJsonSchema, transcriptionSchema } from './schema.ts'
+import { INSTRUCTIONS } from '../../supabase/functions/transcribe-label/prompt.ts'
+import {
+  transcriptionJsonSchema,
+  transcriptionSchema,
+} from '../../supabase/functions/transcribe-label/schema.ts'
 
 const DEFAULT_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite']
 const SIZES = [

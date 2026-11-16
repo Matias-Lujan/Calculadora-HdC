@@ -24,7 +24,8 @@ const GRAMS_SUFFIX = /\s*(?:g|gr|grs|gramos?)\.?$/i
  *   pick a value for the user;
  * - ambiguous separators ("1.234": one thousand two hundred thirty-four, or
  *   one point two three four?);
- * - negative numbers, percentages or anything else.
+ * - negative numbers, percentages or anything else;
+ * - numbers too large to represent (a 9 repeated 400 times would be Infinity).
  *
  * "0" is a plain number and gives 0.
  */
@@ -34,13 +35,17 @@ export function parseLabelNumber(text: string | null): number | null {
   const trimmed = text.trim().replace(GRAMS_SUFFIX, '')
 
   if (DECIMAL_COMMA.test(trimmed)) {
-    return Number(trimmed.replace(',', '.'))
+    return finiteOrNull(Number(trimmed.replace(',', '.')))
   }
   if (THOUSANDS_DOT_DECIMAL_COMMA.test(trimmed)) {
-    return Number(trimmed.replaceAll('.', '').replace(',', '.'))
+    return finiteOrNull(Number(trimmed.replaceAll('.', '').replace(',', '.')))
   }
   if (DECIMAL_DOT.test(trimmed)) {
-    return Number(trimmed)
+    return finiteOrNull(Number(trimmed))
   }
   return null
+}
+
+function finiteOrNull(value: number): number | null {
+  return Number.isFinite(value) ? value : null
 }

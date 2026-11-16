@@ -40,6 +40,16 @@ export type FoodFormErrors = Partial<
   Record<keyof FoodFormTexts | 'measuredFactor', FoodFieldError>
 >
 
+/**
+ * The fields every food form has besides the carbs: the manual form and
+ * the label confirmation (labelForm.ts) share them.
+ */
+export type CommonFoodTexts = Omit<FoodFormTexts, 'carbsPer100g'>
+
+export type CommonFoodErrors = Partial<
+  Record<keyof CommonFoodTexts | 'measuredFactor', FoodFieldError>
+>
+
 export type FoodFormResult = {
   /** null when there is any error. */
   values: FoodFormValues | null
@@ -147,7 +157,7 @@ export function startsWithMoreOptionsOpen(food?: Food): boolean {
 }
 
 /** Whether a field inside "Más opciones" has an error. */
-export function hasMoreOptionsErrors(errors: FoodFormErrors): boolean {
+export function hasMoreOptionsErrors(errors: CommonFoodErrors): boolean {
   return (
     errors.unitWeight !== undefined ||
     errors.rawWeight !== undefined ||
@@ -161,9 +171,9 @@ export function hasMoreOptionsErrors(errors: FoodFormErrors): boolean {
  * factor as it is (null for a new food: a valid "not loaded yet").
  */
 function validateCookingFactor(
-  texts: FoodFormTexts,
+  texts: CommonFoodTexts,
   savedCookingFactor: number | null,
-  errors: FoodFormErrors,
+  errors: CommonFoodErrors,
 ): number | null {
   const rawEmpty = texts.rawWeight.trim() === ''
   const cookedEmpty = texts.cookedWeight.trim() === ''
@@ -200,9 +210,9 @@ function untouchedOr(
 
 /** Weight and name of one unit of an as_eaten food (both optional). */
 function validateUnit(
-  texts: FoodFormTexts,
+  texts: CommonFoodTexts,
   savedUnitWeight: number | null | undefined,
-  errors: FoodFormErrors,
+  errors: CommonFoodErrors,
 ): { unit_weight_g: number | null; unit_label: string | null } {
   const unitLabel = optionalText(texts.unitLabel)
   if (texts.unitWeight.trim() === '') {
@@ -221,11 +231,58 @@ function validateUnit(
 }
 
 /**
- * Validates the form and returns what to save, or the error of each field.
+ * Validates every field but the carbs (name, "¿Se cocina antes de comer?",
+ * how much it yields, the unit, brand and note), adds their errors to
+ * `errors` and returns their values, or null if any of them has an error.
  * `savedCookingFactor` is the factor of the food being edited (null for a
  * new food): it is kept when both weights are empty. Hidden fields (the
  * weights of an as_eaten food, the unit of a raw_cooked one) are neither
- * validated nor saved, even if they still hold text. `savedFood` holds the
+ * validated nor saved, even if they still hold text. `savedUnitWeight` is
+ * the saved unit weight of the food being edited: while the field still
+ * holds the text it started with, that exact value is saved (spec §14 #53).
+ */
+export function validateCommonFields(
+  texts: CommonFoodTexts,
+  savedCookingFactor: number | null,
+  savedUnitWeight: number | null | undefined,
+  errors: CommonFoodErrors,
+): Omit<FoodFormValues, 'carbs_per_100g'> | null {
+  const own: CommonFoodErrors = {}
+
+  const name = texts.name.trim()
+  if (name === '') own.name = 'REQUIRED'
+
+  let cookingFactor: number | null = null
+  let unit: { unit_weight_g: number | null; unit_label: string | null } = {
+    unit_weight_g: null,
+    unit_label: null,
+  }
+  if (texts.state === null) {
+    own.state = 'STATE_REQUIRED'
+  } else if (texts.state === 'raw_cooked') {
+    cookingFactor = validateCookingFactor(texts, savedCookingFactor, own)
+  } else {
+    unit = validateUnit(texts, savedUnitWeight, own)
+  }
+
+  Object.assign(errors, own)
+  if (Object.keys(own).length > 0 || texts.state === null) return null
+
+  return {
+    name,
+    brand: optionalText(texts.brand),
+    state: texts.state,
+    cooking_factor: cookingFactor,
+    unit_weight_g: unit.unit_weight_g,
+    unit_label: unit.unit_label,
+    notes: optionalText(texts.notes),
+  }
+}
+
+/**
+ * Validates the form and returns what to save, or the error of each field.
+ * The fields besides the carbs go through validateCommonFields (with
+ * `savedCookingFactor` and the saved unit weight). `savedFood` holds the
  * saved carbs and unit weight of the food being edited: a field that still
  * holds the text it started with saves that exact value, not the parsed
  * text (spec §14 #53).
@@ -237,47 +294,26 @@ export function validateFoodForm(
 ): FoodFormResult {
   const errors: FoodFormErrors = {}
 
-  const name = texts.name.trim()
-  if (name === '') errors.name = 'REQUIRED'
-
   const carbs = parseCarbsPer100g(texts.carbsPer100g)
   if ('error' in carbs) errors.carbsPer100g = carbs.error
 
-  let cookingFactor: number | null = null
-  let unit: { unit_weight_g: number | null; unit_label: string | null } = {
-    unit_weight_g: null,
-    unit_label: null,
-  }
-  if (texts.state === null) {
-    errors.state = 'STATE_REQUIRED'
-  } else if (texts.state === 'raw_cooked') {
-    cookingFactor = validateCookingFactor(texts, savedCookingFactor, errors)
-  } else {
-    unit = validateUnit(texts, savedFood?.unit_weight_g, errors)
-  }
+  const common = validateCommonFields(
+    texts,
+    savedCookingFactor,
+    savedFood?.unit_weight_g,
+    errors,
+  )
 
-  if (
-    Object.keys(errors).length > 0 ||
-    texts.state === null ||
-    'error' in carbs
-  ) {
-    return { values: null, errors }
-  }
+  if (common === null || 'error' in carbs) return { values: null, errors }
 
   return {
     values: {
-      name,
-      brand: optionalText(texts.brand),
-      state: texts.state,
+      ...common,
       carbs_per_100g: untouchedOr(
         texts.carbsPer100g,
         savedFood?.carbs_per_100g,
         carbs.value,
       ),
-      cooking_factor: cookingFactor,
-      unit_weight_g: unit.unit_weight_g,
-      unit_label: unit.unit_label,
-      notes: optionalText(texts.notes),
     },
     errors,
   }

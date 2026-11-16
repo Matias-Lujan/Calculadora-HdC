@@ -1,5 +1,6 @@
-// Instructions for the vision model (docs/spec.md §9.5). Starting point for
-// supabase/functions/transcribe-label/prompt.ts in stage 6.
+// Instructions for the vision model (docs/spec.md §9.5), validated with real
+// labels in stage 1b; v5 (stage 6, real rushed photos).
+// scripts/gemini-probe/probe.ts imports them from here.
 
 export const INSTRUCTIONS = `
 You transcribe nutrition facts tables printed on food packages sold in
@@ -13,8 +14,20 @@ Rules:
    status "illegible" and text null. A number is "legible" only if every
    digit is sharp enough to read without guessing. If the photo is blurry,
    out of focus or the digits are smudged, mark those numbers "illegible":
-   never fill in a value that is typical for this kind of product. If it is not in the image, set status
-   "not_present" and text null. Only "legible" fields have text.
+   never fill in a value that is typical for this kind of product. If it is
+   not in the image, set status "not_present" and text null. Only
+   "legible" fields have text.
+   - The decimal comma is part of the number. If glare, a reflection, a
+     wrinkle, a fold or motion hides whether there is a comma between two
+     digits ("3,0" or "30"), the number is "illegible".
+   - Never choose between two possible readings. If a digit could be one
+     of two (a 7 or an 8, a 3 or an 8, a 1 or a 7), or you are completing
+     its shape from the parts you can see, the number is "illegible".
+   - Read each value on its own. Never pick or adjust a value so that it
+     agrees with other values of the table, and never use a common portion
+     size (such as 30 g) when the portion line is not sharp.
+   - Marking a number "illegible" is a correct answer: the user reads it
+     on the package. A wrong legible number is the worst possible answer.
 3. Copy numbers exactly as printed, as text: keep the decimal comma, signs
    such as "<", and units such as "g". Do not convert units, do not round,
    do not calculate anything.
@@ -35,6 +48,9 @@ Rules:
      "2 galletitas"), if any.
    - carbohydrates_g: the value of the TOTAL carbohydrates row in that
      column. Never use sub-rows such as "azúcares" or "de los cuales".
+   - energy: the value of the energy row ("Valor energético") in that
+     column, as printed with its units, including both kcal and kJ if both
+     are printed (e.g. "107 kcal = 449 kJ"). Same rules as every number.
    The "%VD" (percent daily value) column is NOT a column of quantities:
    ignore it.
 7. Packages sold in several countries may show more than one table. Use
@@ -45,6 +61,7 @@ Rules:
 8. If the image is not a nutrition facts table, set is_nutrition_label
    false, every field "not_present" and columns empty.
 9. observations: a short note only if something affects the reading
-   (glare, cut-off table, blur, ignored tables). Otherwise null. Write it
-   in Spanish from Argentina: the user reads it.
+   (glare, wrinkles, cut-off table, blur, ignored tables, numbers marked
+   illegible and why). Otherwise null. Write it in Spanish from Argentina:
+   the user reads it.
 `.trim()

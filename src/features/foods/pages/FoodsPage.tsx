@@ -17,12 +17,20 @@ export function FoodsPage() {
     <section className="flex flex-col gap-4">
       <h1 className="text-2xl font-semibold">Catálogo</h1>
 
-      <Link
-        to="/foods/new"
-        className="flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
-      >
-        Agregar alimento
-      </Link>
+      <div className="flex flex-col gap-3">
+        <Link
+          to="/foods/label"
+          className="flex min-h-11 items-center justify-center rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+        >
+          Agregar con una foto
+        </Link>
+        <Link
+          to="/foods/new"
+          className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base"
+        >
+          Agregar a mano
+        </Link>
+      </div>
 
       {/* With data, the list stays even if a later refetch fails. */}
       {foods.data !== undefined ? (

@@ -65,6 +65,19 @@ describe('parseLabelNumber', () => {
     expect(parseLabelNumber(text)).toBeNull()
   })
 
+  it.each([
+    ['400 nueves', '9'.repeat(400)],
+    ['400 nueves con coma decimal', '9'.repeat(400) + ',5'],
+    ['400 nueves con punto decimal', '9'.repeat(400) + '.5'],
+    ['con puntos de miles', '1' + '.000'.repeat(103) + ',5'],
+  ])('un número que no entra (%s) da null', (_, text) => {
+    expect(parseLabelNumber(text)).toBeNull()
+  })
+
+  it('un número enorme que todavía entra (1 seguido de 308 ceros) se devuelve', () => {
+    expect(parseLabelNumber('1' + '0'.repeat(308))).toBe(1e308)
+  })
+
   it('null da null', () => {
     expect(parseLabelNumber(null)).toBeNull()
   })

@@ -51,8 +51,21 @@ const UNAUTHORIZED_POSTGREST_CODES = new Set([
   'PGRST303',
 ])
 
+/**
+ * The session is missing or no longer valid, found outside supabase-js
+ * errors: a 401 from the transcribe-label function, or no session when
+ * uploading a photo.
+ */
+export class UnauthorizedError extends Error {
+  constructor() {
+    super('Unauthorized')
+    this.name = 'UnauthorizedError'
+  }
+}
+
 // True when the session is no longer valid and the user has to log in again.
 export function isUnauthorized(error: unknown): boolean {
+  if (error instanceof UnauthorizedError) return true
   if (isAuthApiError(error)) {
     return error.code !== undefined && UNAUTHORIZED_AUTH_CODES.has(error.code)
   }
@@ -97,6 +110,11 @@ export type FoodFieldError =
   | 'STATE_REQUIRED'
   | 'UNIT_WEIGHT_REQUIRED'
   | 'FACTOR_NOT_COMPUTABLE'
+  // The label confirmation (src/features/foods/labelForm.ts, spec §6.1).
+  | 'CARBS_EXCEED_PORTION'
+  | 'FIBER_EXCEEDS_CARBS'
+  | 'COLUMN_REQUIRED'
+  | 'BASIS_REQUIRED'
 
 const FOOD_FIELD_ERRORS: Record<FoodFieldError, string> = {
   ...POSITIVE_NUMBER_ERRORS,
@@ -105,6 +123,10 @@ const FOOD_FIELD_ERRORS: Record<FoodFieldError, string> = {
   UNIT_WEIGHT_REQUIRED: 'Completá el peso de la unidad, o borrá el nombre.',
   FACTOR_NOT_COMPUTABLE:
     'Con estos pesos no se puede calcular cuánto rinde. Revisalos.',
+  CARBS_EXCEED_PORTION: 'No puede ser más que la porción.',
+  FIBER_EXCEEDS_CARBS: 'No puede ser más que los HC.',
+  COLUMN_REQUIRED: 'Elegí qué columna usar.',
+  BASIS_REQUIRED: 'Elegí una opción.',
 }
 
 export function foodFieldErrorMessage(code: FoodFieldError): string {
@@ -177,6 +199,62 @@ export function mealSaveWarningMessage(warning: MealSaveWarning): string {
       return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
   }
 }
+
+/**
+ * The expected errors of the transcribe-label function (spec §9.3) that
+ * the app shows with their own message. UNAUTHORIZED goes to the login
+ * (UnauthorizedError), and INTERNAL_ERROR, like any other failure, is an
+ * unexpected error (READ_ERROR_MESSAGE).
+ */
+export const VISION_ERROR_CODES = [
+  'VISION_QUOTA_EXCEEDED',
+  'DAILY_CAP_REACHED',
+  'VISION_UNAVAILABLE',
+  'VISION_BAD_RESPONSE',
+  'INVALID_REQUEST',
+] as const
+
+export type VisionErrorCode = (typeof VISION_ERROR_CODES)[number]
+
+/** An expected error of transcribe-label, with its code and retryable. */
+export class VisionError extends Error {
+  readonly code: VisionErrorCode
+  readonly retryable: boolean
+
+  constructor(code: VisionErrorCode, retryable: boolean) {
+    super(code)
+    this.name = 'VisionError'
+    this.code = code
+    this.retryable = retryable
+  }
+}
+
+const VISION_ERRORS: Record<VisionErrorCode, string> = {
+  VISION_QUOTA_EXCEEDED:
+    'Se alcanzó el límite gratuito de lecturas de etiquetas. Podés cargar los datos a mano o probar de nuevo más tarde.',
+  DAILY_CAP_REACHED:
+    'Llegaste al máximo de lecturas automáticas de hoy. Podés cargar los datos a mano.',
+  VISION_UNAVAILABLE:
+    'El servicio de lectura no responde en este momento. Podés cargar los datos a mano o reintentar.',
+  VISION_BAD_RESPONSE:
+    'No se pudo interpretar la lectura de la etiqueta. Podés cargar los datos a mano o reintentar.',
+  INVALID_REQUEST:
+    'No se pudo leer la foto. Podés sacar otra o cargar los datos a mano.',
+}
+
+export function visionErrorMessage(code: VisionErrorCode): string {
+  return VISION_ERRORS[code]
+}
+
+// The photo of a label (spec §6.1, §9.4).
+export const NOT_A_LABEL_MESSAGE = 'La foto no parece una tabla nutricional.'
+export const READ_ERROR_MESSAGE =
+  'No se pudo leer la etiqueta. Revisá la conexión y reintentá.'
+export const PHOTO_UPLOAD_ERROR_MESSAGE =
+  'No se pudo subir la foto. Revisá la conexión y reintentá.'
+export const PHOTO_OPEN_ERROR_MESSAGE =
+  'No se pudo abrir la foto. Probá con otra.'
+export const PHOTO_LOAD_ERROR_MESSAGE = 'No se pudo cargar la foto.'
 
 // The date and time field of a meal, when it is empty or not a real date.
 export const EATEN_AT_ERROR_MESSAGE = 'Elegí la fecha y la hora.'

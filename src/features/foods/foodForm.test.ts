@@ -50,6 +50,7 @@ const savedFood: Food = {
   reference_code: null,
   reference_description: null,
   notes: null,
+  photo_path: null,
   archived_at: null,
 }
 

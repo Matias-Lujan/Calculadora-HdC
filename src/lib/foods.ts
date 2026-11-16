@@ -9,11 +9,11 @@ import { supabase } from './supabase.ts'
 
 /**
  * Columns the app reads. Without user_id (RLS already filters by user),
- * photo_path and label_transcription (stage 6) and the timestamps the app
- * does not show.
+ * label_transcription (kept only for traceability, spec §6.1) and the
+ * timestamps the app does not show.
  */
 export const FOOD_COLUMNS =
-  'id, name, brand, source, state, carbs_per_100g, cooking_factor, unit_weight_g, unit_label, reference_db, reference_code, reference_description, notes, archived_at'
+  'id, name, brand, source, state, carbs_per_100g, cooking_factor, unit_weight_g, unit_label, reference_db, reference_code, reference_description, notes, photo_path, archived_at'
 
 type FoodRow = Pick<
   Tables<'foods'>,
@@ -30,6 +30,7 @@ type FoodRow = Pick<
   | 'reference_code'
   | 'reference_description'
   | 'notes'
+  | 'photo_path'
   | 'archived_at'
 >
 
@@ -51,6 +52,7 @@ export const foodSchema = z.object({
   reference_code: z.string().nullable(),
   reference_description: z.string().nullable(),
   notes: z.string().nullable(),
+  photo_path: z.string().nullable(),
   archived_at: z.string().nullable(),
 }) satisfies z.ZodType<FoodRow>
 
