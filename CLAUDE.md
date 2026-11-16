@@ -5,12 +5,13 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 ## Dónde está cada cosa
 
 - **[docs/plan.md](docs/plan.md)**: en qué orden se construye y **en qué etapa estamos** (encabezado y tabla de resumen). Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
-- **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1; las decisiones tomadas, en §14.
+- **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1. Dice **qué** hace la app, no cómo está escrito el código.
+- **[docs/decisiones.md](docs/decisiones.md)**: la tabla de decisiones tomadas (antes spec §14; las referencias "§14 #N" apuntan ahí). Se lee solo cuando hace falta el porqué de una decisión puntual.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
 - **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real; `usda-seed/` arma la migración del seed de `reference_foods` desde SR Legacy de USDA (la lista curada es `selection.json`; los CSV van en `scripts/usda-seed/data/`, que no se commitea). Si cambia la lista, se genera una migración nueva (spec §14 #50).
 - **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer). Ver "Flujo de trabajo".
 
-Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec (incluida la tabla de §14) y, si corresponde, el plan.
+Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec, `docs/decisiones.md` (una fila corta) y, si corresponde, el plan.
 
 Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dejala anotada en la descripción del PR, para revisarla. No inventes abstracciones, parámetros ni capas "por las dudas": se agregan cuando un caso concreto las necesita.
 
@@ -24,7 +25,7 @@ Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo
    - pasar los chequeos de la sección Comandos;
    - marcar los "Terminada cuando" del plan;
    - actualizar el encabezado y la tabla de resumen del plan;
-   - registrar las decisiones nuevas en el spec (§14) y en las secciones que correspondan.
+   - registrar las decisiones nuevas en `docs/decisiones.md` y actualizar las secciones del spec que correspondan.
 4. **Pedir confirmación antes de cada commit, push y PR.** No se hacen sin el OK explícito del usuario.
 5. Los mensajes de commit van en inglés. La descripción del PR va en español: un resumen de lo hecho y una sección "Decisiones para revisar" con todo lo que se resolvió donde el spec no decía nada.
 6. El usuario revisa y mergea el PR. Después se vuelve a `main` con `git checkout main` y `git pull`. Las ramas mergeadas se conservan.
@@ -43,11 +44,13 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
 | 4 | `reviewer` | Lectura y `Bash` solo para git de lectura | Revisa los cambios contra el spec, las reglas de este archivo y la documentación. Responde "Sin hallazgos" o una lista de problemas. |
 
 - **El ciclo es proporcional al cambio.** El tiempo y los tokens importan: no se usan cuatro agentes para lo que resuelve uno.
-  - **Cálculo de HC o de dosis (`src/domain/dose/`), migraciones o RLS**: ciclo completo.
-  - **Lógica de un feature sin cuentas** (queries, guardado, validación de un formulario): planner solo si hay decisiones abiertas; implementer y reviewer; sin tester.
+  - **El planner va solo si hay decisiones abiertas** o el pedido no alcanza para implementar, también en el cálculo. Si ya está todo decidido (por el usuario o por el spec), la sesión principal le pasa el pedido directo al implementer.
+  - **Cálculo de HC o de dosis (`src/domain/`), migraciones o RLS**: implementer, tester y reviewer (planner según el punto anterior).
+  - **Lógica de un feature sin cuentas** (queries, guardado, validación de un formulario): implementer y reviewer; sin tester.
   - **Textos, pantallas o docs**: los hace la sesión principal, o un implementer si son muchos archivos. Sin planner, tester ni reviewer.
   - Los tests se escriben para lo que tiene riesgo (el cálculo, la base, el guardado). No se testean textos uno por uno ni se hacen barridos masivos ni mutaciones fuera del cálculo.
-- **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos importantes, y después otra vez al reviewer (y al tester, si correspondía). Los detalles menores de docs los arregla la sesión principal sin otra vuelta. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
+- **Cada pedido a un agente nombra las secciones del spec que hacen falta** (por ejemplo, "§6.1 y §9.3"), para que no lea el spec entero. El pedido es breve: el agente lee el resto del repo por su cuenta.
+- **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos importantes. La segunda vuelta del reviewer va solo si el arreglo cambia lógica; si es chico (unas líneas, un botón, un texto), la sesión principal revisa el diff (y vuelve al tester si se tocó el cálculo). Los detalles menores de docs los arregla la sesión principal sin otra vuelta. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
 - **Migraciones**: el implementer las crea, pero no las aplica. Antes del tester, la sesión principal las aplica en `dev` (`npx supabase db push --remote`), con el OK del usuario, o le pide que corra el comando.
 - **Los agentes nunca** hacen commit, push ni PR, ni corren `db push`, `secrets set` o `config push`, ni cambian la configuración de Supabase o Vercel. Eso lo hace la sesión principal, con el OK del usuario (punto 4 del flujo).
 - Las restricciones de `Bash` del implementer y del reviewer están escritas en sus definiciones. La herramienta no permite limitar `Bash` a ciertos comandos.
