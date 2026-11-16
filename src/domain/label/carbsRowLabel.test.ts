@@ -18,6 +18,14 @@ describe('isMercosurCarbsLabel', () => {
     'Carbohidratos (g):',
     'Carbohidratos.',
     'Carbohidrátos',
+    'Carbohidratos, de los cuales:',
+    'Carbohidratos, de los cuales',
+    'Carbohidratos de los cuales',
+    'Carbohidratos de los cuales:',
+    'Carbohidratos (g), de los cuales:',
+    'Hidratos de carbono, de los cuales:',
+    'Carbohidratos disponibles, de los cuales',
+    'CARBOHIDRATOS, DE LOS CUALES:',
   ])('"%s" es el rótulo habitual', (text) => {
     expect(isMercosurCarbsLabel(text)).toBe(true)
   })
@@ -29,6 +37,9 @@ describe('isMercosurCarbsLabel', () => {
     'Carbohidratos totales (g):',
     'Hidratos de carbono totales',
     'Azúcares',
+    'Azúcares totales, de los cuales:',
+    'Carbohidratos totales, de los cuales:',
+    'De los cuales:',
     'Carbohidratos disponibles y fibra',
     '',
     '   ',

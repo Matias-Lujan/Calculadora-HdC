@@ -302,6 +302,13 @@ describe('validateLabelForm', () => {
     )
   })
 
+  it('"Carbohidratos, de los cuales:" (formato nuevo) no muestra el aviso', () => {
+    const transcription = label({
+      carbohydrate_row_label: legible('Carbohidratos, de los cuales:'),
+    })
+    expect(needsFiberWarning(transcription)).toBe(false)
+  })
+
   it('un rótulo ilegible o ausente no muestra el aviso', () => {
     expect(
       needsFiberWarning(label({ carbohydrate_row_label: illegible })),

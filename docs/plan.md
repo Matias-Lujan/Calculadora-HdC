@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 5 y 6b terminadas (PR #1 a #4, #7, #8, #10 y #11 mergeados). Etapa 6 en curso en la rama `etapa-6-foto`: la Edge Function `transcribe-label` (funcionalidad 1), el flujo en el cliente (funcionalidad 2) y las instrucciones v5 con el control de calorías (funcionalidad 3) están implementados; la función está desplegada en `dev` con las instrucciones v4 (falta redesplegar con la v5) y sus secrets cargados; la prueba con fotos reales apuradas está hecha (`docs/notas/gemini-probe.md`); falta probar en el iPhone. Orden de lo que falta: 6 y 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-16.
+**Estado: etapas 0 a 5 y 6b terminadas (PR #1 a #4, #7, #8, #10 y #11 mergeados). Etapa 6 terminada en la rama `etapa-6-foto`, con su PR por mergear: la Edge Function `transcribe-label` está desplegada en `dev` (instrucciones v5) con sus secrets. La próxima es la etapa 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-16.
 
 ---
 
@@ -34,7 +34,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
 | 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR #11 |
-| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | En curso (`etapa-6-foto`) |
+| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | ✅ PR por mergear |
 | 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
 
 ---
@@ -256,15 +256,17 @@ Incluye:
 - **Funcionalidad 2, implementada** (el flujo en el cliente, spec §6.1, §9.4 y §14 #55): `/foods/label` desde el Catálogo ("Agregar con una foto"), foto → JPEG achicado → subida → lectura → confirmación, carga a mano, borrado al cancelar y la foto en el detalle. Las cuentas en `src/domain/label/` (`labelCarbsPer100g`, `isMercosurCarbsLabel`, `singleUnitLabel`) y la pantalla en `src/features/foods/labelForm.ts`, con tests; chequeada por `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Sin migración. **Falta**: la prueba en el iPhone (necesita la función desplegada) y marcar los "Terminada cuando".
 - **Funcionalidad 3, implementada** (instrucciones v5 y control de calorías, spec §14 #56): tras la prueba con fotos reales apuradas, reglas nuevas en `prompt.ts` (sin elegir entre dos lecturas, cada valor solo), `energy` en cada columna del esquema, `parseLabelEnergyKcal` y `carbsExceedLabelEnergy` en `src/domain/label/energy.ts`, y el aviso en el recuadro de la confirmación con la confirmación al guardar compartida con cuánto rinde. Sin migración. **Falta**: redesplegar la función (antes que el cliente) y volver a correr `scripts/gemini-probe/` con las fotos reales apuradas, anotando los resultados en `docs/notas/gemini-probe.md`.
 
+Probado en el iPhone (2026-11-16), en la versión de prueba de la rama: etiqueta real leída y guardada con su foto, foto que no es una etiqueta, "Cancelar" y la cuota agotada (respuesta forzada en `provider.ts`, desplegada un rato en `dev` y sin commitear). El tope diario se probó contra `dev` con un usuario de prueba: con 30 lecturas en el día da `DAILY_CAP_REACHED`. La prueba con fotos reales apuradas está en `docs/notas/gemini-probe.md`. En el iPhone apareció un error: «Carbohidratos, de los cuales:» (etiqueta argentina) ofrecía restar la fibra; corregido (spec §14 #57).
+
 **Terminada cuando**:
-- [ ] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
-- [ ] En la pantalla de confirmación, la porción y los HC se ven destacados y juntos, con la foto a la vista (spec §6.1).
-- [ ] **Prueba con desenfoque real**: sacar tres fotos de etiquetas deliberadamente apuradas (movidas o mal enfocadas) y pasarlas por `scripts/gemini-probe/`. El desenfoque gaussiano de la etapa 1b degrada la imagen en forma pareja. Una foto real deja zonas legibles y zonas que no, y ahí es donde el modelo tiende a completar. Anotar los resultados en `docs/notas/gemini-probe.md` y, si aparece un número inventado, ajustar las instrucciones antes de cerrar la etapa.
-- [ ] Simulando la cuota agotada (por ejemplo, forzando un 429 en `provider.ts` en `dev`), la app muestra el mensaje y la carga a mano funciona con la foto.
-- [ ] El tope diario propio corta en el valor configurado.
-- [ ] Una foto que no es una etiqueta da el mensaje correspondiente.
-- [ ] La key de Gemini no aparece en el bundle del frontend ni en el repo.
-- [ ] En el caso normal, cargar un producto con paquete lleva la foto, responder ¿Se cocina antes de comer? (y elegir la columna si hay varias) y Guardar, sin tipear números. (Reescrito por el usuario en la etapa 6: antes decía "la foto y un toque para confirmar", pero la pregunta de si se cocina es obligatoria y sin valor por defecto, spec §6.3.)
+- [x] Una etiqueta real se lee, se confirma y se guarda con su foto, desde el iPhone.
+- [x] En la pantalla de confirmación, la porción y los HC se ven destacados y juntos, con la foto a la vista (spec §6.1).
+- [x] **Prueba con desenfoque real**: sacar tres fotos de etiquetas deliberadamente apuradas (movidas o mal enfocadas) y pasarlas por `scripts/gemini-probe/`. El desenfoque gaussiano de la etapa 1b degrada la imagen en forma pareja. Una foto real deja zonas legibles y zonas que no, y ahí es donde el modelo tiende a completar. Anotar los resultados en `docs/notas/gemini-probe.md` y, si aparece un número inventado, ajustar las instrucciones antes de cerrar la etapa.
+- [x] Simulando la cuota agotada (por ejemplo, forzando un 429 en `provider.ts` en `dev`), la app muestra el mensaje y la carga a mano funciona con la foto.
+- [x] El tope diario propio corta en el valor configurado.
+- [x] Una foto que no es una etiqueta da el mensaje correspondiente.
+- [x] La key de Gemini no aparece en el bundle del frontend ni en el repo.
+- [x] En el caso normal, cargar un producto con paquete lleva la foto, responder ¿Se cocina antes de comer? (y elegir la columna si hay varias) y Guardar, sin tipear números. (Reescrito por el usuario en la etapa 6: antes decía "la foto y un toque para confirmar", pero la pregunta de si se cocina es obligatoria y sin valor por defecto, spec §6.3.)
 
 ## Etapa 6b — Tabla de referencia y formulario simple
 
