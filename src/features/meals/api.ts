@@ -4,6 +4,7 @@ import {
   mealSummarySchema,
   referenceFoodSchema,
   savedMealSchema,
+  type CreateMealPayload,
   type MealsPage,
   type NewMealRecord,
   type NewTableFood,
@@ -70,16 +71,12 @@ export async function findOrCreateTableFood(
  *
  * First, each reference table food of the meal (one per code, in order) is
  * resolved to its copy in the catalog, with findOrCreateTableFood. If one
- * fails, its error is thrown and the meal is not inserted; the copies
- * already created stay, and a retry finds them (spec §14 #51).
+ * fails, its error is thrown and the meal is not saved; the copies already
+ * created stay, and a retry finds them (spec §14 #51).
  *
- * Provisional until create_meal (stage 7, spec §7.2): it is not atomic.
- * Then the meal is inserted, then all its items in a single request
- * (PostgREST inserts them in one transaction: all or none). If the items
- * fail, the meal is soft-deleted (deleted_at, the only column that can be
- * updated), so no visible meal is left without items, and the items' error
- * is thrown. If that update also fails, the meal stays visible without
- * items: the risk accepted until stage 7 (spec §14 #46).
+ * Then the meal and all its items are saved in a single call to the
+ * create_meal function (spec §7.2), which inserts them in one transaction:
+ * all or nothing. Its error is thrown as is.
  */
 export async function createMeal(record: NewMealRecord): Promise<string> {
   const copies = new Map<string, string>()
@@ -91,43 +88,25 @@ export async function createMeal(record: NewMealRecord): Promise<string> {
       )
     }
   }
-  const rows = record.items.map(({ food, ...row }) => {
-    const foodId = 'id' in food ? food.id : copies.get(food.copy.reference_code)
-    if (foodId === undefined) throw new Error('A table food was not resolved')
-    return { ...row, food_id: foodId }
-  })
-
-  const { data, error } = await supabase
-    .from('meals')
-    .insert(record.meal)
-    .select('id')
-    .single()
-  if (error) throw error
-  const { id } = insertedIdSchema.parse(data as unknown)
-
-  const { error: itemsError } = await supabase
-    .from('meal_items')
-    .insert(rows.map((row) => ({ ...row, meal_id: id })))
-  if (itemsError) {
-    // Its result is ignored, even if it throws: the error that matters is
-    // the items' one.
-    try {
-      await supabase
-        .from('meals')
-        .update({ deleted_at: new Date().toISOString() })
-        .eq('id', id)
-    } catch {
-      // Nothing else to do: see the risk above.
-    }
-    throw itemsError
+  const payload: CreateMealPayload = {
+    meal: record.meal,
+    items: record.items.map(({ food, ...row }) => {
+      const foodId =
+        'id' in food ? food.id : copies.get(food.copy.reference_code)
+      if (foodId === undefined) throw new Error('A table food was not resolved')
+      return { ...row, food_id: foodId }
+    }),
   }
 
-  return id
+  const { data, error } = await supabase.rpc('create_meal', { payload })
+  if (error) throw error
+  return z.guid().parse(data as unknown)
 }
 
 // The history (spec §6.7, §14 #47). Deleted meals (deleted_at) never show,
-// and neither do meals without items (a failed provisional save, #46): the
-// `meal_items!inner` embed keeps only meals with at least one item.
+// and neither do meals without items (left in dev by failed saves before
+// create_meal, #46): the `meal_items!inner` embed keeps only meals with at
+// least one item.
 
 /** Meals per page of the history list. */
 export const MEALS_PAGE_SIZE = 50
