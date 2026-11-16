@@ -1,4 +1,6 @@
 export { isMercosurCarbsLabel } from './carbsRowLabel.ts'
+export { carbsExceedLabelEnergy, parseLabelEnergyKcal } from './energy.ts'
+export type { LabelEnergyInput } from './energy.ts'
 export { labelCarbsPer100g } from './labelCarbs.ts'
 export type {
   LabelCarbsBasis,

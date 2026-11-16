@@ -7,7 +7,9 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 import {
+  carbsExceedLabelEnergy,
   carbsPer100gFromPortion,
+  parseLabelEnergyKcal,
   parseLabelNumber,
 } from '../../src/domain/label/index.ts'
 import {
@@ -32,10 +34,19 @@ function describeColumn(column: Transcription['columns'][number]): string {
     const converted = carbsPer100gFromPortion(carbs, portion)
     per100g = converted.ok ? converted.carbsPer100g.toFixed(2) : converted.error
   }
+  // The same calories check the app does, in the column's own basis.
+  const energyFlag = carbsExceedLabelEnergy({
+    carbsG: carbs,
+    fiberG: null,
+    energyKcal: parseLabelEnergyKcal(column.energy.text),
+  })
+    ? ' ⚠ kcal'
+    : ''
   return (
     `[${column.basis}/${column.state} header=${JSON.stringify(column.header_text)} ` +
     `porción=${field(column.portion_size_g)} (${field(column.portion_description)}) ` +
-    `HC=${field(column.carbohydrates_g)} → HC/100g=${per100g}]`
+    `HC=${field(column.carbohydrates_g)} → HC/100g=${per100g} ` +
+    `kcal=${field(column.energy)}${energyFlag}]`
   )
 }
 

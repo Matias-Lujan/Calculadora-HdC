@@ -5,8 +5,10 @@ import {
   parsePositiveUserNumber,
 } from '../../domain/dose/index.ts'
 import {
+  carbsExceedLabelEnergy,
   isMercosurCarbsLabel,
   labelCarbsPer100g,
+  parseLabelEnergyKcal,
   parseLabelNumber,
   singleUnitLabel,
   type LabelCarbsBasis,
@@ -335,6 +337,50 @@ export function carbsLine(
   }
   const raw = texts.state === 'raw_cooked' ? ' en crudo' : ''
   return `${math} = ${formatCarbs(result)} g de HC cada 100 g${raw}`
+}
+
+/** The confirmation asked on save while the calories warning is shown. */
+export const ENERGY_CONFIRMATION_TEXT =
+  'Los HC no cierran con las calorías de la etiqueta. Revisalos contra el paquete antes de guardar.'
+
+/**
+ * The calories warning of the chosen column (spec §6.1, §9.7): the typed
+ * carbs (minus the typed fiber, only with the fiber warning) give more
+ * calories than the energy printed in the same column
+ * (carbsExceedLabelEnergy). null when loaded by hand, with no column
+ * chosen, when the energy has no single kcal value, when the carbs or the
+ * fiber are not valid, or when the numbers agree.
+ */
+export function energyWarning(
+  texts: LabelFormTexts,
+  transcription: Transcription | null,
+): string | null {
+  const column = chosenColumn(texts, transcription)
+  if (column === null) return null
+  const energyText = legibleText(column.energy)
+  const energyKcal = parseLabelEnergyKcal(energyText)
+  if (energyText === null || energyKcal === null) return null
+
+  const carbs = parseNonNegativeUserNumber(texts.labelCarbs)
+  if ('error' in carbs) return null
+
+  let fiber: number | null = null
+  if (needsFiberWarning(transcription) && texts.fiber.trim() !== '') {
+    const parsed = parseNonNegativeUserNumber(texts.fiber)
+    if ('error' in parsed) return null
+    fiber = parsed.value
+  }
+
+  if (
+    !carbsExceedLabelEnergy({
+      carbsG: carbs.value,
+      fiberG: fiber,
+      energyKcal,
+    })
+  ) {
+    return null
+  }
+  return `Revisá los HC contra el paquete: la etiqueta dice "${energyText.trim()}", y ${texts.labelCarbs.trim()} g de HC ya dan más calorías que eso. Puede ser un número mal leído, por ejemplo una coma que no se vio.`
 }
 
 /**

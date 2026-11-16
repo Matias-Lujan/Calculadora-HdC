@@ -22,6 +22,7 @@ const TRANSCRIPTION = {
       portion_size_g: { status: 'legible', text: '30 g' },
       portion_description: { status: 'legible', text: '3 unidades' },
       carbohydrates_g: { status: 'legible', text: '21,4' },
+      energy: { status: 'legible', text: '130 kcal = 546 kJ' },
     },
   ],
   observations: null,
@@ -163,6 +164,19 @@ describe('readLabel', () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(answer(legibleWithoutText))
+    expect(await readLabel(IMAGE, config(fetchMock))).toEqual({
+      ok: false,
+      code: 'VISION_BAD_RESPONSE',
+    })
+  })
+
+  it('una columna sin energy da VISION_BAD_RESPONSE', async () => {
+    const [column] = TRANSCRIPTION.columns
+    if (column === undefined) throw new Error('missing column')
+    const { energy: _energy, ...withoutEnergy } = column
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(answer({ ...TRANSCRIPTION, columns: [withoutEnergy] }))
     expect(await readLabel(IMAGE, config(fetchMock))).toEqual({
       ok: false,
       code: 'VISION_BAD_RESPONSE',

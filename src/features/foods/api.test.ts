@@ -320,6 +320,7 @@ const transcription: Transcription = {
       portion_size_g: { status: 'legible', text: '50 g' },
       portion_description: { status: 'legible', text: '1 alfajor' },
       carbohydrates_g: { status: 'legible', text: '38' },
+      energy: { status: 'legible', text: '190 kcal' },
     },
   ],
   observations: null,

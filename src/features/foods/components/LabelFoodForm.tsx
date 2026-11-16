@@ -17,7 +17,9 @@ import {
   carbsRowText,
   chooseColumn,
   chosenColumn,
+  ENERGY_CONFIRMATION_TEXT,
   columnOptionText,
+  energyWarning,
   fieldNote,
   initialLabelFormTexts,
   nameNote,
@@ -78,6 +80,7 @@ export function LabelFoodForm({
   const column = chosenColumn(texts, transcription)
   const fiberShown = needsFiberWarning(transcription) && texts.basis !== null
   const line = carbsLine(texts, transcription)
+  const energy = energyWarning(texts, transcription)
   const offer = unitOffer(texts, transcription)
   const observations = transcription?.observations?.trim() ?? ''
 
@@ -94,7 +97,8 @@ export function LabelFoodForm({
     form.setShownErrors(result.errors)
     if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
     if (result.values === null) return
-    if (needsFactorConfirmation(result.values)) {
+    // The calories warning and an unusual yield share one confirmation.
+    if (energy !== null || needsFactorConfirmation(result.values)) {
       form.setConfirmingFactor(true)
       return
     }
@@ -147,12 +151,20 @@ export function LabelFoodForm({
     )
   }
 
+  // The texts of the confirmation on save: the calories warning and an
+  // unusual yield, whichever apply, in a single "Guardar igual".
+  const confirmationParts: string[] = []
+  if (form.confirmingFactor && result.values !== null) {
+    if (energy !== null) confirmationParts.push(ENERGY_CONFIRMATION_TEXT)
+    const factor = result.values.cooking_factor
+    const yieldText =
+      factor !== null && needsFactorConfirmation(result.values)
+        ? unusualYieldText(factor)
+        : null
+    if (yieldText !== null) confirmationParts.push(yieldText)
+  }
   const confirmationText =
-    form.confirmingFactor &&
-    result.values !== null &&
-    result.values.cooking_factor !== null
-      ? unusualYieldText(result.values.cooking_factor)
-      : null
+    confirmationParts.length > 0 ? confirmationParts.join(' ') : null
 
   // The errors of the fields above "¿Se cocina antes de comer?".
   const labelErrors: (keyof LabelFormErrors)[] = [
@@ -243,6 +255,14 @@ export function LabelFoodForm({
           <p aria-live="polite" className="text-base">
             {line}
           </p>
+          {/* Always in the page, so the warning is announced when it shows. */}
+          <div aria-live="polite">
+            {energy !== null && (
+              <p className="rounded-lg bg-amber-50 p-2 text-amber-900">
+                {energy}
+              </p>
+            )}
+          </div>
         </section>
       )}
 

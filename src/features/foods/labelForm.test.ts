@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   carbsLine,
   chooseColumn,
+  energyWarning,
   fieldNote,
   initialLabelFormTexts,
   labelNumberText,
@@ -35,6 +36,7 @@ const perPortion: TranscriptionColumn = {
   portion_size_g: legible('50 g'),
   portion_description: legible('1 alfajor'),
   carbohydrates_g: legible('38'),
+  energy: legible('190 kcal = 798 kJ'),
 }
 
 const per100g: TranscriptionColumn = {
@@ -45,6 +47,7 @@ const per100g: TranscriptionColumn = {
   portion_size_g: absent,
   portion_description: absent,
   carbohydrates_g: legible('78,3'),
+  energy: legible('390 kcal = 1638 kJ'),
 }
 
 function label(overrides: Partial<Transcription> = {}): Transcription {
@@ -416,6 +419,114 @@ describe('carbsLine', () => {
     expect(carbsLine({ ...filled(label()), labelCarbs: '51' }, label())).toBe(
       null,
     )
+  })
+})
+
+describe('energyWarning', () => {
+  // 30 g of carbs in a column of 107 kcal: a decimal comma lost ("3,0").
+  const lostComma: TranscriptionColumn = {
+    ...perPortion,
+    portion_size_g: legible('60 g'),
+    carbohydrates_g: legible('30 g'),
+    energy: legible('107 kcal = 449 kJ'),
+  }
+  const withEnergy = (energy: TranscribedField) =>
+    label({ columns: [{ ...lostComma, energy }] })
+
+  it('avisa con la energía como está impresa y los HC como están en el campo', () => {
+    const transcription = label({ columns: [lostComma] })
+    const warning = energyWarning(filled(transcription), transcription)
+    expect(warning).toContain('"107 kcal = 449 kJ"')
+    expect(warning).toContain('30 g de HC')
+  })
+
+  it('con los HC bien leídos no avisa', () => {
+    const transcription = label({ columns: [lostComma] })
+    expect(
+      energyWarning(
+        { ...filled(transcription), labelCarbs: '3' },
+        transcription,
+      ),
+    ).toBeNull()
+  })
+
+  it.each([
+    ['ilegible', illegible],
+    ['ausente', absent],
+    ['solo en kJ', legible('449 kJ')],
+  ])('sin calorías (%s) no avisa', (_, energy) => {
+    const transcription = withEnergy(energy)
+    expect(energyWarning(filled(transcription), transcription)).toBeNull()
+  })
+
+  it('cargado a mano no avisa', () => {
+    expect(
+      energyWarning(
+        { ...filled(null), basis: 'per_portion', labelCarbs: '30' },
+        null,
+      ),
+    ).toBeNull()
+  })
+
+  describe('con dos columnas', () => {
+    const per100gColumn: TranscriptionColumn = {
+      ...per100g,
+      carbohydrates_g: legible('40'),
+      energy: legible('178 kcal'),
+    }
+    const transcription = label({ columns: [lostComma, per100gColumn] })
+
+    it('sin columna elegida no avisa', () => {
+      expect(energyWarning(filled(transcription), transcription)).toBeNull()
+    })
+
+    it('la de 100 g se compara con sus propias calorías', () => {
+      const texts = {
+        ...filled(transcription),
+        ...chooseColumn(per100gColumn, 1),
+      }
+      // 40 g give 160 kcal: within 178, though above the portion's 107.
+      expect(energyWarning(texts, transcription)).toBeNull()
+      const warning = energyWarning(
+        { ...texts, labelCarbs: '50' },
+        transcription,
+      )
+      expect(warning).toContain('"178 kcal"')
+      expect(warning).toContain('50 g de HC')
+    })
+  })
+
+  it('con el aviso de fibra, la fibra cargada se resta; sin el aviso, se ignora', () => {
+    const fiberLabel = label({
+      carbohydrate_row_label: legible('Total Carbohydrate'),
+      columns: [lostComma],
+    })
+    const mercosur = label({ columns: [lostComma] })
+    expect(
+      energyWarning({ ...filled(fiberLabel), fiber: '10' }, fiberLabel),
+    ).toBeNull()
+    expect(
+      energyWarning({ ...filled(fiberLabel), fiber: '' }, fiberLabel),
+    ).not.toBeNull()
+    expect(
+      energyWarning({ ...filled(mercosur), fiber: '10' }, mercosur),
+    ).not.toBeNull()
+  })
+
+  it('con HC vacíos o no válidos, o fibra no válida, no avisa', () => {
+    const transcription = label({ columns: [lostComma] })
+    const fiberLabel = label({
+      carbohydrate_row_label: legible('Total Carbohydrate'),
+      columns: [lostComma],
+    })
+    for (const labelCarbs of ['', '-30', 'abc']) {
+      expect(
+        energyWarning({ ...filled(transcription), labelCarbs }, transcription),
+      ).toBeNull()
+    }
+    expect(
+      energyWarning({ ...filled(fiberLabel), fiber: 'abc' }, fiberLabel),
+    ).toBeNull()
   })
 })
 

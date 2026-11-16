@@ -27,6 +27,8 @@ import {
 import {
   carbsLine,
   columnOptionText,
+  ENERGY_CONFIRMATION_TEXT,
+  energyWarning,
   fieldNote,
   initialLabelFormTexts,
   nameNote,
@@ -198,6 +200,7 @@ describe('plain words on the screen', () => {
       portion_size_g: legible('50 g'),
       portion_description: legible('1 alfajor'),
       carbohydrates_g: legible('38'),
+      energy: legible('190 kcal'),
     }
     const transcription = {
       is_nutrition_label: true,
@@ -226,6 +229,15 @@ describe('plain words on the screen', () => {
         transcription,
       ),
     ])
+
+    // 38 g of carbs in 107 kcal: the calories warning shows.
+    const lowEnergy = {
+      ...transcription,
+      columns: [{ ...column, energy: legible('107 kcal = 449 kJ') }],
+    }
+    const warning = energyWarning({ ...texts, fiber: '' }, lowEnergy)
+    expect(warning).not.toBeNull()
+    expectPlain([warning, ENERGY_CONFIRMATION_TEXT])
   })
 
   it('the meal breakdown, in sight and inside "Ver la cuenta"', () => {

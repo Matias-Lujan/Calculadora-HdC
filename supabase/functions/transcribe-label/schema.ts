@@ -23,6 +23,7 @@ const column = z.object({
   portion_size_g: transcribedField,
   portion_description: transcribedField,
   carbohydrates_g: transcribedField,
+  energy: transcribedField,
 })
 
 export const transcriptionSchema = z.object({

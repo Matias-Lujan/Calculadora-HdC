@@ -16,8 +16,8 @@ type Options<T, F extends string, V> = {
 /**
  * The state of a food form, shared by the manual form (FoodForm) and the
  * label confirmation (LabelFoodForm): the texts, the result of validating
- * them, the errors on screen, "Más opciones" and the unusual-yield
- * confirmation.
+ * them, the errors on screen, "Más opciones" and the confirmation on save
+ * (unusual yield, and the calories warning of a label).
  */
 export function useFoodFormState<T extends object, F extends string, V>({
   initialTexts,
@@ -35,7 +35,8 @@ export function useFoodFormState<T extends object, F extends string, V>({
   const [shownErrors, setShownErrors] = useState<
     Partial<Record<F, FoodFieldError>>
   >({})
-  // The unusual-factor confirmation is open (spec §6.4).
+  // The confirmation on save is open: an unusual factor (spec §6.4) or,
+  // from a label, carbs that do not agree with the calories (spec §6.1).
   const [confirmingFactor, setConfirmingFactor] = useState(false)
 
   const result = validate(texts)

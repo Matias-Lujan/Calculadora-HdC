@@ -101,6 +101,33 @@ Imágenes generadas a partir de las fotos reales, para controlar cada caso:
 - la pantalla de confirmación, donde la porción y los HC se muestran destacados y juntos para compararlos con el paquete (requisito de diseño, spec §6.1);
 - el control de la etapa 1 que rechaza más HC que gramos de porción. Habría frenado el caso "porción 30 g" si los HC se hubieran leído bien, pero **no detecta nada cuando el modelo lee mal los dos valores y el resultado queda coherente** (30 g / 24 g → 80 g/100 g, contra 76 reales). En ese caso, el único resguardo es la revisión visual.
 
+## Fotos reales apuradas (etapa 6)
+
+Tres fotos sacadas con el celular, a propósito movidas o con reflejos (carpeta `samples/real-borrosa/`, fuera de git), con Flash-Lite, en 1600 px (lo que manda la app) y en tamaño original. Valores reales, leídos del paquete:
+
+| Foto | Porción | HC por porción | Energía |
+|---|---|---|---|
+| Gallo (arroz), movida | 50 g | 38 g | 171 kcal |
+| G4U (envoltorio plástico arrugado, con reflejos) | 60 g | 3,0 g | 107 kcal |
+| Cabrales/Barilla (pasta), con la tabla en árabe abajo | 80 g | 57 g | — |
+
+**Instrucciones v4** (corridas `v4-real-1…3`, 3 veces por tamaño; la tercera corrida de Cabrales dio 429 por el límite por minuto):
+
+- Gallo, 1600 px: HC ilegibles 2 de 3 veces; 1 vez **porción "30 g" como legible** (inventada; la misma porción típica que en la etapa 1b). Original: **HC "37 g"** como legible 3 de 3 (un dígito mal leído).
+- G4U, 1600 px: "3,0 g" 2 de 2 (bien). Original: **"30 g"** 3 de 3, diez veces más.
+- Cabrales: 80 g y 57 g siempre, y descartó la tabla en árabe.
+- Flash (`v4-real-flash-1`, una vez) no lo resolvió: Gallo ilegible (bien), pero G4U "30 g" en 1600 px, y tardó 14–33 s.
+
+**Ajustes** (#56): instrucciones v5 (la coma tapada por un reflejo o una arruga, nunca elegir entre dos lecturas, cada valor por separado, nunca una porción típica) y el control de calorías en la app: los HC × 4 kcal no pueden superar la energía de la misma columna (con tolerancia).
+
+**Instrucciones v5** (corridas `v5-real-1…3`; una llamada dio 503):
+
+- Gallo: porción "50 g" bien siempre; HC ilegibles 4 de 5, y 1 vez **"37 g"** como legible (1600 px). El control de calorías no lo detecta (37 × 4 = 148 < 171).
+- G4U: **"30 g"** 6 de 6, pero el control de calorías avisa las 6 veces (30 × 4 = 120 > 107).
+- Cabrales: bien siempre.
+
+Conclusión: la v5 ya no inventa la porción. El error grave (×10 en G4U) lo frena siempre el control de calorías. Queda un dígito mal leído en una foto muy movida (37 en lugar de 38: 74 g/100 g contra 76), que solo detecta la revisión contra el paquete, como pide spec §6.1.
+
 ## Decisiones
 
 1. **Modelo por defecto: `gemini-3.5-flash-lite`** (secret `GEMINI_MODEL`). Flash queda como alternativa si en algún momento Flash-Lite falla con alguna etiqueta.
@@ -117,7 +144,7 @@ En el Barilla (foto 4), la tabla en español dice 57 g de HC por porción de 80 
 
 - 5 fotos de un solo tipo de producto (arroz y pastas secas), todas con valores solo por porción y con buena luz.
 - No se probaron etiquetas con columna por 100 g ni columnas "preparado".
-- El desenfoque fue generado (gaussiano, sobre una sola etiqueta) y degrada la imagen en forma pareja. Una foto movida o mal enfocada de verdad deja zonas legibles y zonas que no, que es donde el modelo tiende a completar. Queda como tarea de la etapa 6: tres fotos reales apuradas ([plan](../plan.md#etapa-6--alta-por-foto)).
+- El desenfoque fue generado (gaussiano, sobre una sola etiqueta) y degrada la imagen en forma pareja. Una foto movida o mal enfocada de verdad deja zonas legibles y zonas que no, que es donde el modelo tiende a completar. En la etapa 6 se probaron tres fotos reales apuradas: ver [Fotos reales apuradas](#fotos-reales-apuradas-etapa-6).
 - Pocas repeticiones por caso (hasta 10): sirven para ver tendencias, no para dar una tasa de error.
 - Dos días de prueba: la tasa de 503 depende de la demanda del servicio en ese momento.
 
