@@ -840,7 +840,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 ## 10. Autenticación y sesión
 
 - **Email + contraseña.** No se usa magic link: en una app agregada a la pantalla de inicio de iOS, el link se abre en Safari y no en la app instalada, que tiene su propio almacenamiento.
-- El **registro de nuevos usuarios está deshabilitado en los dos proyectos** (desde la etapa 2). Los usuarios se crean a mano desde el panel de Supabase; el propio ya existe en `dev`, y en `prod` se crea en la etapa 7.
+- El **registro de nuevos usuarios está deshabilitado en los dos proyectos** (desde la etapa 2). Los usuarios se crean a mano desde el panel de Supabase; el propio existe en `dev` y en `prod` (creado en la etapa 7, después de las migraciones: el trigger `on_auth_user_created` crea su fila de `user_settings`).
 - **Sesión lo más larga posible.** En Supabase, el *access token* dura poco (por defecto 1 hora) pero se renueva solo con el *refresh token*, que por defecto no vence. Configuración:
   - `persistSession: true` y `autoRefreshToken: true` en el cliente (son los valores por defecto).
   - **No** activar en Auth el "time-box" de sesiones ni el timeout por inactividad.
@@ -871,7 +871,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 |---|---|---|
 | Supabase | `calculadora-hdc-dev` (ref `xyolhiklqqoejkapqbxt`) | `calculadora-hdc-prd` (ref `zoxlvutjqolwfjcsbtog`) |
 | Frontend | `npm run dev` local, o *preview* de Vercel | Vercel, rama `main`: https://calculadora-hdc.vercel.app/ |
-| Variables en Vercel | entorno *Preview* → `dev` | entorno *Production* → `prod`. **Hasta la etapa 7 apunta a `dev`** (plan, convenciones) |
+| Variables en Vercel | entorno *Preview* → `dev` | entorno *Production* → `prod` (desde la etapa 7; antes apuntaba a `dev`) |
 
 - El *ref* es el identificador del proyecto. No es secreto: forma parte de la URL de Supabase, que va en el frontend.
 - Los dos proyectos están en **São Paulo (`sa-east-1`)**, la región más cercana a Argentina, y tienen la misma configuración:
@@ -879,7 +879,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
   - **exposición automática de tablas desactivada**: cada migración da los permisos explícitamente (§7.3);
   - **RLS automática activada**, como red de seguridad: si una migración se olvidara de activar RLS, Supabase lo activa igual;
   - **registro de usuarios deshabilitado** (§10).
-- Estado al cerrar la etapa 2: `dev` tiene las 7 migraciones aplicadas y el usuario propio creado; `prod` está vacío.
+- Estado al cerrar la etapa 7: `dev` y `prod` tienen las 10 migraciones aplicadas, la Edge Function `transcribe-label` con sus secrets y el usuario propio creado. `prod` empezó de cero (#59).
 - En Vercel, la **protección de los *preview* (Vercel Authentication) está desactivada**, para poder instalar la app en el iPhone desde un *preview* (§14, decisión 34). No expone nada nuevo: la URL de producción ya es pública y los datos los protegen RLS y el registro deshabilitado.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
 - Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.

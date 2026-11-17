@@ -67,7 +67,7 @@ No hace falta Docker: se trabaja siempre contra proyectos de Supabase en la nube
    ```
 
    No usar `npx supabase config push`: `supabase/config.toml` es solo para un stack local y pisaría la configuración de Auth del proyecto.
-3. **Usuarios**: se crean desde el panel (Authentication → Users → Add user).
+3. **Usuarios**: se crean desde el panel (Authentication → Users → Add user), **después de aplicar las migraciones**: una de ellas crea la configuración de cada usuario nuevo, y un usuario creado antes queda sin ella (se arregla borrándolo y volviéndolo a crear).
 4. **Lectura de etiquetas**: una key de Gemini de Google AI Studio, de un proyecto de Google **sin facturación** (así nunca se cobra; al pasar la cuota gratuita, la app avisa y deja cargar a mano). Se carga en los secrets de Supabase y se despliega la Edge Function:
 
    ```bash
