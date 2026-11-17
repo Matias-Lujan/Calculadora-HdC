@@ -358,7 +358,18 @@ Incluye (alcance acordado con el usuario, 2026-11-17, spec §14 #64):
 
 **Terminada cuando**:
 - [x] Existen el agente y el script, y el script corre de punta a punta contra `dev` (2026-11-17: 29 estados, 45 capturas; las 2 de "sin alerta" se sacan con `--sin-alerta`).
-- [ ] El usuario vio el informe de la primera revisión y eligió qué se hace.
+- [x] El usuario vio el informe de la primera revisión y eligió qué se hace (2026-11-17: las 27 propuestas, `UX-01` a `UX-27`, anotado en el informe, con berenjena como color de la app).
 - [ ] Lo elegido está implementado, verificado con capturas y probado por el usuario en el iPhone.
 
-**Próximo paso (para la sesión que siga con M1)**: correr la primera revisión con el agente `ux-designer` en modo revisión (secciones del spec: §6.1 y §6.5 a §6.8), mostrarle al usuario el informe `docs/ux/revision-1.md` como página con las capturas, y anotar en el informe lo que el usuario elija. El permiso para correr el script de capturas está en `.claude/settings.json`. Detalle conocido del script: si corta temprano por un error (por ejemplo, credenciales mal puestas), en Windows Node termina con "Assertion failed … UV_HANDLE_CLOSING" y el código 127 en lugar de 1; cuando todo sale bien, termina limpio.
+**Tandas** (el "Orden sugerido" del informe). Cada una se verifica con el `ux-designer` en modo verificación, contra las capturas de antes en `scripts/ux-screens/out/revision-1/` (no se commitean; si no están en la máquina, se sacan de `main` antes de empezar), y el usuario la prueba en el iPhone con la versión de prueba de la rama. Los cambios al spec y a `docs/decisiones.md` van en la tanda que implementa cada propuesta.
+
+| Tanda | Propuestas | Ciclo | Estado |
+|---|---|---|---|
+| 1. Base | UX-18 (colores, letra y componentes; sección 2 del informe) y UX-19 (íconos, con `lucide-react`) | Pantallas: implementer | Próxima |
+| 2. Seguridad | UX-01, UX-02, UX-03 y UX-04 | Formato nuevo en `src/domain/dose/`: implementer, tester y reviewer | Pendiente |
+| 3. Pantalla de comida | UX-05, UX-06, UX-07, UX-13, UX-14 y UX-15 | UX-07 toca `src/domain/dose/` (cambia #46): implementer, tester y reviewer | Pendiente |
+| 4. Atajos | UX-08, UX-09 y UX-10 | Lógica de un feature: implementer y reviewer. UX-10 decide si reemplazar la comida necesita una función nueva en la base | Pendiente |
+| 5. Historial y alimentos | UX-11, UX-12, UX-17 y UX-16 | Pantallas: implementer | Pendiente |
+| 6. Cierre | UX-20, UX-21, UX-22, UX-23, UX-24, UX-25, UX-26 (puntos 1 a 5) y UX-27 | Pantallas: implementer | Pendiente |
+
+**Próximo paso (para la sesión que siga con M1)**: implementar la tanda 1, con berenjena como color de la app. El pedido al implementer nombra la sección 2 del informe y las propuestas UX-18 y UX-19. El permiso para correr el script de capturas está en `.claude/settings.json`. Detalle conocido del script: si corta temprano por un error (por ejemplo, credenciales mal puestas), en Windows Node termina con "Assertion failed … UV_HANDLE_CLOSING" y el código 127 en lugar de 1; cuando todo sale bien, termina limpio.
