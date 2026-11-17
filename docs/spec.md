@@ -882,7 +882,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 - Estado al cerrar la etapa 7: `dev` y `prod` tienen las 10 migraciones aplicadas, la Edge Function `transcribe-label` con sus secrets y el usuario propio creado. `prod` empezó de cero (#59).
 - En Vercel, la **protección de los *preview* (Vercel Authentication) está desactivada**, para poder instalar la app en el iPhone desde un *preview* (§14, decisión 34). No expone nada nuevo: la URL de producción ya es pública y los datos los protegen RLS y el registro deshabilitado.
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
-- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`. La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
+- Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`, antes de mergear y compatibles con la versión publicada (el orden completo está en `CLAUDE.md`, "Cambios que llegan a prod", #63). La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
 - **La configuración de Auth se maneja desde el panel.** `supabase/config.toml` solo sirve para un stack local, que no se usa. No se corre `npx supabase config push`, porque pisaría la configuración real de los proyectos con la del archivo (por ejemplo, podría reabrir el registro).
 - Los proyectos del plan gratuito se **pausan después de una semana sin actividad**. Con uso diario no le pasa a `prod`, pero sí le puede pasar a `dev`, que se reactiva desde el panel.
 
@@ -946,6 +946,8 @@ Tiene que incluir:
 La tabla está en [decisiones.md](decisiones.md). Las referencias "§14 #N" apuntan ahí.
 
 ## 15. Pendientes
+
+También están en el plan, como mejora M6 ("Después del MVP").
 
 - Revisar el texto vigente de la Res. GMC 05/25 (rotulado nutricional) y ajustar las instrucciones de transcripción si cambia el formato de las etiquetas.
 - Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).

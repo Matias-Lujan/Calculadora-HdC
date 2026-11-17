@@ -1,8 +1,8 @@
 # Calculadora de HdC — Plan de implementación
 
-Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
+Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado. Etapas 0 a 7 terminadas (PR #1 a #4, #7, #8 y #10 a #14 mergeados). La app se usa a diario sobre `prod`.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-17.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). Próxima: M1, revisión de UI/UX.** Última actualización: 2026-11-17.
 
 ---
 
@@ -16,13 +16,13 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 
 ## Convenciones de trabajo
 
-- Una rama por etapa (`etapa-0-base`, `etapa-1-calculo`, …). Se mergea a `main` cuando se cumplen todos los puntos de "Terminada cuando". Las ramas mergeadas se conservan.
+- Hasta el MVP, una rama por etapa (`etapa-0-base`, `etapa-1-calculo`, …); después, una rama por mejora (`mejora-<tema>`). Se mergea a `main` cuando se cumplen todos los puntos de "Terminada cuando". Las ramas mergeadas se conservan.
 - La CI (etapa 0) tiene que pasar en cada PR.
-- **Cada etapa se trabaja en una sesión nueva de Claude Code**, que arranca solo con lo que está escrito en el repo. Por eso, al cerrar una etapa se actualizan el estado de este plan (encabezado, tabla de resumen y "Terminada cuando") y el spec, con sus decisiones en `docs/decisiones.md`. El flujo completo está en `CLAUDE.md`.
-- **Backend hasta la etapa 7**: la URL de producción de Vercel apuntó al proyecto Supabase `dev` hasta el cambio a prod de la etapa 7; desde entonces apunta a `prod`.
+- **Cada etapa o mejora se trabaja en una sesión nueva de Claude Code**, que arranca solo con lo que está escrito en el repo. Por eso, al cerrarla se actualizan el estado de este plan (encabezado, tabla y "Terminada cuando") y el spec, con sus decisiones en `docs/decisiones.md`. El flujo completo está en `CLAUDE.md`.
+- **Backend**: la URL de producción de Vercel apuntó al proyecto Supabase `dev` hasta el cambio a prod de la etapa 7; desde entonces apunta a `prod`, con los datos reales. Lo que se mergea llega enseguida a la app en uso: cómo se llevan a `prod` las migraciones, la Edge Function y los secrets está en `CLAUDE.md`, "Cambios que llegan a prod" (spec §14 #63).
 - Ningún secret, configuración personal ni dato real se commitea (spec §11). Las fotos de etiquetas que se usen para probar van en carpetas incluidas en `.gitignore`.
 
-## Resumen
+## Resumen de las etapas del MVP
 
 | # | Etapa | Terminada cuando… | Estado |
 |---|---|---|---|
@@ -325,3 +325,23 @@ Funcionalidades (ciclo de agentes): 1) `create_meal` — implementada: migració
 - [x] La app funciona sobre `prod` desde el iPhone. Confirmado por el usuario (2026-11-17).
 - [x] El registro de usuarios está deshabilitado en `prod` (se cerró en la etapa 2, para que nadie pudiera crearse una cuenta mientras tanto).
 - [x] Se tomó la decisión sobre los datos de `dev`. `prod` empieza de cero (#59).
+
+---
+
+## Después del MVP
+
+Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que sigue son **mejoras**: cada una con su rama (`mejora-<tema>`), su sesión y su PR, con el flujo de `CLAUDE.md`. Como lo que se mergea llega enseguida a la app en uso, cada mejora se prueba antes en la versión de prueba de su rama (sobre `dev`), y lo que toque la base o la Edge Function se lleva a `prod` antes de mergear ("Cambios que llegan a prod" en `CLAUDE.md`).
+
+**Cómo se usa esta sección**:
+- La tabla es la lista de mejoras, en el orden en que se piensan hacer. "Próxima" marca la que toma una sesión nueva si el usuario no pide otra.
+- Al empezar una mejora, se le escribe una subsección abajo (objetivo, qué incluye y "Terminada cuando", como las etapas), con el OK del usuario sobre el alcance, y su fila pasa a "En curso (`<rama>`)". Al cerrarla, "✅ PR #N".
+- Una idea nueva se agrega como fila; no hace falta decidir el alcance hasta empezarla. Lo que el spec dejó fuera del MVP (§2.2: glucemia de referencia, código de barras, recetas, exportar, uso sin conexión) entra a la tabla solo si el usuario lo pide.
+
+| # | Mejora | De dónde sale | Estado |
+|---|---|---|---|
+| M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | Próxima |
+| M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | Pendiente |
+| M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
+| M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
+| M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
+| M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Pendiente |

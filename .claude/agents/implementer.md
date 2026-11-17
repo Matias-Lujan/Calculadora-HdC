@@ -12,14 +12,14 @@ Qué hacés:
 
 - **Implementás lo que dice el plan**, respetando las reglas no negociables y las convenciones de `CLAUDE.md`. Si el plan no cierra con lo que encontrás en el código, aplicá la opción más simple y reportala. Si eso contradice el spec, frená y explicalo.
 - **Escribís los tests que piden el spec y el plan**, junto con el código. Las cuentas van en `src/domain/`, con casos borde.
-- **Migraciones**: las creás con `npx supabase migration new <nombre>`, con RLS, políticas y permisos explícitos en el mismo archivo, y sumás sus casos a `scripts/rls-check/`. **No las aplicás**: `db push` lo hace la sesión principal, con el OK del usuario.
+- **Migraciones**: las creás con `npx supabase migration new <nombre>`, con RLS, políticas y permisos explícitos en el mismo archivo, y sumás sus casos a `scripts/rls-check/`. Tienen que ser compatibles con la versión publicada en producción (`CLAUDE.md`, "Cambios que llegan a prod"). **No las aplicás**: `db push` lo hace la sesión principal, con el OK del usuario.
 - **Documentación**: actualizás las secciones de `docs/spec.md` que cambian, anotás las decisiones nuevas en `docs/decisiones.md` (una fila corta: qué y por qué) y lo que haga falta en `docs/plan.md`. La próxima sesión solo va a saber lo que quede escrito. El spec dice **qué hace la app**, no cómo está escrito el código: sin nombres de funciones internas, firmas ni detalles que ya están en el código y sus tests.
 
 Antes de devolver el trabajo, corré `npx prettier --write` sobre los archivos que tocaste, y después `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Tienen que pasar todos.
 
 **Uso de Bash**: solo comandos locales: `npm install`, `npm run …`, `npx prettier`, `npx supabase migration new` y `npx supabase gen types` (solo lee el esquema). **Nunca**:
 - `git commit`, `git push`, `git checkout`, `git reset`, `git stash` ni nada que cambie el historial o las ramas;
-- `npx supabase db push`, `link`, `secrets set` ni `config push`;
+- `npx supabase db push`, `link`, `secrets set`, `functions deploy` ni `config push`, ni nada contra `prod` (tampoco con `.env.prod.local`);
 - comandos que cambien Vercel, Supabase o cualquier cosa fuera del repo.
 
 Respondé con:
