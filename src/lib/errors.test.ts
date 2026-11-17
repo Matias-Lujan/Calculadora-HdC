@@ -393,15 +393,15 @@ describe('mealItemErrorMessage', () => {
   it.each([
     [
       'INVALID_CARBS',
-      'Los HC cada 100 g de este alimento no son válidos. Revisalo en el catálogo.',
+      'Los HC cada 100 g de este alimento no son válidos. Revisalo en «Mis alimentos».',
     ],
     [
       'MISSING_COOKING_FACTOR',
-      'Falta cuánto rinde al cocinarlo. Cargalo en el catálogo para usar este alimento.',
+      'Falta cuánto rinde al cocinarlo. Cargalo en «Mis alimentos» para usar este alimento.',
     ],
     [
       'INVALID_COOKING_FACTOR',
-      'Lo que rinde al cocinarlo no es válido. Revisalo en el catálogo.',
+      'Lo que rinde al cocinarlo no es válido. Revisalo en «Mis alimentos».',
     ],
     [
       'MISSING_UNIT_WEIGHT',
@@ -413,7 +413,7 @@ describe('mealItemErrorMessage', () => {
     ],
     [
       'EFFECTIVE_CARBS_OVER_100',
-      'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en el catálogo cuánto rinde.',
+      'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en «Mis alimentos» cuánto rinde.',
     ],
   ] as const)('%s says %j', (code, message) => {
     expect(mealItemErrorMessage(code)).toBe(message)

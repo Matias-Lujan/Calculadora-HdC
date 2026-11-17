@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 5 y 6b terminadas (PR #1 a #4, #7, #8, #10 y #11 mergeados). Etapa 6 terminada en la rama `etapa-6-foto`, con su PR por mergear: la Edge Function `transcribe-label` está desplegada en `dev` (instrucciones v5) con sus secrets. La próxima es la etapa 7.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-16.
+**Estado: etapas 0 a 6 terminadas (PR #1 a #4, #7, #8 y #10 a #12 mergeados). Etapa 7 hecha en la rama `etapa-7-produccion`, con su PR por mergear: `prod` ya tiene las migraciones, la Edge Function y los secrets, y Vercel Production apunta a `prod`. Falta mergear el PR y confirmar el uso en el iPhone sobre `prod` (último "Terminada cuando"). Es la última etapa del MVP.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-16.
 
 ---
 
@@ -19,7 +19,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 - Una rama por etapa (`etapa-0-base`, `etapa-1-calculo`, …). Se mergea a `main` cuando se cumplen todos los puntos de "Terminada cuando". Las ramas mergeadas se conservan.
 - La CI (etapa 0) tiene que pasar en cada PR.
 - **Cada etapa se trabaja en una sesión nueva de Claude Code**, que arranca solo con lo que está escrito en el repo. Por eso, al cerrar una etapa se actualizan el estado de este plan (encabezado, tabla de resumen y "Terminada cuando") y el spec, con sus decisiones en `docs/decisiones.md`. El flujo completo está en `CLAUDE.md`.
-- **Backend hasta la etapa 7**: la URL de producción de Vercel apunta al proyecto Supabase `dev`. El proyecto `prod` se crea en la etapa 2, pero recién se usa en la etapa 7 (§ Etapa 7, "Cambio a prod").
+- **Backend hasta la etapa 7**: la URL de producción de Vercel apuntó al proyecto Supabase `dev` hasta el cambio a prod de la etapa 7; desde entonces apunta a `prod`.
 - Ningún secret, configuración personal ni dato real se commitea (spec §11). Las fotos de etiquetas que se usen para probar van en carpetas incluidas en `.gitignore`.
 
 ## Resumen
@@ -34,8 +34,8 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 4 | Catálogo | Papa, arroz y un alfajor cargados desde el iPhone | ✅ PR #8 |
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
 | 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR #11 |
-| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | ✅ PR por mergear |
-| 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | |
+| 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | ✅ PR #12 |
+| 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | PR por mergear (`etapa-7-produccion`) |
 
 ---
 
@@ -302,9 +302,9 @@ Funcionalidades (ciclo de agentes): 1) formulario simple — implementada: a la 
 
 Incluye:
 - **`create_meal(payload jsonb)`** (spec §7.2): inserción atómica, `security invoker`, verificación de que los totales y la dosis coincidan con la suma de los ítems. El cliente pasa a usarla y se elimina el guardado provisorio de la etapa 5.
-- Pulido: estados vacíos, mensajes de error y revisión general de la UI en el iPhone.
-- Salir de Inicio pierde la comida en curso (también los links «Cargar cuánto rinde» e «Ir a Configuración», spec §14 #52): conservarla al salir, por ejemplo en `sessionStorage`.
-- Entrada al alta por foto desde Inicio («Agregar con una foto»), una vez que la comida en curso se conserve al salir (spec §6.1 y §14 #55).
+- Pulido: estados vacíos, mensajes de error y revisión general de la UI en el iPhone — hecho (spec §14 #62; el usuario lo probó en el iPhone, 2026-11-16).
+- Salir de Inicio pierde la comida en curso (también los links «Cargar cuánto rinde» e «Ir a Configuración», spec §14 #52): conservarla al salir, por ejemplo en `sessionStorage` — hecho (spec §6.6 y §14 #61).
+- Entrada al alta por foto desde Inicio («Agregar con una foto»), una vez que la comida en curso se conserve al salir (spec §6.1 y §14 #55) — hecho (spec §6.6 y §14 #61).
 - **Cambio a prod**:
   - aplicar todas las migraciones en `prod`: `npx supabase link --project-ref zoxlvutjqolwfjcsbtog`, `npx supabase db push --remote`, y después volver a vincular `dev` (`npx supabase link --project-ref xyolhiklqqoejkapqbxt`), porque la CLI queda vinculada a un solo proyecto;
   - correr la prueba de aislamiento contra `prod`, con dos usuarios de prueba creados ahí y borrados al terminar;
@@ -312,12 +312,16 @@ Incluye:
   - cargar los secrets de Gemini;
   - apuntar las variables de Production de Vercel a `prod`;
   - volver a loguearse en la app instalada (al cambiar de proyecto, la sesión anterior no sirve).
-- **Decisión pendiente: datos cargados en `dev`.** Lo que se use a diario desde la etapa 5 vive en `dev`. Hay dos opciones: migrar el catálogo a `prod` con un script SQL que reasigne el `user_id` y copie las fotos, o empezar de cero en `prod`. Se decide al llegar.
-- README completo (spec §12.4).
-- Revisar el tamaño del bundle: desde la etapa 3, el build avisa que el JS supera los 500 kB (666 kB). No es un error; se puede resolver con *code-splitting*.
+
+  Hecho el 2026-11-16: `prod` estaba pausado por inactividad y se reactivó desde el panel; las 10 migraciones aplicadas, la Edge Function `transcribe-label` desplegada (faltaba en esta lista) con sus secrets, `scripts/rls-check/` en verde contra `prod` (60 casos), las variables de Production de Vercel apuntando a `prod` y la CLI vinculada de nuevo a `dev`. **Los usuarios se crean después de las migraciones**: el trigger `on_auth_user_created` crea su fila de `user_settings`. Los tres primeros se habían creado antes y no tenían esa fila (fallaban dos casos de `user_settings`); se borraron y se volvieron a crear. Falta: borrar los dos usuarios de prueba, mergear el PR y volver a loguearse en el iPhone.
+- **Datos cargados en `dev`**: decidido, `prod` empieza de cero (no se migra nada de `dev`; spec §14 #59).
+- README completo (spec §12.4) — hecho.
+- Revisar el tamaño del bundle: desde la etapa 3, el build avisa que el JS supera los 500 kB (666 kB) — hecho (spec §14 #60).
+
+Funcionalidades (ciclo de agentes): 1) `create_meal` — implementada: migración `create_meal` con la función (`security invoker`, `search_path` vacío, al menos un ítem, verifica la suma de los ítems y la dosis con tolerancia 0,001, devuelve el `id`; `execute` solo para `authenticated`) y sus casos en `scripts/rls-check/`; el guardado de la app pasa a una sola llamada con el payload `{ meal, items }`, después de resolver las copias de la tabla; se borró el guardado provisorio (spec §7.2 y §14 #58). Migración aplicada en `dev`, tipos regenerados y `scripts/rls-check/` en verde (60 casos, 14 de `create_meal`). 2) README completo — hecho: sección "Cómo levantarla desde cero" (spec §12.4). 3) Bundle — hecho: las librerías van en chunks propios (`vite.config.ts`), sin rutas lazy; el JS de la app quedó en 95 kB y ya no aparece el aviso de 500 kB (spec §14 #60). 4) Comida en curso y foto desde Inicio — implementada: la comida en curso se guarda con cada cambio en `sessionStorage` (validada al leerla; se borra sin ítems, al guardar con éxito y en cada `SIGNED_OUT`), y el botón "Agregar con una foto" de Inicio abre `/foods/label`, que al guardar vuelve a Inicio con el alimento por el estado de navegación y lo suma al final (un alimento cocido sin cuánto rinde no se suma y se avisa) (spec §6.1, §6.6, §10 y §14 #61). Falta probarla en el iPhone. 5) Pulido de UI — implementado: el historial agrupado por día de Buenos Aires (cada día plegable, con la cantidad de comidas y los HC del día, sumados en `src/domain/dose/`; cada comida con la hora y los nombres de sus alimentos; un día que puede seguir en la página siguiente muestra solo su nombre; los días abiertos se conservan al volver del detalle), el catálogo pasa a "Alimentos" en la barra y "Mis alimentos" en la pantalla (resultados solo con texto en la búsqueda y la lista completa detrás de "Ver todos los alimentos"), Inicio sin ítems no muestra el cuadro del total y la dosis aplicada del detalle va dentro del cuadro del total (spec §6.5, §6.6, §6.7 y §14 #62). Probadas en el iPhone por el usuario (4 y 5). 6) Cambio a prod — hecho (ver arriba).
 
 **Terminada cuando**:
-- [ ] `create_meal` está en uso y el guardado no atómico ya no existe.
+- [x] `create_meal` está en uso y el guardado no atómico ya no existe. Probado en el iPhone sobre `dev`; en `prod`, la función está aplicada y la usa la app desde el merge.
 - [ ] La app funciona sobre `prod` desde el iPhone.
 - [x] El registro de usuarios está deshabilitado en `prod` (se cerró en la etapa 2, para que nadie pudiera crearse una cuenta mientras tanto).
-- [ ] Se tomó la decisión sobre los datos de `dev`.
+- [x] Se tomó la decisión sobre los datos de `dev`. `prod` empieza de cero (#59).

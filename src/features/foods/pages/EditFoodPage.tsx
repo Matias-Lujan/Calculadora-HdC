@@ -16,7 +16,7 @@ export function EditFoodPage() {
             to="/foods"
             className="flex min-h-11 items-center self-start rounded-lg border border-slate-300 px-4 text-base"
           >
-            Ir al catálogo
+            Ir a mis alimentos
           </Link>
         </div>
       ) : food.data !== undefined ? (

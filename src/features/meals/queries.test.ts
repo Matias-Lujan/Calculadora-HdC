@@ -9,6 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextMealsOffset } from './history.ts'
 import { foodsKeys } from '../../lib/foods.ts'
+import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
 import { createMeal, fetchReferenceFoods } from './api.ts'
 import {
   mealListOptions,
@@ -22,6 +23,7 @@ import {
 import type { MealsPage } from './types.ts'
 
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {} }))
+vi.mock('../../lib/mealDraftStorage.ts', () => ({ clearMealDraft: vi.fn() }))
 
 // Only the hooks are replaced (to see what each hook passes them);
 // QueryClient and InfiniteQueryObserver stay the real ones.
@@ -109,13 +111,14 @@ describe('useReferenceFoods', () => {
 })
 
 describe('useCreateMeal', () => {
-  it('after saving, reads again the meals and the catalog list', async () => {
+  it('after saving, clears the kept meal and reads again the meals and the catalog list', async () => {
     const client = new QueryClient()
     const invalidate = vi
       .spyOn(client, 'invalidateQueries')
       .mockResolvedValue(undefined)
     vi.mocked(useQueryClient).mockReturnValue(client)
     vi.mocked(useMutation).mockClear()
+    vi.mocked(clearMealDraft).mockClear()
 
     useCreateMeal()
     const options = vi.mocked(useMutation).mock.calls[0]?.[0]
@@ -130,5 +133,15 @@ describe('useCreateMeal', () => {
       { queryKey: mealsKeys.all },
       { queryKey: foodsKeys.list },
     ])
+    expect(clearMealDraft).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the meal if saving fails (onSuccess only)', () => {
+    vi.mocked(useQueryClient).mockReturnValue(new QueryClient())
+    vi.mocked(useMutation).mockClear()
+    useCreateMeal()
+    const options = vi.mocked(useMutation).mock.calls[0]?.[0]
+    expect(options?.onError).toBeUndefined()
+    expect(options?.onSettled).toBeUndefined()
   })
 })

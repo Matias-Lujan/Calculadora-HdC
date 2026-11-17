@@ -33,7 +33,12 @@ import {
   initialLabelFormTexts,
   nameNote,
 } from './features/foods/labelForm.ts'
-import { appliedDoseText, mealSummaryText } from './features/meals/history.ts'
+import { formatDayTitle } from './features/meals/eatenAt.ts'
+import {
+  appliedDoseText,
+  daySummaryText,
+  mealSummaryText,
+} from './features/meals/history.ts'
 import { SETTINGS_FIELDS } from './features/settings/fields.ts'
 import * as errors from './lib/errors.ts'
 import { TABLE_VALUE_INFO, cookedPer100gText } from './lib/foodText.ts'
@@ -285,16 +290,28 @@ describe('plain words on the screen', () => {
   })
 
   it('the history', () => {
+    const meal = {
+      id: '00000000-0000-4000-8000-000000000001',
+      eaten_at: '2026-11-14T16:05:00.000Z',
+      total_carbs_g: 128.2,
+      calculated_dose_units: 8.55,
+      applied_dose_units: null,
+      meal_items: [{ position: 0, food_name: 'Arroz de prueba' }],
+    }
+    const now = new Date('2026-11-16T13:00:00Z')
     expectPlain([
       appliedDoseText(null),
       appliedDoseText(8.5),
-      mealSummaryText({
-        id: '00000000-0000-4000-8000-000000000001',
-        eaten_at: '2026-11-14T16:05:00.000Z',
-        total_carbs_g: 128.2,
-        calculated_dose_units: 8.55,
-        applied_dose_units: null,
+      mealSummaryText(meal),
+      daySummaryText({ day: '2026-11-14', meals: [meal], complete: true }),
+      daySummaryText({
+        day: '2026-11-14',
+        meals: [meal, meal],
+        complete: true,
       }),
+      ...['2026-11-16', '2026-11-15', '2026-11-14', '2025-11-14'].map((day) =>
+        formatDayTitle(day, now),
+      ),
     ])
   })
 

@@ -1,13 +1,19 @@
 import { onlineManager } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { readMealDraft, writeMealDraft } from './mealDraftStorage.ts'
 import { queryClient } from './queryClient.ts'
+
+const auth = vi.hoisted(() => ({
+  listener: null as ((event: string) => void) | null,
+}))
 
 vi.mock('./supabase.ts', () => ({
   supabase: {
     auth: {
-      onAuthStateChange: () => ({
-        data: { subscription: { unsubscribe: () => {} } },
-      }),
+      onAuthStateChange: (listener: (event: string) => void) => {
+        auth.listener = listener
+        return { data: { subscription: { unsubscribe: () => {} } } }
+      },
       signOut: () => Promise.resolve({ error: null }),
     },
   },
@@ -15,8 +21,8 @@ vi.mock('./supabase.ts', () => ({
 
 afterEach(() => {
   onlineManager.setOnline(true)
+  vi.unstubAllGlobals()
 })
-
 describe('queryClient mutations', () => {
   it('use networkMode "always" and keep the default of no retries', () => {
     const mutations = queryClient.getDefaultOptions().mutations
@@ -53,5 +59,40 @@ describe('queryClient mutations', () => {
     onlineManager.setOnline(true)
     await done
     expect(mutationFn).toHaveBeenCalledTimes(1)
+  })
+})
+
+// A minimal sessionStorage (Node has none).
+function stubSessionStorage() {
+  const values = new Map<string, string>()
+  vi.stubGlobal('sessionStorage', {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  })
+}
+
+describe('sign-out', () => {
+  it('clears the cache and the meal being entered (spec §10)', () => {
+    stubSessionStorage()
+    writeMealDraft({ items: [] })
+    queryClient.setQueryData(['foods', 'list'], [])
+    auth.listener?.('SIGNED_OUT')
+    expect(readMealDraft()).toBeNull()
+    expect(queryClient.getQueryData(['foods', 'list'])).toBeUndefined()
+  })
+
+  it('keeps both on other events', () => {
+    stubSessionStorage()
+    writeMealDraft({ items: [] })
+    queryClient.setQueryData(['foods', 'list'], [])
+    auth.listener?.('TOKEN_REFRESHED')
+    expect(readMealDraft()).toEqual({ items: [] })
+    expect(queryClient.getQueryData(['foods', 'list'])).toEqual([])
+    queryClient.clear()
+  })
+
+  it('is registered with supabase', () => {
+    expect(auth.listener).not.toBeNull()
   })
 })

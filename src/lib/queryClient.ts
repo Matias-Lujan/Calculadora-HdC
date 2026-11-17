@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { isUnauthorized } from './errors.ts'
+import { clearMealDraft } from './mealDraftStorage.ts'
 import { supabase } from './supabase.ts'
 
 // A revoked or expired session ends locally: onAuthStateChange emits
@@ -31,9 +32,15 @@ export const queryClient = new QueryClient({
 })
 
 // Every sign-out (the "Cerrar sesión" button, a 401, a rejected refresh)
-// clears the cache, so another account on the same device never sees the
-// previous one's data. The callback stays synchronous and calls nothing else
-// from Supabase (supabase-js recommendation).
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') queryClient.clear()
-})
+// clears the cache and the meal being entered (spec §10), so another account
+// on the same device never sees the previous one's data. The callback stays
+// synchronous and calls nothing else from Supabase (supabase-js
+// recommendation).
+function onAuthEvent(event: string) {
+  if (event === 'SIGNED_OUT') {
+    queryClient.clear()
+    clearMealDraft()
+  }
+}
+
+supabase.auth.onAuthStateChange(onAuthEvent)

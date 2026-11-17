@@ -102,8 +102,8 @@ export type NewMeal = Required<
  * An item of a meal to insert: a copy of the food values used and the
  * result of its calculation (spec §6.7), and the food it points to.
  * createMeal turns `food` into food_id (resolving the copy of a reference
- * table food first) and adds meal_id once the meal exists; id and user_id
- * come from the column defaults.
+ * table food first); create_meal sets meal_id, and id and user_id come from
+ * the column defaults.
  */
 export type NewMealItem = Required<
   Omit<TablesInsert<'meal_items'>, 'id' | 'user_id' | 'meal_id' | 'food_id'>
@@ -113,6 +113,16 @@ export type NewMealItem = Required<
 export type NewMealRecord = {
   meal: NewMeal
   items: NewMealItem[]
+}
+
+/**
+ * The payload of the create_meal function (spec §7.2): the record, with
+ * each item's food already resolved to its food_id. The function reads only
+ * these keys; user_id, meal_id and id come from the column defaults.
+ */
+export type CreateMealPayload = {
+  meal: NewMeal
+  items: (Omit<NewMealItem, 'food'> & { food_id: string })[]
 }
 
 // Saved meals, as the history reads them (spec §6.7). The rows enter as
@@ -143,9 +153,29 @@ export const mealSummarySchema = z.object({
 
 export type MealSummary = z.infer<typeof mealSummarySchema>
 
+/**
+ * A meal in the history list, with the names of its foods (spec §6.7). The
+ * `meal_items!inner` embed keeps only meals with at least one item, so a
+ * meal without items is not valid.
+ */
+export const listedMealSchema = mealSummarySchema.extend({
+  meal_items: z
+    .array(
+      z.object({
+        position: z.number(),
+        food_name: z.string(),
+      }) satisfies z.ZodType<
+        Pick<Tables<'meal_items'>, 'position' | 'food_name'>
+      >,
+    )
+    .min(1),
+})
+
+export type ListedMeal = z.infer<typeof listedMealSchema>
+
 /** One page of the history list; `hasMore` says whether there is a next one. */
 export type MealsPage = {
-  meals: MealSummary[]
+  meals: ListedMeal[]
   hasMore: boolean
 }
 

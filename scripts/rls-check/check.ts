@@ -15,6 +15,11 @@
 // Update it whenever a table or a policy is added (CLAUDE.md, rule 1).
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import {
+  CALC_VERSION,
+  calculateMeal,
+  type MealItemInput,
+} from '../../src/domain/dose/index.ts'
 
 function env(name: string): string {
   const value = process.env[name]
@@ -558,6 +563,309 @@ console.log('\nControles de la base (red de seguridad)')
     'foods: acepta un alimento manual sin nota',
     manualWithoutNote.error === null,
     manualWithoutNote.error?.message,
+  )
+}
+
+// --- create_meal (spec §7.2) ---------------------------------------------------
+
+console.log('\ncreate_meal')
+{
+  // A valid meal of one item: 250 g of A's rice, 75 g HC, ratio 15, dose 5.
+  const mealOf = (foodId: string) => ({
+    meal: {
+      eaten_at: new Date().toISOString(),
+      carb_ratio_g_per_unit: 15,
+      total_carbs_g: 75,
+      calculated_dose_units: 5,
+      applied_dose_units: 5,
+      calc_version: '1',
+    },
+    items: [
+      {
+        food_id: foodId,
+        position: 0,
+        food_name: 'rls-check arroz',
+        food_brand: null,
+        food_source: 'manual',
+        food_state: 'raw_cooked',
+        quantity_mode: 'grams',
+        units: null,
+        unit_weight_g: null,
+        grams: 250,
+        carbs_per_100g: 78,
+        cooking_factor: 2.6,
+        effective_carbs_per_100g: 30,
+        carbs_g: 75,
+      },
+    ],
+  })
+  const countMeals = async (who: typeof a) => {
+    const { count } = await who.supabase
+      .from('meals')
+      .select('id', { count: 'exact', head: true })
+    return count
+  }
+
+  const created = await a.supabase.rpc('create_meal', {
+    payload: mealOf(foodA.id),
+  })
+  const createdId = typeof created.data === 'string' ? created.data : ''
+  const saved = await a.supabase
+    .from('meals')
+    .select('user_id, meal_items(id)')
+    .eq('id', createdId)
+    .maybeSingle()
+  check(
+    'create_meal: A guarda una comida con su ítem',
+    created.error === null &&
+      saved.data?.user_id === a.id &&
+      saved.data.meal_items.length === 1,
+    created.error?.message ?? saved.error?.message,
+  )
+
+  const foodB = must(
+    await b.supabase
+      .from('foods')
+      .insert({
+        name: 'rls-check arroz de B',
+        source: 'manual',
+        state: 'raw_cooked',
+        carbs_per_100g: 78,
+        cooking_factor: 2.6,
+      })
+      .select()
+      .single(),
+    'food de B',
+  )
+  const withOwner = mealOf(foodB.id)
+  const spoofed = await b.supabase.rpc('create_meal', {
+    payload: { ...withOwner, meal: { ...withOwner.meal, user_id: a.id } },
+  })
+  const spoofedId = typeof spoofed.data === 'string' ? spoofed.data : ''
+  const seenByA = await a.supabase
+    .from('meals')
+    .select('id')
+    .eq('id', spoofedId)
+  const seenByB = await b.supabase
+    .from('meals')
+    .select('user_id')
+    .eq('id', spoofedId)
+    .maybeSingle()
+  check(
+    'create_meal: ignora un user_id en el payload (la comida es de quien la guarda)',
+    spoofed.error === null &&
+      seenByA.data?.length === 0 &&
+      seenByB.data?.user_id === b.id,
+    spoofed.error?.message,
+  )
+
+  const bBefore = await countMeals(b)
+  const foreignFood = await b.supabase.rpc('create_meal', {
+    payload: mealOf(foodA.id),
+  })
+  check(
+    'create_meal: B no puede usar un alimento de A, y no queda la comida',
+    foreignFood.error !== null && (await countMeals(b)) === bBefore,
+  )
+
+  const aBefore = await countMeals(a)
+  const valid = mealOf(foodA.id)
+  const [item] = valid.items
+  if (item === undefined) throw new Error('no item')
+  const rejected: [string, unknown][] = [
+    [
+      'rechaza un total que no es la suma de los ítems',
+      {
+        ...valid,
+        meal: { ...valid.meal, total_carbs_g: 90, calculated_dose_units: 6 },
+      },
+    ],
+    [
+      'rechaza una dosis que no coincide con HC ÷ ratio',
+      { ...valid, meal: { ...valid.meal, calculated_dose_units: 6 } },
+    ],
+    ['rechaza una comida sin ítems', { ...valid, items: [] }],
+    ['rechaza un payload sin ítems', { meal: valid.meal }],
+    [
+      'rechaza un ratio de 0 (no divide por cero)',
+      { ...valid, meal: { ...valid.meal, carb_ratio_g_per_unit: 0 } },
+    ],
+    [
+      // The total and the dose match the items, but the second item breaks
+      // a CHECK of meal_items: the meal and the first item are not kept.
+      'si falla un ítem no queda nada (atómica)',
+      {
+        meal: {
+          ...valid.meal,
+          total_carbs_g: 155,
+          calculated_dose_units: 155 / 15,
+        },
+        items: [item, { ...item, position: 1, carbs_g: 80 }],
+      },
+    ],
+  ]
+  for (const [description, payload] of rejected) {
+    const { error } = await a.supabase.rpc('create_meal', { payload })
+    check(`create_meal: ${description}`, error !== null)
+  }
+  check(
+    'create_meal: las llamadas rechazadas no dejaron comidas',
+    (await countMeals(a)) === aBefore,
+  )
+
+  const anonymous = await anon.rpc('create_meal', { payload: valid })
+  check('create_meal: sin sesión no se puede llamar', anonymous.error !== null)
+
+  // A meal as the app builds it: the numbers come from calculateMeal, as
+  // unrounded doubles (grams, units and cooked), and the ratio does not
+  // divide evenly. They have to be saved and read back exactly.
+  const ratio = 13
+  const inputs: MealItemInput[] = [
+    {
+      foodState: 'as_eaten',
+      carbsPer100g: 20.2,
+      cookingFactor: null,
+      unitWeightG: null,
+      quantityMode: 'grams',
+      quantity: 120,
+    },
+    {
+      foodState: 'as_eaten',
+      carbsPer100g: 58,
+      cookingFactor: null,
+      unitWeightG: 45,
+      quantityMode: 'units',
+      quantity: 0.5,
+    },
+    {
+      foodState: 'raw_cooked',
+      carbsPer100g: 78,
+      cookingFactor: 2.6,
+      unitWeightG: null,
+      quantityMode: 'grams',
+      quantity: 250,
+    },
+  ]
+  const result = calculateMeal(inputs, {
+    carbRatioGPerUnit: ratio,
+    maxDoseWarningUnits: null,
+    maxItemGramsWarning: 500,
+  })
+  if (!result.ok) throw new Error('the meal of the check does not calculate')
+  const appItems = inputs.map((input, position) => {
+    const calculated = result.items[position]
+    if (calculated === undefined) throw new Error('no calculated item')
+    return {
+      food_id: foodA.id,
+      position,
+      food_name: `rls-check ítem ${position}`,
+      food_brand: null,
+      food_source: 'manual',
+      food_state: input.foodState,
+      quantity_mode: input.quantityMode,
+      units: input.quantityMode === 'units' ? input.quantity : null,
+      unit_weight_g: input.quantityMode === 'units' ? input.unitWeightG : null,
+      grams: calculated.grams,
+      carbs_per_100g: input.carbsPer100g,
+      cooking_factor: input.cookingFactor,
+      effective_carbs_per_100g: calculated.effectiveCarbsPer100g,
+      carbs_g: calculated.carbsG,
+    }
+  })
+  const appMeal = await a.supabase.rpc('create_meal', {
+    payload: {
+      meal: {
+        eaten_at: new Date().toISOString(),
+        carb_ratio_g_per_unit: ratio,
+        total_carbs_g: result.totalCarbsG,
+        calculated_dose_units: result.doseUnits,
+        applied_dose_units: result.doseUnits,
+        calc_version: CALC_VERSION,
+      },
+      items: appItems,
+    },
+  })
+  const appMealId = typeof appMeal.data === 'string' ? appMeal.data : ''
+  const savedMeal = await a.supabase
+    .from('meals')
+    .select('total_carbs_g, calculated_dose_units, applied_dose_units')
+    .eq('id', appMealId)
+    .maybeSingle()
+  const savedItems = await a.supabase
+    .from('meal_items')
+    .select(
+      'position, quantity_mode, units, grams, effective_carbs_per_100g, carbs_g',
+    )
+    .eq('meal_id', appMealId)
+    .order('position')
+  check(
+    'create_meal: guarda una comida de 3 ítems como la arma la app, sin redondear y en orden',
+    appMeal.error === null &&
+      savedMeal.data?.total_carbs_g === result.totalCarbsG &&
+      savedMeal.data.calculated_dose_units === result.doseUnits &&
+      savedMeal.data.applied_dose_units === result.doseUnits &&
+      JSON.stringify(savedItems.data) ===
+        JSON.stringify(
+          appItems.map((row) => ({
+            position: row.position,
+            quantity_mode: row.quantity_mode,
+            units: row.units,
+            grams: row.grams,
+            effective_carbs_per_100g: row.effective_carbs_per_100g,
+            carbs_g: row.carbs_g,
+          })),
+        ),
+    appMeal.error?.message ??
+      JSON.stringify({ sent: result, saved: savedMeal.data, savedItems }),
+  )
+
+  const withoutApplied = mealOf(foodA.id)
+  const noApplied = await a.supabase.rpc('create_meal', {
+    payload: {
+      ...withoutApplied,
+      meal: { ...withoutApplied.meal, applied_dose_units: null },
+    },
+  })
+  const noAppliedSaved = await a.supabase
+    .from('meals')
+    .select('applied_dose_units')
+    .eq('id', typeof noApplied.data === 'string' ? noApplied.data : '')
+    .maybeSingle()
+  check(
+    'create_meal: acepta una comida sin dosis aplicada (queda null)',
+    noApplied.error === null &&
+      noAppliedSaved.data !== null &&
+      noAppliedSaved.data.applied_dose_units === null,
+    noApplied.error?.message,
+  )
+
+  // The item is a copy of the food (spec §6.6): archiving the food after
+  // choosing it does not stop the meal from being saved.
+  const archived = must(
+    await a.supabase
+      .from('foods')
+      .insert({
+        name: 'rls-check archivado',
+        source: 'manual',
+        state: 'raw_cooked',
+        carbs_per_100g: 78,
+        cooking_factor: 2.6,
+      })
+      .select()
+      .single(),
+    'food archivado de A',
+  )
+  const archive = await a.supabase
+    .from('foods')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', archived.id)
+  const withArchived = await a.supabase.rpc('create_meal', {
+    payload: mealOf(archived.id),
+  })
+  check(
+    'create_meal: acepta un ítem de un alimento ya archivado',
+    archive.error === null && withArchived.error === null,
+    archive.error?.message ?? withArchived.error?.message,
   )
 }
 

@@ -31,4 +31,5 @@ export type {
   PositiveNumberResult,
 } from './parsePositiveUserNumber.ts'
 export { parseUserNumber } from './parseUserNumber.ts'
+export { sumCarbs } from './sumCarbs.ts'
 export type * from './types.ts'

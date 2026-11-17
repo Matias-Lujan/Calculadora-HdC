@@ -8,7 +8,7 @@ export function NewFoodPage() {
         to="/foods"
         className="flex min-h-11 items-center self-start text-slate-700"
       >
-        ← Catálogo
+        ← Mis alimentos
       </Link>
       <FoodForm mode="create" />
     </section>
