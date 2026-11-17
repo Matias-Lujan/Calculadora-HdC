@@ -1,3 +1,5 @@
+import { Notice } from '../../../components/Notice.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods } from '../../../lib/foods.ts'
 import { useSettings } from '../../../lib/settings.ts'
@@ -20,7 +22,7 @@ export function NewMealPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Nueva comida</h1>
+      <h1 className={pageTitle}>Nueva comida</h1>
 
       {foods.data !== undefined &&
       referenceFoods.data !== undefined &&
@@ -32,12 +34,12 @@ export function NewMealPage() {
         />
       ) : failed.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={queries.some((query) => query.isFetching)}
             onClick={() => {
               for (const query of failed) void query.refetch()
@@ -47,7 +49,7 @@ export function NewMealPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-ink-soft">Cargando…</p>
       )}
     </section>
   )

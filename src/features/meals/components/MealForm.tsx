@@ -1,7 +1,11 @@
+import { Camera } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { button, field, fieldLabel } from '../../../components/styles.ts'
 import {
   calculateMeal,
   parseNonNegativeUserNumber,
@@ -286,44 +290,41 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
       disabled={createMeal.isPending}
     >
       {settings.max_dose_warning_units === null && (
-        <div className="flex flex-col gap-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <Notice tone="warning">
           <p>
             Todavía no configuraste la alerta de dosis máxima: si una dosis es
             alta, la app no te va a avisar.
           </p>
-          <Link
-            to="/settings"
-            className="flex min-h-11 items-center self-start font-medium underline"
-          >
+          <Link to="/settings" className={`${button.text} self-start`}>
             Ir a Configuración
           </Link>
-        </div>
+        </Notice>
       )}
 
       {savedMealId !== null && (
-        <div className="flex flex-col gap-1 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+        <Notice tone="success">
           <p role="status">Comida guardada.</p>
           <Link
             to={`/history/${savedMealId}`}
-            className="flex min-h-11 items-center self-start font-medium underline"
+            className={`${button.text} self-start`}
           >
             Ver en el historial
           </Link>
-        </div>
+        </Notice>
       )}
 
       {notUsableFood !== null && (
-        <div className="flex flex-col gap-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+        <Notice tone="warning">
           <p role="status">
             {`Guardaste "${notUsableFood.name}". Para usarlo en una comida, cargá cuánto rinde al cocinarlo.`}
           </p>
           <Link
             to={`/foods/${notUsableFood.id}/edit`}
-            className="flex min-h-11 items-center self-start font-medium underline"
+            className={`${button.text} self-start`}
           >
             Cargar cuánto rinde
           </Link>
-        </div>
+        </Notice>
       )}
 
       {items.length > 0 && (
@@ -353,13 +354,13 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
 
       {/* Without items there is no total box: the search comes first. */}
       {items.length > 0 && (
-        <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
+        <div className="flex flex-col gap-1 rounded-card bg-sunken p-4">
           {result.ok ? (
             <>
-              <p className="text-slate-700">
+              <p className="font-display tabular-nums">
                 {totalCarbsText(result.totalCarbsG)}
               </p>
-              <p className="text-xl font-semibold">
+              <p className="font-display text-xl font-semibold tabular-nums">
                 {doseText(result.doseUnits)}
               </p>
               <CalculationDetails
@@ -373,11 +374,11 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               />
             </>
           ) : result.errors.includes('INVALID_RATIO') ? (
-            <p className="text-red-700">{INVALID_RATIO_MESSAGE}</p>
+            <FieldMessage>{INVALID_RATIO_MESSAGE}</FieldMessage>
           ) : result.errors.includes('INVALID_QUANTITY') ? (
-            <p className="text-red-700">{MEAL_OUT_OF_RANGE_MESSAGE}</p>
+            <FieldMessage>{MEAL_OUT_OF_RANGE_MESSAGE}</FieldMessage>
           ) : (
-            <p className="text-slate-700">
+            <p>
               Para ver el total y la dosis, completá o corregí los alimentos de
               arriba.
             </p>
@@ -405,8 +406,9 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
             if (savingRef.current || createMeal.isPending)
               event.preventDefault()
           }}
-          className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base aria-disabled:pointer-events-none aria-disabled:opacity-60"
+          className={`${button.secondary} aria-disabled:pointer-events-none aria-disabled:opacity-60`}
         >
+          <Camera aria-hidden="true" />
           Agregar con una foto
         </Link>
       </div>
@@ -414,10 +416,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
       {items.length > 0 && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor={APPLIED_DOSE_ID}
-              className="text-sm font-medium text-slate-700"
-            >
+            <label htmlFor={APPLIED_DOSE_ID} className={fieldLabel}>
               Dosis aplicada (U)
             </label>
             {/* NumberInput writes a value that changes from outside to the
@@ -444,17 +443,14 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               }
             />
             {appliedDoseShownError !== null && (
-              <p
-                id={`${APPLIED_DOSE_ID}-error`}
-                className="text-sm text-red-700"
-              >
+              <FieldMessage id={`${APPLIED_DOSE_ID}-error`}>
                 {positiveNumberErrorMessage(appliedDoseShownError)}
-              </p>
+              </FieldMessage>
             )}
             {appliedDoseText !== null && (
               <button
                 type="button"
-                className="min-h-11 self-start rounded-lg border border-slate-300 px-3 text-base"
+                className={`${button.text} self-start`}
                 onClick={() => {
                   touch()
                   setAppliedDoseText(null)
@@ -469,14 +465,12 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
           <div className="flex flex-col gap-1">
             {eatenAtText === null ? (
               <>
-                <span className="text-sm font-medium text-slate-700">
-                  Fecha y hora
-                </span>
+                <span className={fieldLabel}>Fecha y hora</span>
                 <div className="flex items-center justify-between gap-2">
                   <span>Ahora</span>
                   <button
                     type="button"
-                    className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
+                    className={button.text}
                     onClick={() => {
                       touch()
                       setEatenAtText(dateTimeInputValue(new Date()))
@@ -489,17 +483,14 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               </>
             ) : (
               <>
-                <label
-                  htmlFor={EATEN_AT_ID}
-                  className="text-sm font-medium text-slate-700"
-                >
+                <label htmlFor={EATEN_AT_ID} className={fieldLabel}>
                   Fecha y hora
                 </label>
                 <input
                   id={EATEN_AT_ID}
                   name={EATEN_AT_ID}
                   type="datetime-local"
-                  className="min-h-11 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 text-base focus:border-slate-500 focus:outline-none aria-invalid:border-red-600"
+                  className={`${field} appearance-none`}
                   value={eatenAtText}
                   onChange={(event) => {
                     touch()
@@ -514,16 +505,13 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
                   }
                 />
                 {eatenAtShownError && (
-                  <p
-                    id={`${EATEN_AT_ID}-error`}
-                    className="text-sm text-red-700"
-                  >
+                  <FieldMessage id={`${EATEN_AT_ID}-error`}>
                     {EATEN_AT_ERROR_MESSAGE}
-                  </p>
+                  </FieldMessage>
                 )}
                 <button
                   type="button"
-                  className="min-h-11 self-start rounded-lg border border-slate-300 px-3 text-base"
+                  className={`${button.text} self-start`}
                   onClick={() => {
                     touch()
                     setEatenAtText(null)
@@ -537,10 +525,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
           </div>
 
           {confirming && warnings.length > 0 ? (
-            <div
-              role="alert"
-              className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900"
-            >
+            <Notice tone="warning" role="alert">
               <p>Revisá antes de guardar:</p>
               <ul className="flex list-disc flex-col gap-1 pl-5">
                 {warnings.map((warning, index) => (
@@ -551,39 +536,35 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  className="min-h-11 rounded-lg bg-amber-900 px-4 text-base font-medium text-white disabled:opacity-60"
+                  className={button.secondary}
                   onClick={save}
                 >
                   Guardar igual
                 </button>
                 <button
                   type="button"
-                  className="min-h-11 rounded-lg border border-amber-300 px-4 text-base"
+                  className={button.secondary}
                   onClick={() => setConfirming(false)}
                 >
                   Revisar
                 </button>
               </div>
-            </div>
+            </Notice>
           ) : blocked ? (
-            <p role="alert" className="text-sm text-red-700">
-              {MEAL_BLOCKED_MESSAGE}
-            </p>
+            <Notice tone="error" role="alert">
+              <p>{MEAL_BLOCKED_MESSAGE}</p>
+            </Notice>
           ) : (
             createMeal.isError && (
-              <p role="alert" className="text-sm text-red-700">
-                {SAVE_ERROR_MESSAGE}
-              </p>
+              <Notice tone="error" role="alert">
+                <p>{SAVE_ERROR_MESSAGE}</p>
+              </Notice>
             )
           )}
 
           {/* type="button" and outside a <form>: the "Ir" key of the
               search keyboard never saves. */}
-          <button
-            type="button"
-            className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
-            onClick={handleSave}
-          >
+          <button type="button" className={button.primary} onClick={handleSave}>
             {createMeal.isPending ? 'Guardando…' : 'Guardar'}
           </button>
         </div>

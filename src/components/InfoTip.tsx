@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react'
 import { useId, useState } from 'react'
 
 type Props = {
@@ -21,12 +22,12 @@ export function InfoTip({ text }: Props) {
         aria-label="Más información"
         aria-expanded={open}
         aria-controls={id}
-        className="inline-flex size-11 items-center justify-center rounded-full text-lg text-slate-500"
+        className="inline-flex size-11 items-center justify-center rounded-full text-ink-soft"
         onClick={() => setOpen((current) => !current)}
       >
-        ⓘ
+        <Info aria-hidden="true" />
       </button>
-      <p id={id} hidden={!open} className="basis-full text-sm text-slate-600">
+      <p id={id} hidden={!open} className="basis-full text-sm text-ink-soft">
         {text}
       </p>
     </>

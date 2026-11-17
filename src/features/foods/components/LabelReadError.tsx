@@ -1,3 +1,5 @@
+import { Notice } from '../../../components/Notice.tsx'
+import { button } from '../../../components/styles.ts'
 import { PhotoPickerButton } from './PhotoPickerButton.tsx'
 
 type Props = {
@@ -27,27 +29,19 @@ export function LabelReadError({
 }: Props) {
   return (
     <div className="flex flex-col gap-3">
-      <p role="alert" className="text-red-700">
-        {message}
-      </p>
+      <Notice tone="error" role="alert">
+        <p>{message}</p>
+      </Notice>
       {observation !== null && (
-        <p className="text-sm text-slate-700">{`Al leer la foto: ${observation}`}</p>
+        <p className="text-sm text-ink">{`Al leer la foto: ${observation}`}</p>
       )}
       {onManual !== undefined && (
-        <button
-          type="button"
-          className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
-          onClick={onManual}
-        >
+        <button type="button" className={button.primary} onClick={onManual}>
           Cargar a mano
         </button>
       )}
       {onRetry !== undefined && (
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
-          onClick={onRetry}
-        >
+        <button type="button" className={button.secondary} onClick={onRetry}>
           Reintentar
         </button>
       )}
@@ -58,11 +52,7 @@ export function LabelReadError({
           variant="secondary"
         />
       )}
-      <button
-        type="button"
-        className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
-        onClick={onCancel}
-      >
+      <button type="button" className={button.secondary} onClick={onCancel}>
         Cancelar
       </button>
     </div>

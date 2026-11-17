@@ -1,3 +1,5 @@
+import { Notice } from '../../../components/Notice.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import {
   LOAD_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
@@ -12,7 +14,7 @@ export function SettingsPage() {
 
   return (
     <section className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Configuración</h1>
+      <h1 className={pageTitle}>Configuración</h1>
 
       {/* With data, the form stays even if a later refetch fails, so what
           the user is editing is not lost. */}
@@ -20,12 +22,12 @@ export function SettingsPage() {
         <SettingsForm initial={settings.data} />
       ) : settings.isError ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={settings.isFetching}
             onClick={() => void settings.refetch()}
           >
@@ -33,34 +35,34 @@ export function SettingsPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-ink-soft">Cargando…</p>
       )}
 
       {/* SIGNED_OUT reaches RequireAuth, which goes to the login. */}
-      <div className="flex flex-col gap-2 border-t border-slate-200 pt-6">
+      <div className="flex flex-col gap-2 border-t border-line pt-6">
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base font-medium disabled:opacity-60"
+          className={button.secondary}
           disabled={signOut.isPending}
           onClick={() => signOut.mutate()}
         >
           Cerrar sesión
         </button>
         {signOut.isError && (
-          <p role="alert" className="text-sm text-red-700">
-            {SIGN_OUT_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{SIGN_OUT_ERROR_MESSAGE}</p>
+          </Notice>
         )}
       </div>
 
       {/* USDA attribution for the table of foods (spec §5.2, §14 #50). */}
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-ink-soft">
         Los valores de la tabla de alimentos son de{' '}
         <a
           href="https://fdc.nal.usda.gov/"
           target="_blank"
           rel="noreferrer"
-          className="underline"
+          className="text-accent underline"
         >
           USDA FoodData Central
         </a>

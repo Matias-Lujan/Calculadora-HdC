@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { Notice } from '../../../components/Notice.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { MealDayGroup } from '../components/MealDayGroup.tsx'
 import { groupMealsByDay, openDaysFromState, toggledDays } from '../history.ts'
@@ -34,15 +36,15 @@ export function HistoryPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Historial</h1>
+      <h1 className={pageTitle}>Historial</h1>
 
       {/* With data, the list stays even if a later refetch fails. */}
       {days !== undefined ? (
         days.length === 0 ? (
-          <p className="text-slate-700">Todavía no registraste comidas.</p>
+          <p>Todavía no registraste comidas.</p>
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-slate-200">
+            <ul className="flex flex-col divide-y divide-line">
               {days.map((day) => (
                 <li key={day.day}>
                   <MealDayGroup
@@ -60,7 +62,7 @@ export function HistoryPage() {
                     during a refetch would use an offset about to change. */}
                 <button
                   type="button"
-                  className="min-h-11 rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+                  className={button.secondary}
                   disabled={list.isFetching}
                   onClick={() => {
                     if (!list.isFetching) void list.fetchNextPage()
@@ -70,9 +72,9 @@ export function HistoryPage() {
                 </button>
                 {/* The retry is "Ver más" again. */}
                 {list.isFetchNextPageError && (
-                  <p role="alert" className="text-red-700">
-                    {LOAD_ERROR_MESSAGE}
-                  </p>
+                  <Notice tone="error" role="alert">
+                    <p>{LOAD_ERROR_MESSAGE}</p>
+                  </Notice>
                 )}
               </div>
             )}
@@ -80,12 +82,12 @@ export function HistoryPage() {
         )
       ) : list.isError ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={list.isFetching}
             onClick={() => void list.refetch()}
           >
@@ -93,7 +95,7 @@ export function HistoryPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        <p className="text-ink-soft">Cargando…</p>
       )}
     </section>
   )

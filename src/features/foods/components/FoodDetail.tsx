@@ -1,6 +1,8 @@
+import { Pencil } from 'lucide-react'
 import { Link } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import {
   formatCarbs,
   formatUserNumber,
@@ -37,16 +39,16 @@ export function FoodDetail({ food }: Props) {
   return (
     <article className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{food.name}</h1>
-        {food.brand !== null && <p className="text-slate-500">{food.brand}</p>}
+        <h1 className={pageTitle}>{food.name}</h1>
+        {food.brand !== null && <p className="text-ink-soft">{food.brand}</p>}
         {food.archived_at !== null && (
-          <span className="self-start rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+          <span className="self-start rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-soft">
             Archivado
           </span>
         )}
         {isFromTable(food) && (
           <div className="flex flex-wrap items-center">
-            <p className="text-sm text-slate-700">De la tabla de alimentos</p>
+            <p className="text-sm text-ink-soft">De la tabla de alimentos</p>
             <InfoTip text={TABLE_VALUE_INFO} />
           </div>
         )}
@@ -56,24 +58,24 @@ export function FoodDetail({ food }: Props) {
 
       <dl className="flex flex-col gap-3">
         <div>
-          <dt className="text-sm text-slate-500">¿Se cocina antes de comer?</dt>
+          <dt className="text-sm text-ink-soft">¿Se cocina antes de comer?</dt>
           <dd>{COOKED_ANSWERS[food.state]}</dd>
         </div>
 
         <div>
-          <dt className="text-sm text-slate-500">{carbsLabel(food.state)}</dt>
-          <dd>{formatCarbs(food.carbs_per_100g)} g</dd>
+          <dt className="text-sm text-ink-soft">{carbsLabel(food.state)}</dt>
+          <dd className="font-display tabular-nums">
+            {formatCarbs(food.carbs_per_100g)} g
+          </dd>
         </div>
 
         {isRawCooked && (
           <div>
-            <dt className="text-sm text-slate-500">
-              Cuánto rinde al cocinarlo
-            </dt>
+            <dt className="text-sm text-ink-soft">Cuánto rinde al cocinarlo</dt>
             {needsCookingFactor(food.state, food.cooking_factor) ? (
               <dd className="flex flex-col items-start gap-1">
                 <MissingFactorBadge />
-                <span className="text-sm text-slate-700">
+                <span className="text-sm text-ink">
                   Cargalo con «Editar» para poder usarlo en una comida.
                 </span>
               </dd>
@@ -91,7 +93,7 @@ export function FoodDetail({ food }: Props) {
 
         {food.unit_weight_g !== null && (
           <div>
-            <dt className="text-sm text-slate-500">Peso por unidad</dt>
+            <dt className="text-sm text-ink-soft">Peso por unidad</dt>
             <dd>
               {`1 ${food.unit_label ?? 'unidad'} = ${formatUserNumber(food.unit_weight_g)} g`}
             </dd>
@@ -100,16 +102,14 @@ export function FoodDetail({ food }: Props) {
 
         {food.notes !== null && (
           <div>
-            <dt className="text-sm text-slate-500">Nota</dt>
+            <dt className="text-sm text-ink-soft">Nota</dt>
             <dd>{food.notes}</dd>
           </div>
         )}
       </dl>
 
-      <Link
-        to={`/foods/${food.id}/edit`}
-        className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base font-medium"
-      >
+      <Link to={`/foods/${food.id}/edit`} className={button.secondary}>
+        <Pencil aria-hidden="true" />
         Editar
       </Link>
 

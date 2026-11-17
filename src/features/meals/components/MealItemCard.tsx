@@ -1,5 +1,13 @@
+import { X } from 'lucide-react'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import {
+  button,
+  card,
+  fieldLabel,
+  segmented,
+} from '../../../components/styles.ts'
 import {
   formatUserNumber,
   type ItemResult,
@@ -63,38 +71,39 @@ export function MealItemCard({
   ]
 
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3">
+    <li className={`flex flex-col gap-3 ${card}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col">
           {/* The ⓘ of a table food goes next to its name, always in sight
               (spec §14 #51 (8)). */}
           <div className="flex flex-wrap items-center">
-            <span className="font-medium">{food.name}</span>
+            <span className="font-semibold">{food.name}</span>
             {isFromTable(food) && <InfoTip text={TABLE_VALUE_INFO} />}
           </div>
           {food.brand !== null && (
-            <span className="text-sm text-slate-500">{food.brand}</span>
+            <span className="text-sm text-ink-soft">{food.brand}</span>
           )}
         </div>
         <button
           type="button"
-          className="min-h-11 shrink-0 rounded-lg border border-slate-300 px-3 text-base"
+          className={`${button.text} shrink-0`}
           aria-label={`Quitar ${food.name}`}
           onClick={onRemove}
         >
+          <X aria-hidden="true" className="shrink-0" />
           Quitar
         </button>
       </div>
 
       {canUseUnits(food) && food.unit_weight_g !== null && (
         <div className="flex flex-col gap-1">
-          <div className="flex gap-2">
+          <div className={segmented.group}>
             {MODES.map(({ value, label }) => (
               <button
                 key={value}
                 type="button"
                 aria-pressed={item.quantityMode === value}
-                className="min-h-11 flex-1 rounded-lg border border-slate-300 px-3 text-base aria-pressed:border-slate-900 aria-pressed:bg-slate-900 aria-pressed:text-white"
+                className={`${segmented.option} ${segmented.pressed}`}
                 onClick={() => {
                   if (item.quantityMode !== value) onModeChange(value)
                 }}
@@ -103,14 +112,14 @@ export function MealItemCard({
               </button>
             ))}
           </div>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-soft">
             {`1 ${food.unit_label ?? 'unidad'} = ${formatUserNumber(food.unit_weight_g)} g`}
           </p>
         </div>
       )}
 
       <div className="flex flex-col gap-1">
-        <label htmlFor={inputId} className="text-sm font-medium text-slate-700">
+        <label htmlFor={inputId} className={fieldLabel}>
           {quantityLabel(item)}
         </label>
         <NumberInput
@@ -123,21 +132,21 @@ export function MealItemCard({
           describedBy={showError ? errorId : undefined}
         />
         {shownError !== null && (
-          <p id={errorId} className="text-sm text-red-700">
+          <FieldMessage id={errorId}>
             {positiveNumberErrorMessage(shownError)}
-          </p>
+          </FieldMessage>
         )}
       </div>
 
       {errors.map((code) => (
-        <p key={code} className="text-sm text-red-700">
-          {mealItemErrorMessage(code)}
-        </p>
+        <FieldMessage key={code}>{mealItemErrorMessage(code)}</FieldMessage>
       ))}
 
       {/* In sight, the carbs of the item; the calculation goes folded under
           "Ver la cuenta" (spec §14 #52). */}
-      {carbsText !== null && <p className="font-medium">{carbsText}</p>}
+      {carbsText !== null && (
+        <p className="font-display font-semibold tabular-nums">{carbsText}</p>
+      )}
       <CalculationDetails lines={lines} />
     </li>
   )

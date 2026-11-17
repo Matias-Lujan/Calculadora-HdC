@@ -1,7 +1,9 @@
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
+import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { button, fieldLabel, pageTitle } from '../../../components/styles.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import {
   carbsLabel,
@@ -78,7 +80,7 @@ export function FoodForm(props: Props) {
 
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-      <h1 className="text-2xl font-semibold">
+      <h1 className={pageTitle}>
         {food === null ? 'Agregar alimento' : 'Editar alimento'}
       </h1>
 
@@ -94,10 +96,7 @@ export function FoodForm(props: Props) {
         carbsField={
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-1">
-              <label
-                htmlFor="food-carbs"
-                className="text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="food-carbs" className={fieldLabel}>
                 {carbsLabel(texts.state)}
               </label>
               <InfoTip text={CARBS_INFO} />
@@ -135,22 +134,22 @@ export function FoodForm(props: Props) {
       )}
 
       {mutation.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {SAVE_ERROR_MESSAGE}
-        </p>
+        <Notice tone="error" role="alert">
+          <p>{SAVE_ERROR_MESSAGE}</p>
+        </Notice>
       )}
 
       <div className="flex flex-col gap-3">
         <button
           type="submit"
-          className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.primary}
           disabled={mutation.isPending}
         >
           {mutation.isPending ? 'Guardando…' : 'Guardar'}
         </button>
         <Link
           to={food === null ? '/foods' : `/foods/${food.id}`}
-          className="flex min-h-11 items-center justify-center rounded-lg border border-slate-300 px-4 text-base"
+          className={button.secondary}
         >
           Cancelar
         </Link>

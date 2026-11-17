@@ -1,3 +1,6 @@
+import { Notice } from '../../../components/Notice.tsx'
+import { button } from '../../../components/styles.ts'
+
 type Props = {
   text: string
   disabled: boolean
@@ -18,28 +21,21 @@ export function UnusualYieldConfirmation({
   onReview,
 }: Props) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-900"
-    >
+    <Notice tone="warning" role="alert">
       <p>{text}</p>
       <div className="flex gap-3">
         <button
           type="button"
-          className="min-h-11 rounded-lg bg-amber-900 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.secondary}
           disabled={disabled}
           onClick={onConfirm}
         >
           Guardar igual
         </button>
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border border-amber-300 px-4 text-base"
-          onClick={onReview}
-        >
+        <button type="button" className={button.secondary} onClick={onReview}>
           Revisar
         </button>
       </div>
-    </div>
+    </Notice>
   )
 }

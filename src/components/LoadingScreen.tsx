@@ -1,6 +1,6 @@
 export function LoadingScreen() {
   return (
-    <p className="flex min-h-dvh items-center justify-center text-slate-500">
+    <p className="flex min-h-dvh items-center justify-center text-ink-soft">
       Cargando…
     </p>
   )

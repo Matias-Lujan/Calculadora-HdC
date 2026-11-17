@@ -1,4 +1,6 @@
 import { useId, useState } from 'react'
+import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { disclosure } from '../../../components/styles.ts'
 
 type Props = {
   /** The lines of the calculation, already formatted (breakdown.ts). */
@@ -20,14 +22,14 @@ export function CalculationDetails({ lines }: Props) {
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        className="flex min-h-11 items-center gap-2 self-start text-sm font-medium text-slate-700"
+        className={`${disclosure} text-sm`}
         onClick={() => setOpen((current) => !current)}
       >
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <DisclosureIcon open={open} />
         {open ? 'Ocultar la cuenta' : 'Ver la cuenta'}
       </button>
       {open && (
-        <div id={id} className="flex flex-col gap-0.5 text-sm text-slate-700">
+        <div id={id} className="flex flex-col gap-0.5 text-sm tabular-nums">
           {lines.map((line, index) => (
             <p key={index}>{line}</p>
           ))}

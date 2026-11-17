@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from 'react'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { InfoTip } from '../../../components/InfoTip.tsx'
+import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { button, fieldLabel } from '../../../components/styles.ts'
 import {
   formatUserNumber,
   parsePositiveUserNumber,
@@ -91,10 +94,12 @@ export function SettingsForm({ initial }: { initial: Settings }) {
       {/* The row the server returned on save is newer than initial, so the
           notice goes away as soon as the save is confirmed. */}
       {(updateSettings.data ?? initial).max_dose_warning_units === null && (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          Para empezar, completá la alerta de dosis máxima. Si una dosis la
-          supera, la app te va a pedir que la confirmes.
-        </p>
+        <Notice tone="warning">
+          <p>
+            Para empezar, completá la alerta de dosis máxima. Si una dosis la
+            supera, la app te va a pedir que la confirmes.
+          </p>
+        </Notice>
       )}
 
       {SETTINGS_FIELDS.map(({ name, label, info }) => {
@@ -105,10 +110,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         return (
           <div key={name} className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center">
-              <label
-                htmlFor={inputId}
-                className="text-sm font-medium text-slate-700"
-              >
+              <label htmlFor={inputId} className={fieldLabel}>
                 {label}
               </label>
               {info !== undefined && <InfoTip text={info} />}
@@ -131,29 +133,29 @@ export function SettingsForm({ initial }: { initial: Settings }) {
               describedBy={showError ? errorId : undefined}
             />
             {shownError !== null && (
-              <p id={errorId} className="text-sm text-red-700">
+              <FieldMessage id={errorId}>
                 {positiveNumberErrorMessage(shownError)}
-              </p>
+              </FieldMessage>
             )}
           </div>
         )
       })}
 
       {updateSettings.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {SAVE_ERROR_MESSAGE}
-        </p>
+        <Notice tone="error" role="alert">
+          <p>{SAVE_ERROR_MESSAGE}</p>
+        </Notice>
       )}
 
       {updateSettings.isSuccess && !editedSinceSubmit && (
-        <p role="status" className="text-sm text-green-800">
-          Guardado.
-        </p>
+        <Notice tone="success" role="status">
+          <p>Guardado.</p>
+        </Notice>
       )}
 
       <button
         type="submit"
-        className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
+        className={button.primary}
         disabled={updateSettings.isPending}
       >
         {updateSettings.isPending ? 'Guardando…' : 'Guardar'}

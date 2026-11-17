@@ -1,7 +1,9 @@
+import { Plus, Search } from 'lucide-react'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Link } from 'react-router'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
+import { button, field, fieldLabel } from '../../../components/styles.ts'
 import { needsCookingFactor } from '../../../domain/dose/index.ts'
 import type { Food } from '../../../lib/foods.ts'
 import { pickerResults } from '../tableFoods.ts'
@@ -65,10 +67,10 @@ export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
           type="button"
           aria-expanded={open}
           aria-controls="meal-food-picker"
-          className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+          className={button.soft}
           onClick={toggle}
         >
-          <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+          <Plus aria-hidden="true" />
           Agregar alimento
         </button>
       )}
@@ -77,10 +79,7 @@ export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
         <div id="meal-food-picker" className="flex flex-col gap-2">
           <div className="flex flex-col gap-1">
             {alwaysOpen ? (
-              <label
-                htmlFor="meal-food-search"
-                className="text-sm font-medium text-slate-700"
-              >
+              <label htmlFor="meal-food-search" className={fieldLabel}>
                 Agregar alimento
               </label>
             ) : (
@@ -88,30 +87,34 @@ export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
                 Buscar alimento
               </label>
             )}
-            <input
-              ref={inputRef}
-              id="meal-food-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              enterKeyHint="search"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              aria-describedby="meal-food-search-help"
-              className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
-            />
-            <p id="meal-food-search-help" className="text-sm text-slate-500">
+            <div className="relative">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-soft"
+              />
+              <input
+                ref={inputRef}
+                id="meal-food-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                enterKeyHint="search"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                aria-describedby="meal-food-search-help"
+                className={`${field} pl-10`}
+              />
+            </div>
+            <p id="meal-food-search-help" className="text-sm text-ink-soft">
               Buscá por nombre o marca, por ejemplo «banana» o «arroz».
             </p>
           </div>
 
           {hasQuery &&
             (noResults ? (
-              <p className="text-slate-700">
-                {`No hay alimentos que coincidan con "${query.trim()}".`}
-              </p>
+              <p>{`No hay alimentos que coincidan con "${query.trim()}".`}</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {results.catalog.length > 0 && (
@@ -122,13 +125,13 @@ export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
                           <div className="flex flex-col items-start gap-1 py-2">
                             <FoodName food={food} />
                             <MissingFactorBadge />
-                            <span className="text-sm text-slate-700">
+                            <span className="text-sm text-ink">
                               Para usarlo en una comida, cargá cuánto rinde al
                               cocinarlo.
                             </span>
                             <Link
                               to={`/foods/${food.id}/edit`}
-                              className="flex min-h-11 items-center text-base font-medium underline"
+                              className={button.text}
                             >
                               Cargar cuánto rinde
                             </Link>
@@ -166,8 +169,8 @@ function ResultGroup({
 }) {
   return (
     <section className="flex flex-col">
-      <h2 className="text-sm font-medium text-slate-500">{title}</h2>
-      <ul className="flex flex-col divide-y divide-slate-200">{children}</ul>
+      <h2 className="text-sm font-medium text-ink-soft">{title}</h2>
+      <ul className="flex flex-col divide-y divide-line">{children}</ul>
     </section>
   )
 }
@@ -182,7 +185,7 @@ function PickButton({
   return (
     <button
       type="button"
-      className="flex min-h-11 w-full flex-col items-start justify-center py-2 text-left"
+      className="flex min-h-14 w-full flex-col items-start justify-center py-2 text-left"
       onClick={() => onPick(food)}
     >
       <FoodName food={food} />
@@ -193,9 +196,9 @@ function PickButton({
 function FoodName({ food }: { food: Pick<MealFood, 'name' | 'brand'> }) {
   return (
     <>
-      <span className="font-medium">{food.name}</span>
+      <span className="font-semibold">{food.name}</span>
       {food.brand !== null && (
-        <span className="text-sm text-slate-500">{food.brand}</span>
+        <span className="text-sm text-ink-soft">{food.brand}</span>
       )}
     </>
   )

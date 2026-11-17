@@ -1,5 +1,8 @@
+import { Archive } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { button } from '../../../components/styles.ts'
 import { ARCHIVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import { useArchiveFood } from '../queries.ts'
@@ -20,8 +23,9 @@ export function ArchiveFoodSection({ food }: Props) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 rounded-lg border border-red-300 px-4 text-base font-medium text-red-700"
+        className={`${button.dangerText} self-start`}
       >
+        <Archive aria-hidden="true" />
         Archivar
       </button>
     )
@@ -44,23 +48,24 @@ export function ArchiveFoodSection({ food }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
+    <div className="flex flex-col gap-3 rounded-card border border-danger bg-danger-soft p-4">
       <p>
         ¿Archivar {food.name}? Deja de aparecer en «Mis alimentos» y no vas a
         poder volver a usarlo. Las comidas ya registradas no cambian.
       </p>
       {archive.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {ARCHIVE_ERROR_MESSAGE}
-        </p>
+        <div role="alert">
+          <FieldMessage>{ARCHIVE_ERROR_MESSAGE}</FieldMessage>
+        </div>
       )}
       <div className="flex gap-3">
         <button
           type="button"
           onClick={handleConfirm}
           disabled={archive.isPending}
-          className="min-h-11 rounded-lg bg-red-700 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.danger}
         >
+          <Archive aria-hidden="true" />
           {archive.isPending ? 'Archivando…' : 'Archivar'}
         </button>
         {/* Disabled while archiving: the request is already sent and can't be
@@ -69,7 +74,7 @@ export function ArchiveFoodSection({ food }: Props) {
           type="button"
           onClick={handleCancel}
           disabled={archive.isPending}
-          className="min-h-11 rounded-lg border border-red-300 px-4 text-base disabled:opacity-60"
+          className={button.secondary}
         >
           Cancelar
         </button>

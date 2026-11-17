@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { formatEatenTime } from '../eatenAt.ts'
 import { mealFoodsText, mealSummaryText } from '../history.ts'
@@ -17,18 +18,23 @@ export function MealListItem({ meal }: Props) {
     <Link
       to={`/history/${meal.id}`}
       state={{ fromHistory: true }}
-      className="flex min-h-11 w-full flex-col justify-center gap-0.5 py-2"
+      className="flex min-h-14 w-full items-center gap-3 py-2"
     >
-      <span className="flex min-w-0 gap-2">
-        <span className="shrink-0 font-medium">
-          {formatEatenTime(meal.eaten_at)}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 gap-2">
+          <span className="shrink-0 font-semibold tabular-nums">
+            {formatEatenTime(meal.eaten_at)}
+          </span>
+          {/* Many foods: at most two lines, cut with "…". */}
+          <span className="line-clamp-2 min-w-0 break-words">
+            {mealFoodsText(meal)}
+          </span>
         </span>
-        {/* Many foods: at most two lines, cut with "…". */}
-        <span className="line-clamp-2 min-w-0 break-words">
-          {mealFoodsText(meal)}
+        <span className="text-sm text-ink-soft tabular-nums">
+          {mealSummaryText(meal)}
         </span>
       </span>
-      <span className="text-sm text-slate-700">{mealSummaryText(meal)}</span>
+      <ChevronRight aria-hidden="true" className="shrink-0 text-ink-soft" />
     </Link>
   )
 }

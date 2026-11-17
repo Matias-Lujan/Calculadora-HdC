@@ -1,14 +1,12 @@
+import { Camera } from 'lucide-react'
+import { button } from '../../../components/styles.ts'
+
 type Props = {
   label: string
   onFile: (file: File) => void
   /** The main action (filled) or a secondary one (with a border). */
   variant?: 'primary' | 'secondary'
 }
-
-const VARIANTS = {
-  primary: 'bg-slate-900 font-medium text-white',
-  secondary: 'border border-slate-300',
-} as const
 
 /**
  * A button that takes a photo or picks one from the gallery (spec §6.1):
@@ -24,8 +22,9 @@ export function PhotoPickerButton({
 }: Props) {
   return (
     <label
-      className={`flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-4 text-base focus-within:outline-2 focus-within:outline-slate-500 ${VARIANTS[variant]}`}
+      className={`${button[variant]} cursor-pointer focus-within:outline-2 focus-within:outline-accent`}
     >
+      <Camera aria-hidden="true" />
       {label}
       <input
         type="file"

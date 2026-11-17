@@ -1,5 +1,8 @@
+import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { button } from '../../../components/styles.ts'
 import { DELETE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { formatEatenAt } from '../eatenAt.ts'
 import { useDeleteMeal } from '../queries.ts'
@@ -23,8 +26,9 @@ export function DeleteMealSection({ meal }: Props) {
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 rounded-lg border border-red-300 px-4 text-base font-medium text-red-700"
+        className={`${button.dangerText} self-start`}
       >
+        <Trash2 aria-hidden="true" />
         Borrar
       </button>
     )
@@ -48,23 +52,24 @@ export function DeleteMealSection({ meal }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
+    <div className="flex flex-col gap-3 rounded-card border border-danger bg-danger-soft p-4">
       <p>
         ¿Borrar la comida del {formatEatenAt(meal.eaten_at)}? Deja de aparecer
         en el historial y no se puede deshacer.
       </p>
       {del.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {DELETE_ERROR_MESSAGE}
-        </p>
+        <div role="alert">
+          <FieldMessage>{DELETE_ERROR_MESSAGE}</FieldMessage>
+        </div>
       )}
       <div className="flex gap-3">
         <button
           type="button"
           onClick={handleConfirm}
           disabled={del.isPending}
-          className="min-h-11 rounded-lg bg-red-700 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.danger}
         >
+          <Trash2 aria-hidden="true" />
           {del.isPending ? 'Borrando…' : 'Borrar'}
         </button>
         {/* Disabled while deleting: the request is already sent and can't be
@@ -73,7 +78,7 @@ export function DeleteMealSection({ meal }: Props) {
           type="button"
           onClick={handleCancel}
           disabled={del.isPending}
-          className="min-h-11 rounded-lg border border-red-300 px-4 text-base disabled:opacity-60"
+          className={button.secondary}
         >
           Cancelar
         </button>

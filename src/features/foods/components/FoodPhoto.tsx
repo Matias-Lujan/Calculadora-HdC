@@ -14,17 +14,17 @@ export function FoodPhoto({ path }: Props) {
       <img
         src={url.data}
         alt="Foto de la etiqueta"
-        className="max-h-[45vh] w-full rounded-lg object-contain"
+        className="max-h-[45vh] w-full rounded-control object-contain"
       />
     )
   }
   if (url.isError) {
-    return <p className="text-sm text-slate-600">{PHOTO_LOAD_ERROR_MESSAGE}</p>
+    return <p className="text-sm text-ink-soft">{PHOTO_LOAD_ERROR_MESSAGE}</p>
   }
   return (
     <div
       aria-hidden="true"
-      className="h-48 w-full animate-pulse rounded-lg bg-slate-100"
+      className="h-48 w-full animate-pulse rounded-control bg-sunken"
     />
   )
 }

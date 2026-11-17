@@ -1,5 +1,8 @@
 import type { ReactNode } from 'react'
+import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { disclosure, fieldLabel } from '../../../components/styles.ts'
 import type { Food } from '../../../lib/foods.ts'
 import {
   unitLine,
@@ -71,9 +74,9 @@ export function FoodFields({
       {nameNote === null ? (
         nameField
       ) : (
-        <div className="flex flex-col gap-1 rounded-lg bg-amber-50 p-2">
+        <div className="flex flex-col gap-1 rounded-control bg-warning-soft p-3">
           {nameField}
-          <p className="text-sm text-amber-800">{nameNote}</p>
+          <FieldMessage tone="warning">{nameNote}</FieldMessage>
         </div>
       )}
 
@@ -82,6 +85,7 @@ export function FoodFields({
         legend="¿Se cocina antes de comer?"
         info={COOKED_INFO}
         options={COOKED_OPTIONS}
+        segmented
         value={texts.state}
         onChange={(state) => {
           update({ state })
@@ -98,10 +102,10 @@ export function FoodFields({
           type="button"
           aria-expanded={moreOptionsOpen}
           aria-controls={MORE_OPTIONS_ID}
-          className="flex min-h-11 items-center gap-2 self-start text-base font-medium text-slate-700"
+          className={disclosure}
           onClick={() => setMoreOptionsOpen((current) => !current)}
         >
-          <span aria-hidden="true">{moreOptionsOpen ? '▾' : '▸'}</span>
+          <DisclosureIcon open={moreOptionsOpen} />
           Más opciones
         </button>
 
@@ -120,10 +124,7 @@ export function FoodFields({
             {texts.state === 'as_eaten' && (
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="food-unit-weight"
-                    className="text-sm font-medium text-slate-700"
-                  >
+                  <label htmlFor="food-unit-weight" className={fieldLabel}>
                     Peso por unidad (g) (opcional)
                   </label>
                   <NumberInput

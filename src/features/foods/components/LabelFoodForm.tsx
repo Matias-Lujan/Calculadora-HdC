@@ -1,5 +1,9 @@
+import { Plus } from 'lucide-react'
 import type { FormEvent } from 'react'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { button, fieldLabel, pageTitle } from '../../../components/styles.ts'
 import type { FoodFieldError } from '../../../lib/errors.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
@@ -124,9 +128,9 @@ export function LabelFoodForm({
       .join(' ')
     return (
       <div
-        className={`flex flex-col gap-1 ${flagged ? 'rounded-lg bg-amber-50 p-2' : ''}`}
+        className={`flex flex-col gap-1 ${flagged ? 'rounded-control bg-warning-soft p-3' : ''}`}
       >
-        <label htmlFor={id} className="text-sm font-medium text-slate-700">
+        <label htmlFor={id} className={fieldLabel}>
           {label}
         </label>
         <NumberInput
@@ -138,14 +142,16 @@ export function LabelFoodForm({
           invalid={error !== undefined}
           describedBy={describedBy === '' ? undefined : describedBy}
         />
-        {origin !== null && (
-          <p
-            id={noteId}
-            className={`text-sm ${flagged ? 'text-amber-800' : 'text-slate-600'}`}
-          >
-            {fieldNote(origin)}
-          </p>
-        )}
+        {origin !== null &&
+          (flagged ? (
+            <FieldMessage id={noteId} tone="warning">
+              {fieldNote(origin)}
+            </FieldMessage>
+          ) : (
+            <p id={noteId} className="text-sm text-ink-soft">
+              {fieldNote(origin)}
+            </p>
+          ))}
         <FieldError id={errorId} error={error} />
       </div>
     )
@@ -177,16 +183,16 @@ export function LabelFoodForm({
 
   return (
     <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-      <h1 className="text-2xl font-semibold">Revisá los datos</h1>
+      <h1 className={pageTitle}>Revisá los datos</h1>
 
       <img
         src={photoUrl}
         alt="Foto de la etiqueta"
-        className="max-h-[45vh] w-full rounded-lg object-contain"
+        className="max-h-[45vh] w-full rounded-control object-contain"
       />
 
       {observations !== '' && (
-        <p className="text-sm text-slate-700">{`Al leer la foto: ${observations}`}</p>
+        <p className="text-sm text-ink">{`Al leer la foto: ${observations}`}</p>
       )}
 
       {asksColumn(transcription) && (
@@ -215,6 +221,7 @@ export function LabelFoodForm({
             name="label-basis"
             legend="¿Los HC de la etiqueta son de una porción o cada 100 g?"
             options={BASIS_OPTIONS}
+            segmented
             value={texts.basis}
             onChange={(basis) => {
               update({ basis })
@@ -228,8 +235,8 @@ export function LabelFoodForm({
         // The portion and the carbs, together and above the rest, to compare
         // them with the photo: the only real safeguard against a misread
         // (spec §6.1).
-        <section className="flex flex-col gap-3 rounded-lg border-2 border-slate-900 p-3">
-          <h2 className="text-base font-semibold">
+        <section className="flex flex-col gap-3 rounded-card border-2 border-ink bg-surface p-4 shadow-level-1">
+          <h2 className="font-display text-xl font-semibold">
             Compará con la foto de la etiqueta
           </h2>
           {texts.basis === 'per_portion' ? (
@@ -258,17 +265,17 @@ export function LabelFoodForm({
           {/* Always in the page, so the warning is announced when it shows. */}
           <div aria-live="polite">
             {energy !== null && (
-              <p className="rounded-lg bg-amber-50 p-2 text-amber-900">
-                {energy}
-              </p>
+              <Notice tone="warning">
+                <p>{energy}</p>
+              </Notice>
             )}
           </div>
         </section>
       )}
 
       {fiberShown && (
-        <div className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <p className="text-amber-900">
+        <Notice tone="warning">
+          <p>
             {`La etiqueta dice "${carbsRowText(transcription)}". En ese formato los HC pueden incluir la fibra. Si la etiqueta trae la fibra, cargala y la app la resta.`}
           </p>
           {numberField(
@@ -278,19 +285,20 @@ export function LabelFoodForm({
               : 'Fibra cada 100 g (g) (opcional)',
             null,
           )}
-        </div>
+        </Notice>
       )}
 
       {offer !== null && (
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
+          className={button.soft}
           onClick={() => {
             update({ unitWeight: offer.weightText, unitLabel: offer.label })
             hideErrorsOf('unitWeight')
             form.setMoreOptionsOpen(true)
           }}
         >
+          <Plus aria-hidden="true" />
           {`Guardar también 1 ${offer.label} = ${offer.weightText} g`}
         </button>
       )}
@@ -320,22 +328,22 @@ export function LabelFoodForm({
       )}
 
       {createFood.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {SAVE_ERROR_MESSAGE}
-        </p>
+        <Notice tone="error" role="alert">
+          <p>{SAVE_ERROR_MESSAGE}</p>
+        </Notice>
       )}
 
       <div className="flex flex-col gap-3">
         <button
           type="submit"
-          className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.primary}
           disabled={createFood.isPending}
         >
           {createFood.isPending ? 'Guardando…' : 'Guardar'}
         </button>
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+          className={button.secondary}
           disabled={createFood.isPending}
           onClick={onCancel}
         >

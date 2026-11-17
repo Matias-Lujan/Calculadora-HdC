@@ -1,5 +1,8 @@
+import { ChevronLeft } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { Notice } from '../../../components/Notice.tsx'
+import { backLink, button, pageTitle } from '../../../components/styles.ts'
 import {
   NOT_A_LABEL_MESSAGE,
   PHOTO_OPEN_ERROR_MESSAGE,
@@ -151,11 +154,9 @@ export function NewLabelFoodPage() {
   }
 
   const back = (
-    <Link
-      to={backTo}
-      className="flex min-h-11 items-center self-start text-slate-700"
-    >
-      {fromMeal ? '← Inicio' : '← Mis alimentos'}
+    <Link to={backTo} className={backLink}>
+      <ChevronLeft aria-hidden="true" className="shrink-0" />
+      {fromMeal ? 'Inicio' : 'Mis alimentos'}
     </Link>
   )
 
@@ -178,18 +179,18 @@ export function NewLabelFoodPage() {
     <img
       src={photo.url}
       alt="Foto de la etiqueta"
-      className="max-h-[45vh] w-full rounded-lg object-contain"
+      className="max-h-[45vh] w-full rounded-control object-contain"
     />
   )
 
   return (
     <section className="flex flex-col gap-4">
       {back}
-      <h1 className="text-2xl font-semibold">Agregar con una foto</h1>
+      <h1 className={pageTitle}>Agregar con una foto</h1>
 
       {step.kind === 'pick' && (
         <>
-          <p className="text-slate-700">
+          <p>
             Sacale una foto a la tabla nutricional del paquete; si entra,
             también al nombre.
           </p>
@@ -201,16 +202,14 @@ export function NewLabelFoodPage() {
       )}
 
       {step.kind === 'preparing' && (
-        <p aria-live="polite" className="text-slate-700">
-          Preparando la foto…
-        </p>
+        <p aria-live="polite">Preparando la foto…</p>
       )}
 
       {step.kind === 'open-failed' && (
         <>
-          <p role="alert" className="text-red-700">
-            {PHOTO_OPEN_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{PHOTO_OPEN_ERROR_MESSAGE}</p>
+          </Notice>
           <PhotoPickerButton
             label="Sacar o elegir otra foto"
             onFile={(file) => void start(file)}
@@ -222,9 +221,7 @@ export function NewLabelFoodPage() {
       {step.kind === 'uploading' && (
         <>
           {photoView}
-          <p aria-live="polite" className="text-slate-700">
-            Subiendo la foto…
-          </p>
+          <p aria-live="polite">Subiendo la foto…</p>
           <CancelButton onClick={cancel} />
         </>
       )}
@@ -232,13 +229,13 @@ export function NewLabelFoodPage() {
       {step.kind === 'upload-failed' && (
         <>
           {photoView}
-          <p role="alert" className="text-red-700">
-            {PHOTO_UPLOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{PHOTO_UPLOAD_ERROR_MESSAGE}</p>
+          </Notice>
           {photo !== null && (
             <button
               type="button"
-              className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+              className={button.primary}
               onClick={() => void upload(photo.blob, attemptRef.current)}
             >
               Reintentar
@@ -251,7 +248,7 @@ export function NewLabelFoodPage() {
       {step.kind === 'reading' && (
         <>
           {photoView}
-          <p aria-live="polite" className="text-slate-700">
+          <p aria-live="polite">
             Leyendo la etiqueta… Puede tardar unos segundos.
           </p>
           <CancelButton onClick={cancel} />
@@ -331,11 +328,7 @@ function ReadFailure({
 
 function CancelButton({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
-      onClick={onClick}
-    >
+    <button type="button" className={button.secondary} onClick={onClick}>
       Cancelar
     </button>
   )

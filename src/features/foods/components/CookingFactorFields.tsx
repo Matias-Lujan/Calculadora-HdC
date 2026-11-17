@@ -1,4 +1,5 @@
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { card, fieldLabel } from '../../../components/styles.ts'
 import { cookedPer100gText } from '../../../lib/foodText.ts'
 import {
   yieldLine,
@@ -45,7 +46,7 @@ export function CookingFactorFields({
       .join(' ')
     return (
       <div className="flex flex-col gap-1">
-        <label htmlFor={id} className="text-sm font-medium text-slate-700">
+        <label htmlFor={id} className={fieldLabel}>
           {label}
         </label>
         <NumberInput
@@ -63,9 +64,11 @@ export function CookingFactorFields({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3">
-      <h2 className="text-base font-semibold">Cuánto rinde al cocinarlo</h2>
-      <p className="text-sm text-slate-600">
+    <section className={`flex flex-col gap-3 ${card}`}>
+      <h2 className="font-display text-xl font-semibold">
+        Cuánto rinde al cocinarlo
+      </h2>
+      <p className="text-sm text-ink-soft">
         Pesalo crudo, cocinalo y volvé a pesarlo. Si ya sabés cuánto rinde, poné
         100 en el peso crudo.
       </p>
@@ -81,7 +84,7 @@ export function CookingFactorFields({
         {liveText}
       </p>
       {savedText === null && (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-ink-soft">
           Si no sabés cuánto rinde, dejalo vacío y completalo después. Mientras
           tanto, este alimento no se puede usar en una comida.
         </p>

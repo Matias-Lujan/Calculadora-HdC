@@ -10,6 +10,7 @@ import {
   deletionEdit,
   pasteEdit,
 } from './numberInputEdit.ts'
+import { field } from './styles.ts'
 
 type NumberInputProps = {
   id: string
@@ -137,7 +138,7 @@ export function NumberInput({
         ref={inputRef}
         id={id}
         name={name}
-        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base focus:border-slate-500 focus:outline-none aria-invalid:border-red-600"
+        className={`${field} tabular-nums`}
         type="text"
         inputMode="decimal"
         autoComplete="off"
@@ -151,7 +152,7 @@ export function NumberInput({
           onBlur()
         }}
       />
-      <p aria-live="polite" className="text-sm text-slate-500">
+      <p aria-live="polite" className="text-sm text-ink-soft">
         {notice !== null && typedNumberNoticeMessage(notice)}
       </p>
     </>

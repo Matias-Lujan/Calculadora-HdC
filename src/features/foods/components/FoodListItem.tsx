@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import { needsCookingFactor } from '../../../domain/dose/index.ts'
@@ -11,17 +12,20 @@ export function FoodListItem({ food }: Props) {
   return (
     <Link
       to={`/foods/${food.id}`}
-      className="flex min-h-11 w-full flex-col justify-center gap-0.5 py-2"
+      className="flex min-h-14 w-full items-center gap-3 py-2"
     >
-      <span className="font-medium">{food.name}</span>
-      {food.brand !== null && (
-        <span className="text-sm text-slate-500">{food.brand}</span>
-      )}
-      {needsCookingFactor(food.state, food.cooking_factor) && (
-        <span>
-          <MissingFactorBadge />
-        </span>
-      )}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="font-semibold">{food.name}</span>
+        {food.brand !== null && (
+          <span className="text-sm text-ink-soft">{food.brand}</span>
+        )}
+        {needsCookingFactor(food.state, food.cooking_factor) && (
+          <span>
+            <MissingFactorBadge />
+          </span>
+        )}
+      </span>
+      <ChevronRight aria-hidden="true" className="shrink-0 text-ink-soft" />
     </Link>
   )
 }

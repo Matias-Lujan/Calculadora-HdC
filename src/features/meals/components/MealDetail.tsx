@@ -1,3 +1,4 @@
+import { card, pageTitle } from '../../../components/styles.ts'
 import {
   doseLine,
   doseText,
@@ -25,36 +26,37 @@ export function MealDetail({ meal }: Props) {
   return (
     <article className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Comida</h1>
-        <p className="text-slate-500">{formatEatenAt(meal.eaten_at)}</p>
+        <h1 className={pageTitle}>Comida</h1>
+        <p className="text-ink-soft tabular-nums">
+          {formatEatenAt(meal.eaten_at)}
+        </p>
       </header>
 
       <ul className="flex flex-col gap-3">
         {meal.meal_items.map((item) => (
-          <li
-            key={item.position}
-            className="flex flex-col gap-1 rounded-lg border border-slate-200 p-3"
-          >
+          <li key={item.position} className={`flex flex-col gap-1 ${card}`}>
             <div className="flex flex-col">
-              <span className="font-medium">{item.food_name}</span>
+              <span className="font-semibold">{item.food_name}</span>
               {item.food_brand !== null && (
-                <span className="text-sm text-slate-500">
-                  {item.food_brand}
-                </span>
+                <span className="text-sm text-ink-soft">{item.food_brand}</span>
               )}
             </div>
-            <p className="font-medium">{itemCarbsText(item.carbs_g)}</p>
+            <p className="font-display font-semibold tabular-nums">
+              {itemCarbsText(item.carbs_g)}
+            </p>
             <CalculationDetails lines={savedItemLines(item)} />
           </li>
         ))}
       </ul>
 
-      <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
-        <p className="text-slate-700">{totalCarbsText(meal.total_carbs_g)}</p>
-        <p className="text-xl font-semibold">
+      <div className="flex flex-col gap-1 rounded-card bg-sunken p-4">
+        <p className="font-display tabular-nums">
+          {totalCarbsText(meal.total_carbs_g)}
+        </p>
+        <p className="font-display text-xl font-semibold tabular-nums">
           {doseText(meal.calculated_dose_units)}
         </p>
-        <p className="text-slate-700">
+        <p className="font-display tabular-nums">
           Dosis aplicada: {appliedDoseText(meal.applied_dose_units)}
         </p>
         <CalculationDetails

@@ -14,10 +14,10 @@ export function AppLayout() {
           (for example, a meal opened from far down the history). Rendered
           once; in data mode it renders nothing. */}
       <ScrollRestoration />
-      <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))] text-slate-900">
+      <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
         <ul className="mx-auto flex max-w-md">
           {sections.map(({ to, label }) => (
             <li key={to} className="flex-1">
@@ -25,8 +25,8 @@ export function AppLayout() {
                 to={to}
                 end={to === '/'}
                 className={({ isActive }) =>
-                  `flex min-h-14 items-center justify-center px-1 text-sm ${
-                    isActive ? 'font-semibold text-slate-900' : 'text-slate-500'
+                  `flex min-h-14 items-center justify-center px-1 text-xs ${
+                    isActive ? 'font-semibold text-ink' : 'text-ink-soft'
                   }`
                 }
               >
