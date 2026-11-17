@@ -2,7 +2,7 @@
 
 Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada etapa está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: etapas 0 a 6 terminadas (PR #1 a #4, #7, #8 y #10 a #12 mergeados). Etapa 7 hecha en la rama `etapa-7-produccion`, con su PR por mergear: `prod` ya tiene las migraciones, la Edge Function y los secrets, y Vercel Production apunta a `prod`. Falta mergear el PR y confirmar el uso en el iPhone sobre `prod` (último "Terminada cuando"). Es la última etapa del MVP.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-16.
+**Estado: MVP terminado. Etapas 0 a 7 terminadas (PR #1 a #4, #7, #8 y #10 a #14 mergeados). La app se usa a diario sobre `prod`.** Al cerrar la etapa 4 se replanteó el orden de lo que falta para que la app sea más simple de usar (criterio 5 y spec §14 #41): se agregó la etapa 6b (tabla de referencia) y el seed USDA salió de la etapa 7. Al cerrar la etapa 5, el usuario vio que cargar alimentos todavía parece "llenar documentación" (spec §14 #48): la etapa 6b suma el formulario simple (antes en la 6), saca ARGENFOODS de la pantalla y deja elegir de la tabla directo desde la comida. Última actualización: 2026-11-17.
 
 ---
 
@@ -35,7 +35,7 @@ Este documento ordena la construcción del MVP descrito en [spec.md](spec.md). E
 | 5 | Registro de comida e historial | **La app se puede usar todos los días** | ✅ PR #10 |
 | 6b | Tabla de referencia y formulario simple (se hace antes que la 6) | Un alimento sin paquete se elige de la tabla directo desde la comida, y el alta a mano tiene solo nombre, HC y "¿Se cocina?" | ✅ PR #11 |
 | 6 | Alta por foto | Etiqueta real leída de punta a punta; la cuota agotada muestra el mensaje y deja cargar a mano | ✅ PR #12 |
-| 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | PR por mergear (`etapa-7-produccion`) |
+| 7 | `create_meal`, pulido y paso a producción | Uso real sobre `prod` | ✅ PR #14 |
 
 ---
 
@@ -313,7 +313,7 @@ Incluye:
   - apuntar las variables de Production de Vercel a `prod`;
   - volver a loguearse en la app instalada (al cambiar de proyecto, la sesión anterior no sirve).
 
-  Hecho el 2026-11-16: `prod` estaba pausado por inactividad y se reactivó desde el panel; las 10 migraciones aplicadas, la Edge Function `transcribe-label` desplegada (faltaba en esta lista) con sus secrets, `scripts/rls-check/` en verde contra `prod` (60 casos), las variables de Production de Vercel apuntando a `prod` y la CLI vinculada de nuevo a `dev`. **Los usuarios se crean después de las migraciones**: el trigger `on_auth_user_created` crea su fila de `user_settings`. Los tres primeros se habían creado antes y no tenían esa fila (fallaban dos casos de `user_settings`); se borraron y se volvieron a crear. Falta: borrar los dos usuarios de prueba, mergear el PR y volver a loguearse en el iPhone.
+  Hecho el 2026-11-16: `prod` estaba pausado por inactividad y se reactivó desde el panel; las 10 migraciones aplicadas, la Edge Function `transcribe-label` desplegada (faltaba en esta lista) con sus secrets, `scripts/rls-check/` en verde contra `prod` (60 casos), las variables de Production de Vercel apuntando a `prod` y la CLI vinculada de nuevo a `dev`. **Los usuarios se crean después de las migraciones**: el trigger `on_auth_user_created` crea su fila de `user_settings`. Los tres primeros se habían creado antes y no tenían esa fila (fallaban dos casos de `user_settings`); se borraron y se volvieron a crear. Los usuarios de prueba se borraron, el PR #14 se mergeó y el usuario se logueó en el iPhone.
 - **Datos cargados en `dev`**: decidido, `prod` empieza de cero (no se migra nada de `dev`; spec §14 #59).
 - README completo (spec §12.4) — hecho.
 - Revisar el tamaño del bundle: desde la etapa 3, el build avisa que el JS supera los 500 kB (666 kB) — hecho (spec §14 #60).
@@ -322,6 +322,6 @@ Funcionalidades (ciclo de agentes): 1) `create_meal` — implementada: migració
 
 **Terminada cuando**:
 - [x] `create_meal` está en uso y el guardado no atómico ya no existe. Probado en el iPhone sobre `dev`; en `prod`, la función está aplicada y la usa la app desde el merge.
-- [ ] La app funciona sobre `prod` desde el iPhone.
+- [x] La app funciona sobre `prod` desde el iPhone. Confirmado por el usuario (2026-11-17).
 - [x] El registro de usuarios está deshabilitado en `prod` (se cerró en la etapa 2, para que nadie pudiera crearse una cuenta mientras tanto).
 - [x] Se tomó la decisión sobre los datos de `dev`. `prod` empieza de cero (#59).
