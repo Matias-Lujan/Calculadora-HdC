@@ -112,7 +112,7 @@ describe('the breakdown of spec §8.3, line by line', () => {
 
   it('alfajor (1 unit of 50 g)', () => {
     expect(lines(alfajor)).toEqual([
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
       '50 g × 58,0 ÷ 100 = 29,0 g HC',
     ])
   })
@@ -134,36 +134,57 @@ describe('itemCalculationLines, units', () => {
 
   it('0,5 units of 45 g', () => {
     expect(lines(half)).toEqual([
-      '0,5 unidades × 45 g = 22,5 g',
+      '0,5 × unidad de 45 g = 22,5 g',
       '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
     ])
   })
 
   it.each([
-    [2, '2 unidades'],
-    [1.5, '1,5 unidades'],
-    [1, '1 unidad'],
-  ])('%s → "%s"', (quantity, text) => {
+    [2, '2 ×'],
+    [1.5, '1,5 ×'],
+    [1, '1 ×'],
+  ])('%s → "%s", never "unidades" (kept for insulin)', (quantity, text) => {
     const first = lines({ ...alfajor, quantity })[0]
-    expect(first?.startsWith(`${text} ×`)).toBe(true)
+    expect(first?.startsWith(`${text} unidad de `)).toBe(true)
+    expect(first).not.toContain('unidades')
+  })
+
+  it('with the name of the unit: "0,5 × alfajor de 45 g = 22,5 g"', () => {
+    expect(itemCalculationLines(half, success(half), 'alfajor')).toEqual([
+      '0,5 × alfajor de 45 g = 22,5 g',
+      '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
+    ])
+    expect(
+      itemCalculationLines(
+        { ...alfajor, quantity: 2 },
+        success({ ...alfajor, quantity: 2 }),
+        'galletita',
+      )[0],
+    ).toBe('2 × galletita de 50 g = 100 g')
+  })
+
+  it('the name of the unit is ignored outside units mode', () => {
+    expect(itemCalculationLines(banana, success(banana), 'alfajor')).toEqual(
+      lines(banana),
+    )
   })
 
   it('"1,0" typed is 1 unit (the parsed number is shown)', () => {
     // parseUserNumber("1,0") is 1, so the item gets quantity 1.
     expect(lines({ ...alfajor, quantity: 1.0 })[0]).toBe(
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
     )
   })
 
   it('a unit weight with decimals is shown with formatGrams', () => {
     expect(lines({ ...alfajor, unitWeightG: 9.5, quantity: 3 })[0]).toBe(
-      '3 unidades × 9,5 g = 28,5 g',
+      '3 × unidad de 9,5 g = 28,5 g',
     )
   })
 
   it('a typed quantity of units is exact (thousands grouped)', () => {
     expect(lines({ ...alfajor, unitWeightG: 1, quantity: 1500 })[0]).toBe(
-      '1.500 unidades × 1 g = 1500 g',
+      '1.500 × unidad de 1 g = 1500 g',
     )
   })
 })
@@ -443,19 +464,19 @@ describe('itemCalculationLines: bordes', () => {
 
   it('a quarter unit', () => {
     expect(lines({ ...alfajor, quantity: 0.25 })[0]).toBe(
-      '0,25 unidades × 50 g = 12,5 g',
+      '0,25 × unidad de 50 g = 12,5 g',
     )
   })
 
   it('a quantity close to 1 is not "1 unidad"', () => {
     expect(lines({ ...alfajor, quantity: 1.0001 })[0]).toBe(
-      '1,0001 unidades × 50 g = 50 g',
+      '1,0001 × unidad de 50 g = 50 g',
     )
   })
 
   it('a unit weight with many decimals is rounded to 1 decimal', () => {
     expect(lines({ ...alfajor, unitWeightG: 45.25, quantity: 1 })[0]).toBe(
-      '1 unidad × 45,3 g = 45,3 g',
+      '1 × unidad de 45,3 g = 45,3 g',
     )
   })
 
@@ -613,7 +634,7 @@ describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
   it('alfajor (1 unit of 50 g)', () => {
     expect(savedItemLines(savedAlfajor)).toEqual([
       '58,0 g de HC cada 100 g',
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
       '50 g × 58,0 ÷ 100 = 29,0 g HC',
     ])
   })
@@ -629,7 +650,7 @@ describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
       }),
     ).toEqual([
       '58,0 g de HC cada 100 g',
-      '0,5 unidades × 45 g = 22,5 g',
+      '0,5 × unidad de 45 g = 22,5 g',
       '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
     ])
   })
@@ -660,7 +681,7 @@ describe('savedItemLines: does not calculate again', () => {
       savedItemLines({ ...savedAlfajor, grams: 52, carbs_g: 30.16 }),
     ).toEqual([
       '58,0 g de HC cada 100 g',
-      '1 unidad × 50 g = 52 g',
+      '1 × unidad de 50 g = 52 g',
       '52 g × 58,0 ÷ 100 = 30,2 g HC',
     ])
   })

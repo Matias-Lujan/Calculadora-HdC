@@ -1,3 +1,5 @@
+export { appliedDoseShortcuts } from './appliedDoseShortcuts.ts'
+export type { AppliedDoseShortcuts } from './appliedDoseShortcuts.ts'
 export { applyTypedEdit } from './applyTypedEdit.ts'
 export type {
   TypedEdit,

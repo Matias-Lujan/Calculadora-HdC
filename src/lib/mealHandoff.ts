@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { foodSchema, type Food } from './foods.ts'
 
-// "Agregar con una foto" from Inicio (spec §6.1, §6.6, §14 #61). The two
+// "Con foto" from Inicio (spec §6.1, §6.6, §14 #61). The two
 // features talk through the router's navigation state, so neither imports
 // the other's internals:
 // - Inicio opens /foods/label with FROM_MEAL_STATE;

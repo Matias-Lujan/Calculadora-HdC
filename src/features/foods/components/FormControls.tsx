@@ -8,6 +8,7 @@ import {
 import {
   foodFieldErrorMessage,
   type FoodFieldError,
+  type RequiredFoodField,
 } from '../../../lib/errors.ts'
 
 // Small building blocks of the food form. No logic: they only lay out a
@@ -16,11 +17,15 @@ import {
 type FieldErrorProps = {
   id: string
   error: FoodFieldError | undefined
+  /** The field, so an empty one says what to write in it (UX-14). */
+  field?: RequiredFoodField
 }
 
-export function FieldError({ id, error }: FieldErrorProps) {
+export function FieldError({ id, error, field }: FieldErrorProps) {
   if (error === undefined) return null
-  return <FieldMessage id={id}>{foodFieldErrorMessage(error)}</FieldMessage>
+  return (
+    <FieldMessage id={id}>{foodFieldErrorMessage(error, field)}</FieldMessage>
+  )
 }
 
 type TextFieldProps = {

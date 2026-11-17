@@ -58,7 +58,7 @@ export function CookingFactorFields({
           invalid={describedBy !== ''}
           describedBy={describedBy === '' ? undefined : describedBy}
         />
-        <FieldError id={`${id}-error`} error={error} />
+        <FieldError id={`${id}-error`} error={error} field={field} />
       </div>
     )
   }

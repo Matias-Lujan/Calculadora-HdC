@@ -4,8 +4,9 @@ import { flushSync } from 'react-dom'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { focusFirstInvalid } from '../../../components/focusProblem.ts'
 import { button, fieldLabel, pageTitle } from '../../../components/styles.ts'
-import type { FoodFieldError } from '../../../lib/errors.ts'
+import type { FoodFieldError, RequiredFoodField } from '../../../lib/errors.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import {
@@ -82,6 +83,7 @@ export function LabelFoodForm({
   const { texts, update, result, shownErrors, showErrorsOf, hideErrorsOf } =
     form
   const saveButtonRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const columns = transcription?.columns ?? []
   const column = chosenColumn(texts, transcription)
@@ -100,9 +102,15 @@ export function LabelFoodForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    form.setShownErrors(result.errors)
-    if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
-    if (result.values === null) return
+    // Rendered right away, to take the user to the first error (UX-14).
+    flushSync(() => {
+      form.setShownErrors(result.errors)
+      if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
+    })
+    if (result.values === null) {
+      focusFirstInvalid(formRef.current)
+      return
+    }
     // The calories warning and an unusual yield share one confirmation.
     if (energy !== null || needsFactorConfirmation(result.values)) {
       form.setConfirmingFactor(true)
@@ -161,9 +169,22 @@ export function LabelFoodForm({
               {fieldNote(origin)}
             </p>
           ))}
-        <FieldError id={errorId} error={error} />
+        <FieldError id={errorId} error={error} field={requiredField(field)} />
       </div>
     )
+  }
+
+  // What an empty field says, in the words of its label (UX-14). The fiber
+  // is optional: it is never empty-and-required.
+  function requiredField(field: NumberField): RequiredFoodField | undefined {
+    switch (field) {
+      case 'portion':
+        return 'portion'
+      case 'labelCarbs':
+        return texts.basis === 'per_portion' ? 'portionCarbs' : 'carbsPer100g'
+      case 'fiber':
+        return undefined
+    }
   }
 
   // The texts of the confirmation on save: the calories warning and an
@@ -191,7 +212,12 @@ export function LabelFoodForm({
   ]
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+    <form
+      ref={formRef}
+      className="flex flex-col gap-5"
+      onSubmit={handleSubmit}
+      noValidate
+    >
       <h1 className={pageTitle}>Revisá los datos</h1>
 
       <img

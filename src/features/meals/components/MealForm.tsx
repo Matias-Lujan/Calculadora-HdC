@@ -1,26 +1,33 @@
 import { Camera } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Confirmation } from '../../../components/Confirmation.tsx'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import { button, field, fieldLabel } from '../../../components/styles.ts'
+import { revealAndFocus } from '../../../components/focusProblem.ts'
+import { button, chip, field, fieldLabel } from '../../../components/styles.ts'
 import {
+  appliedDoseShortcuts,
   calculateMeal,
+  formatDose,
+  formatDoseCompact,
+  formatUserNumber,
   parseNonNegativeUserNumber,
+  unitsWord,
   type NonNegativeNumberError,
   type PositiveNumberError,
   type QuantityMode,
 } from '../../../domain/dose/index.ts'
 import {
   EATEN_AT_ERROR_MESSAGE,
-  MEAL_BLOCKED_MESSAGE,
   SAVE_ERROR_MESSAGE,
+  appliedDoseErrorMessage,
   mealLiveWarningMessage,
+  mealProblemMessage,
   mealSaveWarningMessage,
-  positiveNumberErrorMessage,
+  type MealProblem,
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import {
@@ -35,13 +42,18 @@ import {
   appliedDose,
   appliedDoseFieldText,
   doseWarning,
+  firstMealProblem,
+  isAppliedDoseShortcut,
   itemWarnings,
   newItemDraft,
   quantityError,
+  removeItem,
+  restoreItem,
   saveWarnings,
   toDoseSettings,
   toMealItemInput,
   toNewMealRecord,
+  type RemovedItem,
 } from '../mealDraft.ts'
 import { useCreateMeal } from '../queries.ts'
 import {
@@ -64,6 +76,32 @@ type Props = {
 
 const APPLIED_DOSE_ID = 'meal-applied-dose'
 const EATEN_AT_ID = 'meal-eaten-at'
+// How long "Quitaste {nombre}." and its "Deshacer" stay (spec §6.6).
+const UNDO_MS = 5000
+// Shared with FoodPicker: where the focus goes when no card is left after
+// the removed one.
+const ADD_FOOD_BUTTON_ID = 'meal-add-food'
+const FOOD_SEARCH_ID = 'meal-food-search'
+
+/** The element to take the user to for a problem (UX-14), or null. */
+function problemElementId(
+  problem: MealProblem,
+  itemKey: number | null,
+): string | null {
+  switch (problem.code) {
+    case 'QUANTITY':
+      return `meal-item-${itemKey}-quantity`
+    case 'FOOD':
+      return `meal-item-${itemKey}`
+    case 'APPLIED_DOSE':
+      return APPLIED_DOSE_ID
+    case 'EATEN_AT':
+      return EATEN_AT_ID
+    case 'MEAL':
+      // The total and the dose: the dose display, always in sight.
+      return null
+  }
+}
 
 function errorOf<E>(result: { value: number } | { error: E }): E | null {
   return 'error' in result ? result.error : null
@@ -116,8 +154,12 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
   const [confirming, setConfirming] = useState(false)
   const reviewButtonRef = useRef<HTMLButtonElement>(null)
   const saveButtonRef = useRef<HTMLButtonElement>(null)
-  // The last "Guardar" found errors.
-  const [blocked, setBlocked] = useState(false)
+  // The first problem the last "Guardar comida" found, named next to it.
+  const [blockedProblem, setBlockedProblem] = useState<MealProblem | null>(null)
+  // The item just removed, while "Deshacer" is offered (not kept in
+  // sessionStorage).
+  const [removed, setRemoved] = useState<RemovedItem | null>(null)
+  const undoButtonRef = useRef<HTMLButtonElement>(null)
   // The id of the meal just saved ("Comida guardada." and its link to the
   // history), until the next change.
   const [savedMealId, setSavedMealId] = useState<string | null>(null)
@@ -145,6 +187,36 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     }
   }, [addedFromPhoto, initial.focusKey, navigate])
 
+  // The items of the last render, for the timer of "Deshacer".
+  const itemsRef = useRef(items)
+  useEffect(() => {
+    itemsRef.current = items
+  })
+
+  // "Deshacer" goes away after a while; removing another item starts again.
+  // If it had the focus, the focus goes to the card now in its place, or to
+  // "+ Agregar alimento" (the search, without items) if none is left.
+  useEffect(() => {
+    if (removed === null) return
+    const timer = window.setTimeout(() => {
+      const hadFocus =
+        undoButtonRef.current !== null &&
+        undoButtonRef.current === document.activeElement
+      flushSync(() => setRemoved(null))
+      if (!hadFocus) return
+      const current = itemsRef.current
+      const next = current[removed.index]
+      const target =
+        next !== undefined
+          ? `meal-item-${next.key}`
+          : current.length > 0
+            ? ADD_FOOD_BUTTON_ID
+            : FOOD_SEARCH_ID
+      document.getElementById(target)?.focus()
+    }, UNDO_MS)
+    return () => window.clearTimeout(timer)
+  }, [removed])
+
   // Every change is kept while the app is open; a meal without items (also
   // after saving it) is not kept. Only what the user entered: the
   // calculation is derived again in the render.
@@ -167,7 +239,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
   // last "Guardar". The error of a failed save stays until the next one.
   function touch() {
     setConfirming(false)
-    setBlocked(false)
+    setBlockedProblem(null)
     setSavedMealId(null)
     setNotUsableFood(null)
   }
@@ -200,20 +272,41 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     setShownError(key, null)
   }
 
+  // No confirmation: "Quitaste {nombre}." with "Deshacer" for a while.
+  // The notice takes the place of the card, and the focus goes to its
+  // "Deshacer" (the ✕ that had it is gone).
   function handleRemove(key: number) {
-    touch()
-    setItems((current) => current.filter((item) => item.key !== key))
-    setShownErrors((current) => {
-      const next = { ...current }
-      delete next[key]
-      return next
+    const next = removeItem(items, key)
+    flushSync(() => {
+      touch()
+      setItems(next.items)
+      if (next.removed !== null) setRemoved(next.removed)
+      setShownErrors((current) => {
+        const rest = { ...current }
+        delete rest[key]
+        return rest
+      })
     })
+    undoButtonRef.current?.focus()
+  }
+
+  // The removed item goes back to its place, with what it had typed, and
+  // the focus goes to its card.
+  function undoRemove() {
+    if (removed === null) return
+    flushSync(() => {
+      touch()
+      setItems((current) => restoreItem(current, removed))
+      setRemoved(null)
+    })
+    document.getElementById(`meal-item-${removed.item.key}`)?.focus()
   }
 
   // After a save: an empty form and "Comida guardada.", with the id that
   // createMeal returned.
   function reset(id: string) {
     setItems([])
+    setRemoved(null)
     setShownErrors({})
     setAppliedDoseText(null)
     setAppliedDoseShownError(null)
@@ -255,29 +348,38 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     // A tap on "Guardar" right after "Guardar igual" must not reopen the
     // confirmation while the meal is being saved.
     if (savingRef.current) return
-    touch()
-    // Every pending error is shown, even in fields the user did not visit.
-    setShownErrors(
-      Object.fromEntries(
-        items.map((item, index) => [
-          item.key,
-          quantityError(item.quantityText, result.items[index]),
-        ]),
-      ),
-    )
-    const doseError =
-      appliedDoseText === null
-        ? null
-        : errorOf(parseNonNegativeUserNumber(appliedDoseText))
-    setAppliedDoseShownError(doseError)
-    const eatenAtInvalid =
-      eatenAtText !== null && eatenAtFromInput(eatenAtText) === null
-    setEatenAtShownError(eatenAtInvalid)
+    const first = firstMealProblem(items, result, appliedDoseText, eatenAtText)
+    // Rendered right away: the errors have to be on screen before going to
+    // the first one, inside the tap (iOS only opens the keyboard that way).
+    flushSync(() => {
+      touch()
+      // Every pending error is shown, even in fields the user did not visit.
+      setShownErrors(
+        Object.fromEntries(
+          items.map((item, index) => [
+            item.key,
+            quantityError(item.quantityText, result.items[index]),
+          ]),
+        ),
+      )
+      setAppliedDoseShownError(
+        appliedDoseText === null
+          ? null
+          : errorOf(parseNonNegativeUserNumber(appliedDoseText)),
+      )
+      setEatenAtShownError(
+        eatenAtText !== null && eatenAtFromInput(eatenAtText) === null,
+      )
+      setBlockedProblem(first?.problem ?? null)
+    })
 
-    if (!result.ok || doseError !== null || eatenAtInvalid) {
-      setBlocked(true)
+    if (first !== null) {
+      const id = problemElementId(first.problem, first.itemKey)
+      if (id !== null) revealAndFocus(document.getElementById(id))
       return
     }
+    // A meal without a valid total is a problem above (MEAL).
+    if (!result.ok) return
     if (saveWarnings(items, result, settings).length > 0) {
       setConfirming(true)
       return
@@ -295,6 +397,54 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
   const confirmationOpen = warnings.length > 0
   const appliedDoseInvalid = appliedDoseShownError !== null
   const liveDoseWarning = doseWarning(result, settings)
+  const shortcuts = appliedDoseShortcuts(
+    result.ok ? result.doseUnits : Number.NaN,
+  )
+
+  // "Quitaste {nombre}." with "Deshacer", for a while, in the place of the
+  // removed card (at the end at most), so it never covers "Guardar comida"
+  // (spec §6.6). Announced when it shows; the focus goes to "Deshacer".
+  const undoIndex =
+    removed === null ? -1 : Math.min(removed.index, items.length)
+  const undoNotice =
+    removed === null ? null : (
+      <li
+        key={`removed-${removed.item.key}`}
+        role="status"
+        className="flex items-center justify-between gap-3 rounded-card border border-dashed border-line-strong bg-sunken py-1 pr-2 pl-4"
+      >
+        <p className="min-w-0">{`Quitaste ${removed.item.food.name}.`}</p>
+        <button
+          ref={undoButtonRef}
+          type="button"
+          className={`${button.text} shrink-0 px-2`}
+          onClick={undoRemove}
+        >
+          Deshacer
+        </button>
+      </li>
+    )
+
+  // The photo screen comes back here after saving, and the food is added to
+  // the meal (spec §6.1, §14 #61). A link is not disabled by the fieldset:
+  // while saving it is made inert by hand (also for the keyboard and
+  // VoiceOver, which skip pointer-events).
+  const photoLink = (
+    <Link
+      to="/foods/label"
+      state={FROM_MEAL_STATE}
+      aria-label="Agregar con foto"
+      aria-disabled={createMeal.isPending || undefined}
+      tabIndex={createMeal.isPending ? -1 : undefined}
+      onClick={(event) => {
+        if (savingRef.current || createMeal.isPending) event.preventDefault()
+      }}
+      className={`${button.secondary} shrink-0 aria-disabled:pointer-events-none aria-disabled:opacity-60`}
+    >
+      <Camera aria-hidden="true" className="shrink-0" />
+      Con foto
+    </Link>
+  )
 
   return (
     // What gets the focus scrolls into view below the dose display, which
@@ -356,66 +506,59 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         />
       )}
 
-      {items.length > 0 && (
+      {(items.length > 0 || removed !== null) && (
         <ul className="flex flex-col gap-3">
           {items.map((item, index) => (
-            <MealItemCard
-              key={item.key}
-              item={item}
-              input={inputs[index] ?? toMealItemInput(item)}
-              result={result.items[index]}
-              shownError={shownErrors[item.key] ?? null}
-              warnings={itemWarnings(item, result.items[index], settings).map(
-                mealLiveWarningMessage,
-              )}
-              onQuantityChange={(text) =>
-                updateItem(item.key, { quantityText: text })
-              }
-              onQuantityBlur={() =>
-                setShownError(
-                  item.key,
-                  quantityError(item.quantityText, result.items[index]),
-                )
-              }
-              onModeChange={(mode) => handleModeChange(item.key, mode)}
-              onRemove={() => handleRemove(item.key)}
-            />
+            <Fragment key={item.key}>
+              {removed !== null && undoIndex === index && undoNotice}
+              <MealItemCard
+                key={item.key}
+                item={item}
+                input={inputs[index] ?? toMealItemInput(item)}
+                result={result.items[index]}
+                shownError={shownErrors[item.key] ?? null}
+                warnings={itemWarnings(item, result.items[index], settings).map(
+                  mealLiveWarningMessage,
+                )}
+                onQuantityChange={(text) =>
+                  updateItem(item.key, { quantityText: text })
+                }
+                onQuantityBlur={() =>
+                  setShownError(
+                    item.key,
+                    quantityError(item.quantityText, result.items[index]),
+                  )
+                }
+                onModeChange={(mode) => handleModeChange(item.key, mode)}
+                onRemove={() => handleRemove(item.key)}
+              />
+            </Fragment>
           ))}
+          {removed !== null && undoIndex === items.length && undoNotice}
         </ul>
       )}
 
+      {/* "Agregar alimento" (soft) and "Con foto" (secondary), on one line
+          under the items, where the next one goes (UX-06). Without items,
+          the search is open and "Con foto" goes under it. */}
       <div className="flex flex-col gap-3">
         <FoodPicker
           foods={foods}
           tableFoods={tableFoods}
           onPick={handlePick}
           alwaysOpen={items.length === 0}
+          besideButton={photoLink}
         />
-        {/* The photo screen comes back here after saving, and the food is
-            added to the meal (spec §6.1, §14 #61). A link is not disabled
-            by the fieldset: while saving it is made inert by hand (also for
-            the keyboard and VoiceOver, which skip pointer-events). */}
-        <Link
-          to="/foods/label"
-          state={FROM_MEAL_STATE}
-          aria-disabled={createMeal.isPending || undefined}
-          tabIndex={createMeal.isPending ? -1 : undefined}
-          onClick={(event) => {
-            if (savingRef.current || createMeal.isPending)
-              event.preventDefault()
-          }}
-          className={`${button.secondary} aria-disabled:pointer-events-none aria-disabled:opacity-60`}
-        >
-          <Camera aria-hidden="true" />
-          Agregar con una foto
-        </Link>
+        {items.length === 0 && photoLink}
       </div>
 
       {items.length > 0 && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor={APPLIED_DOSE_ID} className={fieldLabel}>
-              Dosis aplicada (unidades)
+              Me apliqué
+              {/* "unidades" is written inside the field, only seen. */}
+              <span className="sr-only"> (unidades)</span>
             </label>
             {/* NumberInput writes a value that changes from outside to the
                 field, so while it follows the calculated dose it updates
@@ -439,25 +582,68 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               describedBy={
                 appliedDoseInvalid ? `${APPLIED_DOSE_ID}-error` : undefined
               }
-              className="font-display font-semibold"
+              suffix="unidades"
+              boxClassName="w-[11rem]"
+              className="font-display text-xl font-semibold"
             />
             {appliedDoseShownError !== null && (
               <FieldMessage id={`${APPLIED_DOSE_ID}-error`}>
-                {positiveNumberErrorMessage(appliedDoseShownError)}
+                {appliedDoseErrorMessage(appliedDoseShownError)}
               </FieldMessage>
             )}
-            {appliedDoseText !== null && (
-              <button
-                type="button"
-                className={`${button.text} self-start`}
-                onClick={() => {
-                  touch()
-                  setAppliedDoseText(null)
-                  setAppliedDoseShownError(null)
-                }}
+            {/* Pen values around the calculated dose, and the calculated
+                one (spec §6.6, #71). None starts chosen: until one is
+                tapped (or something is typed), the field follows the
+                calculated dose, exact. */}
+            {shortcuts.penUnits.length > 0 && (
+              <div
+                id={`${APPLIED_DOSE_ID}-shortcuts`}
+                role="group"
+                aria-label="Valores de la lapicera"
+                className="flex flex-wrap gap-2 pt-1"
               >
-                Usar la dosis calculada
-              </button>
+                {shortcuts.penUnits.map((units) => {
+                  const text = formatDoseCompact(units)
+                  return (
+                    <button
+                      key={units}
+                      type="button"
+                      aria-pressed={isAppliedDoseShortcut(
+                        appliedDoseText,
+                        units,
+                      )}
+                      className={chip}
+                      onClick={() => {
+                        touch()
+                        setAppliedDoseText(formatUserNumber(units))
+                        setAppliedDoseShownError(null)
+                      }}
+                    >
+                      {text}
+                      <span className="sr-only">{` ${unitsWord(text)}`}</span>
+                    </button>
+                  )
+                })}
+                {shortcuts.showCalculated && result.ok && (
+                  <button
+                    type="button"
+                    // Never chosen (tapping it goes back to the start, with
+                    // none chosen), but announced like the others.
+                    aria-pressed={false}
+                    className={chip}
+                    onClick={() => {
+                      touch()
+                      setAppliedDoseText(null)
+                      setAppliedDoseShownError(null)
+                    }}
+                  >
+                    {formatDose(result.doseUnits)}
+                    <span className="sr-only">
+                      {` ${unitsWord(formatDose(result.doseUnits))}, la dosis calculada`}
+                    </span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -565,9 +751,9 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
             </Confirmation>
           ) : (
             <>
-              {blocked ? (
+              {blockedProblem !== null ? (
                 <Notice tone="error" role="alert">
-                  <p>{MEAL_BLOCKED_MESSAGE}</p>
+                  <p>{mealProblemMessage(blockedProblem)}</p>
                 </Notice>
               ) : (
                 createMeal.isError && (
@@ -585,7 +771,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
                 className={button.primary}
                 onClick={handleSave}
               >
-                {createMeal.isPending ? 'Guardando…' : 'Guardar'}
+                {createMeal.isPending ? 'Guardando…' : 'Guardar comida'}
               </button>
             </>
           )}

@@ -31,11 +31,22 @@ export const backLink =
  * opciones"), with a DisclosureIcon before its text.
  */
 export const disclosure =
-  'flex min-h-11 items-center gap-2 self-start font-medium text-accent'
+  'flex min-h-11 items-center gap-2 font-medium text-accent'
 
-/** Text and number fields: the border turns accent while typing, and danger with an error. */
+/**
+ * Text and number fields: while typing, the border turns accent and a 2 px
+ * accent outline goes 2 px outside it (UX-13); with an error, a danger
+ * border.
+ */
 export const field =
-  'min-h-12 w-full rounded-control border-[1.5px] border-line-strong bg-surface px-3 text-base text-ink shadow-level-1 placeholder:text-ink-soft focus:border-accent focus:outline-2 focus:outline-accent aria-invalid:border-2 aria-invalid:border-danger'
+  'min-h-12 w-full rounded-control border-[1.5px] border-line-strong bg-surface px-3 text-base text-ink shadow-level-1 placeholder:text-ink-soft focus:border-accent focus:outline-2 focus:outline-offset-2 focus:outline-accent aria-invalid:border-2 aria-invalid:border-danger'
+
+/**
+ * A shortcut to tap (docs/ux/revision-1.md §2.10): 44 px, sunken; the chosen
+ * one (aria-pressed), accent with white text.
+ */
+export const chip =
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-sunken px-4 font-display text-base font-semibold text-ink tabular-nums aria-pressed:bg-accent aria-pressed:text-on-accent disabled:opacity-60'
 
 /** The label above a field. */
 export const fieldLabel = 'text-sm font-medium text-ink-soft'
@@ -61,5 +72,5 @@ export const segmented = {
     'aria-pressed:border-accent aria-pressed:bg-surface aria-pressed:font-semibold aria-pressed:text-ink aria-pressed:shadow-level-1',
   /** The chosen option, in a group of labels that hold a radio. */
   checked:
-    'cursor-pointer has-checked:border-accent has-checked:bg-surface has-checked:font-semibold has-checked:text-ink has-checked:shadow-level-1 has-focus-visible:outline-2 has-focus-visible:outline-accent',
+    'cursor-pointer has-checked:border-accent has-checked:bg-surface has-checked:font-semibold has-checked:text-ink has-checked:shadow-level-1 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-accent',
 } as const

@@ -809,8 +809,9 @@ function buildStates(
     }
   }
 
+  // "Guardar comida" in Inicio, "Guardar" in the other screens.
   const saveButton = (page: Page) =>
-    page.getByRole('button', { name: 'Guardar', exact: true })
+    page.getByRole('button', { name: /^Guardar( comida)?$/ })
 
   // Puts an element in the middle of the screen: scrollIntoViewIfNeeded
   // does nothing if a corner already shows, and the fixed bar at the
@@ -870,7 +871,7 @@ function buildStates(
     {
       name: 'inicio-vacio',
       description:
-        'Inicio sin alimentos en la comida: el buscador abierto y «Agregar con una foto».',
+        'Inicio sin alimentos en la comida: el buscador abierto y «Con foto» debajo.',
       run: emptyMeal,
     },
     {
@@ -905,7 +906,7 @@ function buildStates(
     {
       name: 'inicio-items',
       description:
-        'Inicio con tres alimentos y sus cantidades (uno en unidades, uno cocido y uno de la tabla), el visor con los hidratos, la dosis y el ratio, la dosis aplicada, la fecha y «Guardar».',
+        'Inicio con tres alimentos y sus cantidades (uno en unidades, uno cocido y uno de la tabla), el visor con los hidratos, la dosis y el ratio, «Agregar alimento» y «Con foto», «Me apliqué» con sus atajos, la fecha y «Guardar comida».',
       run: async (page) => {
         await buildMeal(page)
         await page
@@ -933,7 +934,7 @@ function buildStates(
     {
       name: 'inicio-error-cantidad',
       description:
-        'Inicio con la cantidad de un alimento borrada, después de salir del campo: «Completá este campo.» y el visor con «—» en lugar de los números.',
+        'Inicio con la cantidad de un alimento borrada, después de salir del campo: «Poné cuántos gramos comiste.» y el visor con «—» en lugar de los números.',
       run: async (page) => {
         await buildMeal(page)
         const field = itemCard(
@@ -942,14 +943,14 @@ function buildStates(
         ).locator('input[id$="-quantity"]')
         await clearField(field)
         await field.blur()
-        await page.getByText('Completá este campo.').waitFor()
+        await page.getByText('Poné cuántos gramos comiste.').waitFor()
         await center(field)
       },
     },
     {
       name: 'inicio-advertencias',
       description:
-        'Inicio después de tocar «Guardar» con un alimento por encima de la alerta de gramos: el aviso en vivo debajo de su cantidad y el recuadro «Revisá antes de guardar», en lugar de «Guardar», con «Revisar» (principal) y «Guardar igual».',
+        'Inicio después de tocar «Guardar comida» con un alimento por encima de la alerta de gramos: el aviso en vivo debajo de su cantidad y el recuadro «Revisá antes de guardar», en lugar de «Guardar comida», con «Revisar» (principal) y «Guardar igual».',
       run: async (page) => {
         // More grams than the alert, so at least that warning shows up.
         await buildMeal(
@@ -977,16 +978,14 @@ function buildStates(
     {
       name: 'inicio-dosis-editada',
       description:
-        'Inicio con la dosis aplicada cambiada a mano (8,5): aparece «Usar la dosis calculada».',
+        'Inicio con «Me apliqué» cambiado a mano (8,5): los atajos de la lapicera, con el elegido marcado si coincide, y el de la dosis calculada.',
       run: async (page) => {
         await buildMeal(page)
         const dose = page.locator('#meal-applied-dose')
         await clearField(dose)
         await dose.pressSequentially('8,5')
         await dose.blur()
-        await page
-          .getByRole('button', { name: 'Usar la dosis calculada' })
-          .waitFor()
+        await page.locator('#meal-applied-dose-shortcuts').waitFor()
         await center(dose)
       },
     },
@@ -1232,7 +1231,7 @@ function buildStates(
     {
       name: 'inicio-alerta-dosis',
       description:
-        'Inicio con una comida cuya dosis calculada supera la alerta de dosis máxima: el visor con «Más que tu alerta de … unidades.» (sin tocar «Guardar»).',
+        'Inicio con una comida cuya dosis calculada supera la alerta de dosis máxima: el visor con «Más que tu alerta de … unidades.» (sin tocar «Guardar comida»).',
       run: async (page) => {
         await putDoseAlertBack()
         await buildMeal(
@@ -1268,6 +1267,61 @@ function buildStates(
         await saveButton(page).click()
         await page.getByRole('button', { name: 'Guardar igual' }).waitFor()
         await center(page.getByRole('button', { name: 'Revisar' }))
+      },
+    },
+
+    // --- Added in tanda 3 of M1, at the end so the numbers above do not
+    // move. It saves nothing. ---
+    {
+      name: 'inicio-deshacer',
+      description:
+        'Inicio después de quitar un alimento con su ✕: en el lugar de su tarjeta, «Quitaste {nombre}.» con «Deshacer» (con el foco), que dura 5 segundos (no se toca).',
+      run: async (page) => {
+        await buildMeal(page)
+        const table = need(foods.table, 'copiado de la tabla')
+        await page
+          .getByRole('button', { name: `Quitar ${table.name}`, exact: true })
+          .click()
+        const undo = page.getByRole('button', { name: 'Deshacer' })
+        await undo.waitFor()
+        await center(undo)
+      },
+    },
+    {
+      name: 'inicio-guardar-con-error',
+      description:
+        'Inicio con la cantidad de un alimento vacía y la página bajada del todo, después de tocar «Guardar comida»: la pantalla salta a esa cantidad, con el foco, y junto al botón «Falta la cantidad de {nombre}.» (no se guarda).',
+      run: async (page) => {
+        await buildMeal(page)
+        const field = itemCard(
+          page,
+          need(foods.table, 'copiado de la tabla'),
+        ).locator('input[id$="-quantity"]')
+        await clearField(field)
+        await page.evaluate(
+          'window.scrollTo(0, document.documentElement.scrollHeight)',
+        )
+        await saveButton(page).click()
+        await page.getByText(/^Falta la cantidad de /).waitFor()
+      },
+    },
+    {
+      name: 'inicio-cantidad-larga',
+      description:
+        'Inicio con «1.250,5» en la cantidad de un alimento que se cocina, con el foco en el campo: el contorno de foco y el número entero junto a «g cocidos».',
+      run: async (page) => {
+        await emptyMeal(page)
+        const cooked = need(foods.cooked, 'que se cocina, con cuánto rinde')
+        await addItem(page, cooked, '1250,5')
+        const field = itemCard(page, cooked).locator('input[id$="-quantity"]')
+        await field.focus()
+        // The focus selects the whole number (UX-15): the caret goes to the
+        // end, so the screenshot shows the number as it reads.
+        await page.waitForTimeout(50)
+        await page.evaluate(
+          "(() => { const input = document.activeElement; if (input && 'setSelectionRange' in input) input.setSelectionRange(input.value.length, input.value.length) })()",
+        )
+        await center(field)
       },
     },
   ]

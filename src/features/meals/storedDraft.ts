@@ -6,7 +6,7 @@ import type { MealFood, MealItemDraft } from './types.ts'
 
 // The meal being entered, kept while the app is open (spec §6.6, §14 #61):
 // what is stored, how it is read back, and the food that comes back from
-// "Agregar con una foto". Only what the user entered is stored; the
+// "Con foto". Only what the user entered is stored; the
 // calculation and the breakdown are derived again in the render.
 
 /** What is stored: the items (with their copy of the food), as typed. */

@@ -102,7 +102,7 @@ export function FoodFields({
           type="button"
           aria-expanded={moreOptionsOpen}
           aria-controls={MORE_OPTIONS_ID}
-          className={disclosure}
+          className={`${disclosure} self-start`}
           onClick={() => setMoreOptionsOpen((current) => !current)}
         >
           <DisclosureIcon open={moreOptionsOpen} />

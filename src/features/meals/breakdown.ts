@@ -83,22 +83,20 @@ export function foodLines(
     : [foodCarbsLine(food), yieldText]
 }
 
-function unitsText(quantity: number): string {
-  return `${formatUserNumber(quantity)} ${quantity === 1 ? 'unidad' : 'unidades'}`
-}
-
 /**
  * The calculation of a valid item, from the typed quantity to its carbs:
  * - eaten cooked: "Cocido: 78,0 × 100 ÷ 260 = 30,0 g de HC cada 100 g" and
  *   "250 g cocido × 30,0 ÷ 100 = 75,0 g HC" (if the yield cannot be shown,
  *   "Cocido: 30,0 g de HC cada 100 g", without the calculation);
- * - in units: "0,5 unidades × 45 g = 22,5 g" and
- *   "22,5 g × 58,0 ÷ 100 = 13,1 g HC";
+ * - in units: "0,5 × alfajor de 45 g = 22,5 g" (with the name of the unit,
+ *   `unitLabel`, or "unidad" without one: "unidades" is kept for insulin)
+ *   and "22,5 g × 58,0 ÷ 100 = 13,1 g HC";
  * - in grams: "120 g × 20,2 ÷ 100 = 24,2 g HC".
  */
 export function itemCalculationLines(
   input: MealItemInput,
   result: Pick<ItemSuccess, 'grams' | 'effectiveCarbsPer100g' | 'carbsG'>,
+  unitLabel: string | null = null,
 ): string[] {
   const effective = formatCarbs(result.effectiveCarbsPer100g)
   const carbs = `${formatCarbs(result.carbsG)} g HC`
@@ -126,7 +124,7 @@ export function itemCalculationLines(
     input.unitWeightG !== null
   ) {
     lines.push(
-      `${unitsText(input.quantity)} × ${formatGrams(input.unitWeightG)} g = ${grams} g`,
+      `${formatUserNumber(input.quantity)} × ${unitLabel ?? 'unidad'} de ${formatGrams(input.unitWeightG)} g = ${grams} g`,
     )
   }
   lines.push(`${grams} g × ${effective} ÷ 100 = ${carbs}`)
@@ -138,6 +136,7 @@ export function itemCalculationLines(
  * the meal screen showed, from the values saved in the record and without
  * calculating again. The quantity is the saved units in units mode,
  * otherwise the saved grams (in grams mode they are the typed quantity).
+ * The record does not keep the name of the unit: "0,5 × unidad de 45 g".
  */
 export function savedItemLines(item: SavedMealItem): string[] {
   const input: MealItemInput = {

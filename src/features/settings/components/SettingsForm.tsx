@@ -12,9 +12,11 @@ import {
   type PositiveNumberError,
   type PositiveNumberResult,
 } from '../../../domain/dose/index.ts'
+import { focusFirstInvalid } from '../../../components/focusProblem.ts'
 import {
   SAVE_ERROR_MESSAGE,
   positiveNumberErrorMessage,
+  ratioErrorMessage,
 } from '../../../lib/errors.ts'
 import type { Settings } from '../../../lib/settings.ts'
 import {
@@ -82,6 +84,7 @@ export function SettingsForm({ saved }: Props) {
   const [confirmingRatio, setConfirmingRatio] = useState(false)
   const keepRatioButtonRef = useRef<HTMLButtonElement>(null)
   const saveButtonRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
   // The last save changed the ratio: its notice says the new one.
   const [lastSaveChangedRatio, setLastSaveChangedRatio] = useState(false)
 
@@ -123,12 +126,18 @@ export function SettingsForm({ saved }: Props) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setShownErrors({
-      carb_ratio_g_per_unit: errorOf(ratio),
-      max_dose_warning_units: errorOf(dose),
-      max_item_grams_warning: errorOf(grams),
+    // Rendered right away, to take the user to the first error (UX-14).
+    flushSync(() => {
+      setShownErrors({
+        carb_ratio_g_per_unit: errorOf(ratio),
+        max_dose_warning_units: errorOf(dose),
+        max_item_grams_warning: errorOf(grams),
+      })
     })
-    if (values === null) return
+    if (values === null) {
+      focusFirstInvalid(formRef.current)
+      return
+    }
     // The numbers are compared, not the texts: "15" and "15,0" are the same
     // ratio. Only the alerts changed: saved right away.
     if (values.carb_ratio_g_per_unit !== saved.carb_ratio_g_per_unit) {
@@ -169,7 +178,12 @@ export function SettingsForm({ saved }: Props) {
       : null
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+    <form
+      ref={formRef}
+      className="flex flex-col gap-4"
+      onSubmit={handleSubmit}
+      noValidate
+    >
       {saved.max_dose_warning_units === null && (
         <Notice tone="warning">
           <p>
@@ -210,7 +224,7 @@ export function SettingsForm({ saved }: Props) {
         </div>
         {ratioError !== null && (
           <FieldMessage id={ratioErrorId}>
-            {positiveNumberErrorMessage(ratioError)}
+            {ratioErrorMessage(ratioError)}
           </FieldMessage>
         )}
         {example !== null && (

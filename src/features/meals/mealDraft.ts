@@ -2,6 +2,7 @@ import {
   CALC_VERSION,
   cookedGramsPer100gRaw,
   formatDose,
+  formatDoseCompact,
   formatGrams,
   formatUserNumber,
   parseNonNegativeUserNumber,
@@ -16,9 +17,14 @@ import {
   type NonNegativeNumberResult,
   type PositiveNumberError,
 } from '../../domain/dose/index.ts'
-import type { MealItemFoodError, MealSaveWarning } from '../../lib/errors.ts'
+import type {
+  MealItemFoodError,
+  MealProblem,
+  MealSaveWarning,
+} from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
+import { eatenAtFromInput } from './eatenAt.ts'
 import { tableFoodCopy } from './tableFoods.ts'
 import type {
   MealFood,
@@ -128,15 +134,109 @@ export function appliedDose(
 
 /**
  * What the applied dose field shows: the typed text once edited; while it
- * follows the calculated dose, that dose formatted for display ("8,55"),
- * or "" if there is no valid dose.
+ * follows the calculated dose, that dose without trailing zeros ("8,55",
+ * "7", not "7,00"; formatDoseCompact), or "" if there is no valid dose.
  */
 export function appliedDoseFieldText(
   text: string | null,
   result: MealResult,
 ): string {
   if (text !== null) return text
-  return result.ok ? formatDose(result.doseUnits) : ''
+  return result.ok ? formatDoseCompact(result.doseUnits) : ''
+}
+
+/**
+ * Whether the applied dose field holds exactly `units` (a shortcut of
+ * appliedDoseShortcuts): only a typed text, never while it follows the
+ * calculated dose, so no shortcut starts chosen (spec §6.6, §14 #71).
+ */
+export function isAppliedDoseShortcut(
+  text: string | null,
+  units: number,
+): boolean {
+  return text !== null && parseUserNumber(text) === units
+}
+
+/**
+ * The first thing to fix when "Guardar comida" finds errors (spec §6.6), in
+ * the order of the screen: each item (an error of its food, then its
+ * quantity), the applied dose and the date; the meal itself (the total or
+ * the dose, shown in the dose display) last. With the problem, the key of
+ * its item, if it is one. null if nothing blocks saving.
+ */
+export function firstMealProblem(
+  items: readonly MealItemDraft[],
+  result: MealResult,
+  appliedDoseText: string | null,
+  eatenAtText: string | null,
+): { problem: MealProblem; itemKey: number | null } | null {
+  for (const [index, item] of items.entries()) {
+    const calc = result.items[index]
+    const foodName = item.food.name
+    if (calc !== undefined && foodErrors(calc).length > 0) {
+      return { problem: { code: 'FOOD', foodName }, itemKey: item.key }
+    }
+    const error = quantityError(item.quantityText, calc)
+    if (error !== null) {
+      return {
+        problem: { code: 'QUANTITY', foodName, error },
+        itemKey: item.key,
+      }
+    }
+  }
+  if (appliedDoseText !== null) {
+    const applied = parseNonNegativeUserNumber(appliedDoseText)
+    if ('error' in applied) {
+      return {
+        problem: { code: 'APPLIED_DOSE', error: applied.error },
+        itemKey: null,
+      }
+    }
+  }
+  if (eatenAtText !== null && eatenAtFromInput(eatenAtText) === null) {
+    return {
+      problem: { code: 'EATEN_AT', empty: eatenAtText.trim() === '' },
+      itemKey: null,
+    }
+  }
+  if (!result.ok) return { problem: { code: 'MEAL' }, itemKey: null }
+  return null
+}
+
+/** An item just removed from the meal, kept to undo it. */
+export type RemovedItem = { item: MealItemDraft; index: number }
+
+/**
+ * The items without the one with `key`, and that one with its place, to
+ * undo it (spec §6.6: removing asks for nothing, and "Deshacer" brings it
+ * back). `removed` is null if no item has that key.
+ */
+export function removeItem(
+  items: readonly MealItemDraft[],
+  key: number,
+): { items: MealItemDraft[]; removed: RemovedItem | null } {
+  const index = items.findIndex((item) => item.key === key)
+  const item = items[index]
+  if (item === undefined) return { items: [...items], removed: null }
+  return {
+    items: items.filter((other) => other !== item),
+    removed: { item, index },
+  }
+}
+
+/**
+ * The items with a removed one back in its place, as it was (its food and
+ * what was typed). If items were removed in the meantime, it goes at the
+ * end at most; if its key is already there (it was restored), nothing
+ * changes.
+ */
+export function restoreItem(
+  items: readonly MealItemDraft[],
+  removed: RemovedItem,
+): MealItemDraft[] {
+  if (items.some((item) => item.key === removed.item.key)) return [...items]
+  const index = Math.min(removed.index, items.length)
+  return [...items.slice(0, index), removed.item, ...items.slice(index)]
 }
 
 /**

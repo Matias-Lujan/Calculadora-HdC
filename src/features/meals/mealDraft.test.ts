@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appliedDoseShortcuts,
   CALC_VERSION,
   calculateMeal,
+  formatUserNumber,
   type DoseSettings,
   type ItemResult,
   type MealSuccess,
@@ -13,10 +15,14 @@ import {
   appliedDoseFieldText,
   canUseUnits,
   doseWarning,
+  firstMealProblem,
   foodErrors,
+  isAppliedDoseShortcut,
   itemWarnings,
   newItemDraft,
   quantityError,
+  removeItem,
+  restoreItem,
   saveWarnings,
   toDoseSettings,
   toMealItemInput,
@@ -744,11 +750,206 @@ describe('appliedDoseFieldText', () => {
     expect(appliedDoseFieldText('7,5', result)).toBe('7,5')
   })
 
-  it('a dose of 0 is shown as "0,00"', () => {
+  it('a dose of 0 is shown as "0", without trailing zeros', () => {
     const food = { ...base, carbs_per_100g: 0 }
-    expect(appliedDoseFieldText(null, calcOk([draft(food, '120')]))).toBe(
-      '0,00',
-    )
+    expect(appliedDoseFieldText(null, calcOk([draft(food, '120')]))).toBe('0')
+  })
+
+  it('a whole dose is shown as "7", not "7,00"', () => {
+    // 105 g of carbs ÷ 15 = 7.
+    const food = { ...base, carbs_per_100g: 100 }
+    expect(appliedDoseFieldText(null, calcOk([draft(food, '105')]))).toBe('7')
+  })
+})
+
+describe('isAppliedDoseShortcut', () => {
+  it('never while the field follows the calculated dose', () => {
+    expect(isAppliedDoseShortcut(null, 8)).toBe(false)
+    expect(isAppliedDoseShortcut(null, 0)).toBe(false)
+  })
+
+  it.each([
+    ['8', 8, true],
+    ['8,0', 8, true],
+    ['8,5', 8.5, true],
+    ['0', 0, true],
+    ['1.000', 1000, true],
+    ['8,5', 8, false],
+    ['8,', 8, false],
+    ['', 0, false],
+  ])('%j with the shortcut %s → %s', (text, units, chosen) => {
+    expect(isAppliedDoseShortcut(text, units)).toBe(chosen)
+  })
+
+  // MealForm: a tap on a shortcut sets the field to formatUserNumber(units).
+  it.each([0, 0.004, 0.5, 8, 8.5, 8.994, 8.995, 8.999, 999.6, 1234.5])(
+    'a tapped shortcut of the dose %s saves exactly its value, and only it is chosen',
+    (dose) => {
+      const { penUnits } = appliedDoseShortcuts(dose)
+      expect(penUnits.length).toBeGreaterThan(0)
+      for (const units of penUnits) {
+        const text = formatUserNumber(units)
+        expect(appliedDose(text, dose)).toEqual({ value: units })
+        const chosen = penUnits.filter((other) =>
+          isAppliedDoseShortcut(text, other),
+        )
+        expect(chosen).toEqual([units])
+      }
+    },
+  )
+})
+
+describe('firstMealProblem', () => {
+  const at = '2026-11-14T13:05'
+
+  it('a meal that can be saved has none', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), null, null)).toBeNull()
+    expect(firstMealProblem(items, calcOk(items), '8,5', at)).toBeNull()
+    expect(firstMealProblem(items, calcOk(items), '0', null)).toBeNull()
+  })
+
+  it('an empty quantity: what is missing, with the name and the item', () => {
+    const items = [draft(base, '120', 'grams', 0), draft(rice, '', 'grams', 4)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: {
+        code: 'QUANTITY',
+        foodName: 'Arroz de prueba',
+        error: 'REQUIRED',
+      },
+      itemKey: 4,
+    })
+  })
+
+  it('the first item with a problem, in the order of the screen', () => {
+    const items = [draft(base, '12,', 'grams', 3), draft(rice, '', 'grams', 1)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, '', '')).toEqual({
+      problem: {
+        code: 'QUANTITY',
+        foodName: 'Banana de prueba',
+        error: 'INVALID_NUMBER',
+      },
+      itemKey: 3,
+    })
+  })
+
+  it('a quantity of 0 is NOT_POSITIVE', () => {
+    const items = [draft(base, '0')]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)?.problem).toEqual({
+      code: 'QUANTITY',
+      foodName: 'Banana de prueba',
+      error: 'NOT_POSITIVE',
+    })
+  })
+
+  it('an error of the food comes before its quantity', () => {
+    const noFactor = { ...rice, cooking_factor: null }
+    const items = [draft(noFactor, '', 'grams', 2)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: { code: 'FOOD', foodName: 'Arroz de prueba' },
+      itemKey: 2,
+    })
+  })
+
+  it('then the applied dose: empty or not a number', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), '', at)).toEqual({
+      problem: { code: 'APPLIED_DOSE', error: 'REQUIRED' },
+      itemKey: null,
+    })
+    expect(firstMealProblem(items, calcOk(items), '8,', at)).toEqual({
+      problem: { code: 'APPLIED_DOSE', error: 'INVALID_NUMBER' },
+      itemKey: null,
+    })
+  })
+
+  it('then the date: empty or not a real date', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), null, '')).toEqual({
+      problem: { code: 'EATEN_AT', empty: true },
+      itemKey: null,
+    })
+    expect(
+      firstMealProblem(items, calcOk(items), null, '2026-02-30T10:00'),
+    ).toEqual({ problem: { code: 'EATEN_AT', empty: false }, itemKey: null })
+  })
+
+  it('a meal whose total or dose overflow, with valid fields: the meal', () => {
+    const items = mealOf83()
+    const result = calculateMeal(items.map(toMealItemInput), {
+      ...settings,
+      carbRatioGPerUnit: 0,
+    })
+    expect(result.ok).toBe(false)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: { code: 'MEAL' },
+      itemKey: null,
+    })
+  })
+
+  it('a huge quantity whose item overflows is a quantity to check', () => {
+    const items = [draft(base, HUGE_TEXT)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)?.problem).toEqual({
+      code: 'QUANTITY',
+      foodName: 'Banana de prueba',
+      error: 'INVALID_NUMBER',
+    })
+  })
+})
+
+describe('removeItem and restoreItem (undo)', () => {
+  const a = draft(base, '120', 'grams', 0)
+  const b = draft(alfajor, '0,5', 'units', 1)
+  const c = draft(rice, '250', 'grams', 2)
+
+  it('removes the item and keeps it with its place', () => {
+    expect(removeItem([a, b, c], 1)).toEqual({
+      items: [a, c],
+      removed: { item: b, index: 1 },
+    })
+  })
+
+  it('an unknown key removes nothing', () => {
+    expect(removeItem([a, b], 9)).toEqual({ items: [a, b], removed: null })
+  })
+
+  it('undo puts it back in its place, as it was', () => {
+    const { items, removed } = removeItem([a, b, c], 1)
+    if (removed === null) throw new Error('missing')
+    expect(restoreItem(items, removed)).toEqual([a, b, c])
+  })
+
+  it('undo of the last item of the meal', () => {
+    const { items, removed } = removeItem([a], 0)
+    expect(items).toEqual([])
+    if (removed === null) throw new Error('missing')
+    expect(restoreItem(items, removed)).toEqual([a])
+  })
+
+  it('with fewer items in the meantime, it goes at the end at most', () => {
+    expect(restoreItem([a], { item: c, index: 2 })).toEqual([a, c])
+    expect(restoreItem([], { item: c, index: 2 })).toEqual([c])
+  })
+
+  it('with an item added in the meantime, it keeps its index', () => {
+    const d = draft(base, '50', 'grams', 3)
+    expect(restoreItem([a, c, d], { item: b, index: 1 })).toEqual([a, b, c, d])
+  })
+
+  it('an item already back is not added twice', () => {
+    expect(restoreItem([a, b], { item: b, index: 1 })).toEqual([a, b])
+  })
+
+  it('does not modify the list it receives', () => {
+    const items = [a, b, c]
+    removeItem(items, 1)
+    restoreItem(items, { item: draft(base, '1', 'grams', 7), index: 0 })
+    expect(items).toEqual([a, b, c])
   })
 })
 

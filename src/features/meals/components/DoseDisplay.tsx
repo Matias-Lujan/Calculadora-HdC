@@ -94,7 +94,7 @@ export function DoseDisplay({ result, carbRatioGPerUnit, warning }: Props) {
             aria-label="Ver la cuenta"
             aria-expanded={open}
             aria-controls={CALCULATION_ID}
-            className="-mr-2.5 inline-flex size-11 shrink-0 scroll-mt-0! items-center justify-center rounded-full text-on-display"
+            className="-mr-2.5 inline-flex size-11 shrink-0 scroll-mt-0! items-center justify-center rounded-full text-on-display focus-visible:outline-on-display"
             onClick={() => setOpen((current) => !current)}
           >
             <ChevronDown

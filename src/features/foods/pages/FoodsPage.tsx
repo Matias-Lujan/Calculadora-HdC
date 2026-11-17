@@ -95,7 +95,7 @@ export function FoodsPage() {
                   type="button"
                   aria-expanded={showAll}
                   aria-controls={allId}
-                  className={disclosure}
+                  className={`${disclosure} self-start`}
                   onClick={() => setShowAll((current) => !current)}
                 >
                   <DisclosureIcon open={showAll} />

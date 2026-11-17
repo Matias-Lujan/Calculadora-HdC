@@ -250,7 +250,7 @@ export function validateCommonFields(
   const own: CommonFoodErrors = {}
 
   const name = texts.name.trim()
-  if (name === '') own.name = 'REQUIRED'
+  if (name === '') own.name = 'NAME_REQUIRED'
 
   let cookingFactor: number | null = null
   let unit: { unit_weight_g: number | null; unit_label: string | null } = {

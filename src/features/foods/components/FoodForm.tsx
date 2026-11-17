@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { focusFirstInvalid } from '../../../components/focusProblem.ts'
 import { button, fieldLabel, pageTitle } from '../../../components/styles.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import {
@@ -49,6 +50,7 @@ export function FoodForm(props: Props) {
   })
   const { texts, update, result, shownErrors, showErrorsOf } = form
   const saveButtonRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   function save(values: FoodFormValues) {
     form.setConfirmingFactor(false)
@@ -63,9 +65,15 @@ export function FoodForm(props: Props) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    form.setShownErrors(result.errors)
-    if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
-    if (result.values === null) return
+    // Rendered right away, to take the user to the first error (UX-14).
+    flushSync(() => {
+      form.setShownErrors(result.errors)
+      if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
+    })
+    if (result.values === null) {
+      focusFirstInvalid(formRef.current)
+      return
+    }
     if (needsFactorConfirmation(result.values)) {
       form.setConfirmingFactor(true)
       return
@@ -88,7 +96,12 @@ export function FoodForm(props: Props) {
       : null
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
+    <form
+      ref={formRef}
+      className="flex flex-col gap-5"
+      onSubmit={handleSubmit}
+      noValidate
+    >
       <h1 className={pageTitle}>
         {food === null ? 'Agregar alimento' : 'Editar alimento'}
       </h1>
@@ -126,6 +139,7 @@ export function FoodForm(props: Props) {
             <FieldError
               id={'food-carbs-error'}
               error={shownErrors.carbsPer100g}
+              field="carbsPer100g"
             />
           </div>
         }

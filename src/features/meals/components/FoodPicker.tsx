@@ -17,6 +17,8 @@ type Props = {
   onPick: (food: MealFood) => void
   /** The meal has no items: the search is shown open, without the button. */
   alwaysOpen: boolean
+  /** What goes next to the button, on its line ("Con foto", UX-06). */
+  besideButton?: ReactNode
 }
 
 /**
@@ -27,7 +29,13 @@ type Props = {
  * but cannot be picked (spec §6.4). Picking a food folds and empties the
  * search; the same button folds it without picking.
  */
-export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
+export function FoodPicker({
+  foods,
+  tableFoods,
+  onPick,
+  alwaysOpen,
+  besideButton,
+}: Props) {
   const [open, setOpen] = useState(false)
   const expanded = alwaysOpen || open
   const [query, setQuery] = useState('')
@@ -63,16 +71,20 @@ export function FoodPicker({ foods, tableFoods, onPick, alwaysOpen }: Props) {
   return (
     <div className="flex flex-col gap-2">
       {!alwaysOpen && (
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls="meal-food-picker"
-          className={button.soft}
-          onClick={toggle}
-        >
-          <Plus aria-hidden="true" />
-          Agregar alimento
-        </button>
+        <div className="flex gap-3">
+          <button
+            id="meal-add-food"
+            type="button"
+            aria-expanded={open}
+            aria-controls="meal-food-picker"
+            className={`${button.soft} min-w-0 flex-1`}
+            onClick={toggle}
+          >
+            <Plus aria-hidden="true" className="shrink-0" />
+            Agregar alimento
+          </button>
+          {besideButton}
+        </div>
       )}
 
       {expanded && (

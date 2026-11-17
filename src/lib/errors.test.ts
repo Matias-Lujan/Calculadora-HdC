@@ -21,6 +21,7 @@ import {
   LOAD_ERROR_MESSAGE,
   SAVE_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
+  appliedDoseErrorMessage,
   authErrorMessage,
   cookingFactorUnusualMessage,
   foodFieldErrorMessage,
@@ -30,12 +31,17 @@ import {
   visionErrorMessage,
   mealItemErrorMessage,
   mealLiveWarningMessage,
+  mealProblemMessage,
   mealSaveWarningMessage,
   type EmphasizedMessage,
   type FoodFieldError,
+  type MealProblem,
   type MealSaveWarning,
   type MealItemFoodError,
+  type RequiredFoodField,
   positiveNumberErrorMessage,
+  quantityErrorMessage,
+  ratioErrorMessage,
   typedNumberNoticeMessage,
 } from './errors.ts'
 
@@ -318,6 +324,7 @@ describe('foodFieldErrorMessage', () => {
     'INVALID_NUMBER',
     'NOT_POSITIVE',
     'ABOVE_100',
+    'NAME_REQUIRED',
     'STATE_REQUIRED',
     'UNIT_WEIGHT_REQUIRED',
     'FACTOR_NOT_COMPUTABLE',
@@ -331,14 +338,15 @@ describe('foodFieldErrorMessage', () => {
   })
 
   it('all messages are different', () => {
-    const messages = codes.map(foodFieldErrorMessage)
+    const messages = codes.map((code) => foodFieldErrorMessage(code))
     expect(new Set(messages).size).toBe(messages.length)
   })
 
   it.each<[FoodFieldError, string]>([
     ['REQUIRED', 'Completá este campo.'],
     ['ABOVE_100', 'No puede ser más de 100 g cada 100 g.'],
-    ['STATE_REQUIRED', 'Elegí una opción.'],
+    ['STATE_REQUIRED', 'Elegí si se cocina antes de comer.'],
+    ['BASIS_REQUIRED', 'Elegí si los HC son de una porción o cada 100 g.'],
     [
       'UNIT_WEIGHT_REQUIRED',
       'Completá el peso de la unidad, o borrá el nombre.',
@@ -362,9 +370,9 @@ describe('foodFieldErrorMessage', () => {
 describe('cookingFactorUnusualMessage', () => {
   it('says how much 100 g raw yield, with the formatted grams', () => {
     const message = cookingFactorUnusualMessage('90')
-    expect(message).toContain('90 g cocido')
+    expect(message).toContain('90 g cocido')
     expect(message).toBe(
-      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
+      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
   })
 })
@@ -470,9 +478,9 @@ describe('mealSaveWarningMessage (the confirmation before saving)', () => {
       foodName: 'Arroz de prueba',
       cookedGrams: '450',
     })
-    expect(message.strong).toBe('450 g')
+    expect(message.strong).toBe('450 g')
     expect(joined(message)).toBe(
-      'Arroz de prueba: 100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
+      'Arroz de prueba: 100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
     )
   })
 
@@ -550,7 +558,7 @@ describe('mealLiveWarningMessage (in sight, without waiting for "Guardar")', () 
         cookedGrams: '450',
       }),
     ).toBe(
-      '100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
+      '100 g crudo rinden 450 g cocido, y lo habitual es entre 100 y 400 g.',
     )
   })
 
@@ -601,6 +609,113 @@ describe('meal save messages', () => {
     expect(MEAL_BLOCKED_MESSAGE).toBe(
       'Corregí los datos marcados para poder guardar.',
     )
+  })
+})
+
+describe('the error of each field, said with its own words', () => {
+  it('an empty quantity says grams or units', () => {
+    expect(quantityErrorMessage('REQUIRED', 'grams')).toBe(
+      'Poné cuántos gramos comiste.',
+    )
+    expect(quantityErrorMessage('REQUIRED', 'units')).toBe(
+      'Poné cuántas unidades comiste.',
+    )
+  })
+
+  it.each<PositiveNumberError>(['INVALID_NUMBER', 'NOT_POSITIVE'])(
+    'a quantity with %s says what any number field says',
+    (code) => {
+      expect(quantityErrorMessage(code, 'grams')).toBe(
+        positiveNumberErrorMessage(code),
+      )
+      expect(quantityErrorMessage(code, 'units')).toBe(
+        positiveNumberErrorMessage(code),
+      )
+    },
+  )
+
+  it('the applied dose: empty says it can be 0', () => {
+    expect(appliedDoseErrorMessage('REQUIRED')).toBe(
+      'Poné cuánto te aplicaste. Puede ser 0.',
+    )
+    expect(appliedDoseErrorMessage('INVALID_NUMBER')).toBe(
+      positiveNumberErrorMessage('INVALID_NUMBER'),
+    )
+  })
+
+  it('the ratio', () => {
+    expect(ratioErrorMessage('REQUIRED')).toBe('Poné tu ratio.')
+    expect(ratioErrorMessage('INVALID_NUMBER')).toBe(
+      positiveNumberErrorMessage('INVALID_NUMBER'),
+    )
+    expect(ratioErrorMessage('NOT_POSITIVE')).toBe('Tiene que ser mayor que 0.')
+  })
+
+  it('the name of a food', () => {
+    expect(foodFieldErrorMessage('NAME_REQUIRED')).toBe(
+      'Poné el nombre del alimento.',
+    )
+  })
+
+  it.each<[RequiredFoodField, string]>([
+    ['carbsPer100g', 'Poné cuántos g de HC tiene cada 100 g.'],
+    ['rawWeight', 'Poné el peso crudo.'],
+    ['cookedWeight', 'Poné el peso cocido.'],
+    ['portion', 'Poné cuántos gramos es la porción.'],
+    ['portionCarbs', 'Poné cuántos g de HC tiene la porción.'],
+  ])('an empty %s says what to write', (field, message) => {
+    expect(foodFieldErrorMessage('REQUIRED', field)).toBe(message)
+  })
+
+  it('each food field has its own message when empty', () => {
+    const fields: RequiredFoodField[] = [
+      'carbsPer100g',
+      'rawWeight',
+      'cookedWeight',
+      'portion',
+      'portionCarbs',
+    ]
+    const messages = fields.map((field) =>
+      foodFieldErrorMessage('REQUIRED', field),
+    )
+    expect(new Set(messages).size).toBe(fields.length)
+  })
+
+  it('the field only changes an empty field', () => {
+    expect(foodFieldErrorMessage('NOT_POSITIVE', 'rawWeight')).toBe(
+      'Tiene que ser mayor que 0.',
+    )
+    expect(foodFieldErrorMessage('ABOVE_100', 'carbsPer100g')).toBe(
+      'No puede ser más de 100 g cada 100 g.',
+    )
+  })
+})
+
+describe('mealProblemMessage', () => {
+  it.each<[MealProblem, string]>([
+    [
+      { code: 'QUANTITY', foodName: 'Banana', error: 'REQUIRED' },
+      'Falta la cantidad de Banana.',
+    ],
+    [
+      { code: 'QUANTITY', foodName: 'Banana', error: 'INVALID_NUMBER' },
+      'Revisá la cantidad de Banana.',
+    ],
+    [
+      { code: 'QUANTITY', foodName: 'Banana', error: 'NOT_POSITIVE' },
+      'Revisá la cantidad de Banana.',
+    ],
+    [{ code: 'FOOD', foodName: 'Fideos' }, 'Revisá Fideos.'],
+    [{ code: 'APPLIED_DOSE', error: 'REQUIRED' }, 'Falta cuánto te aplicaste.'],
+    [
+      { code: 'APPLIED_DOSE', error: 'INVALID_NUMBER' },
+      'Revisá cuánto te aplicaste.',
+    ],
+    [{ code: 'EATEN_AT', empty: true }, 'Falta la fecha y la hora.'],
+    [{ code: 'EATEN_AT', empty: false }, 'Revisá la fecha y la hora.'],
+    [{ code: 'MEAL' }, 'Corregí los datos marcados para poder guardar.'],
+  ])('%o → %s', (problem, message) => {
+    expect(mealProblemMessage(problem)).toBe(message)
   })
 })
 

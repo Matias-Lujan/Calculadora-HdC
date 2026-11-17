@@ -114,6 +114,17 @@ const inputs: MealItemInput[] = [
   },
 ]
 
+const mealProblems: errors.MealProblem[] = [
+  { code: 'QUANTITY', foodName: 'Banana', error: 'REQUIRED' },
+  { code: 'QUANTITY', foodName: 'Banana', error: 'NOT_POSITIVE' },
+  { code: 'FOOD', foodName: 'Banana' },
+  { code: 'APPLIED_DOSE', error: 'REQUIRED' },
+  { code: 'APPLIED_DOSE', error: 'INVALID_NUMBER' },
+  { code: 'EATEN_AT', empty: true },
+  { code: 'EATEN_AT', empty: false },
+  { code: 'MEAL' },
+]
+
 describe('plain words on the screen', () => {
   it('error messages and notices', () => {
     const positive: PositiveNumberError[] = [
@@ -124,6 +135,7 @@ describe('plain words on the screen', () => {
     const foodFields: errors.FoodFieldError[] = [
       ...positive,
       'ABOVE_100',
+      'NAME_REQUIRED',
       'STATE_REQUIRED',
       'UNIT_WEIGHT_REQUIRED',
       'FACTOR_NOT_COMPUTABLE',
@@ -143,12 +155,29 @@ describe('plain words on the screen', () => {
     const notices: TypedNumberNotice[] = ['DECIMAL_DOT', 'REJECTED']
     expectPlain([
       ...positive.map(errors.positiveNumberErrorMessage),
-      ...foodFields.map(errors.foodFieldErrorMessage),
+      ...foodFields.map((code) => errors.foodFieldErrorMessage(code)),
       ...items.map(errors.mealItemErrorMessage),
       ...notices.map(errors.typedNumberNoticeMessage),
       ...errors.VISION_ERROR_CODES.map(errors.visionErrorMessage),
       errors.cookingFactorUnusualMessage('90'),
       errors.cookingFactorUnusualMessage('450'),
+      ...positive.flatMap((code) => [
+        errors.quantityErrorMessage(code, 'grams'),
+        errors.quantityErrorMessage(code, 'units'),
+        errors.ratioErrorMessage(code),
+      ]),
+      ...(
+        [
+          'carbsPer100g',
+          'rawWeight',
+          'cookedWeight',
+          'portion',
+          'portionCarbs',
+        ] as const
+      ).map((field) => errors.foodFieldErrorMessage('REQUIRED', field)),
+      errors.appliedDoseErrorMessage('REQUIRED'),
+      errors.appliedDoseErrorMessage('INVALID_NUMBER'),
+      ...mealProblems.map(errors.mealProblemMessage),
     ])
   })
 
@@ -384,6 +413,7 @@ describe('plain words: every code, exhaustively', () => {
     INVALID_NUMBER: true,
     NOT_POSITIVE: true,
     ABOVE_100: true,
+    NAME_REQUIRED: true,
     STATE_REQUIRED: true,
     UNIT_WEIGHT_REQUIRED: true,
     FACTOR_NOT_COMPUTABLE: true,
@@ -419,7 +449,7 @@ describe('plain words: every code, exhaustively', () => {
 
   it('food field errors', () => {
     const codes = Object.keys(foodFieldCodes) as errors.FoodFieldError[]
-    expectPlain(codes.map(errors.foodFieldErrorMessage))
+    expectPlain(codes.map((code) => errors.foodFieldErrorMessage(code)))
   })
 
   it('meal item errors', () => {
