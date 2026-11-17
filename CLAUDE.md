@@ -4,7 +4,7 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 
 ## Dónde está cada cosa
 
-- **[docs/plan.md](docs/plan.md)**: en qué orden se construye y **en qué etapa estamos** (encabezado y tabla de resumen). Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una etapa por vez**, respetando su "Terminada cuando".
+- **[docs/plan.md](docs/plan.md)**: **el estado del proyecto** (encabezado). El MVP se construyó por etapas (0 a 7, terminadas); desde entonces se trabaja por **mejoras**, listadas en la sección "Después del MVP" con su estado. Es lo primero que hay que leer al arrancar una sesión. Se trabaja **una mejora por vez**, respetando su "Terminada cuando".
 - **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1. Dice **qué** hace la app, no cómo está escrito el código.
 - **[docs/decisiones.md](docs/decisiones.md)**: la tabla de decisiones tomadas (antes spec §14; las referencias "§14 #N" apuntan ahí). Se lee solo cuando hace falta el porqué de una decisión puntual.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
@@ -17,20 +17,34 @@ Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dej
 
 ## Flujo de trabajo
 
-Cada etapa del plan se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día.
+Cada mejora se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día. (Hasta el MVP la unidad de trabajo fue la etapa, con ramas `etapa-<n>-<tema>`; esas secciones del plan quedan como historia.)
 
-1. **Al empezar**: leer el estado en `docs/plan.md` y crear la rama de la etapa desde `main` actualizado (`etapa-<n>-<tema>`). Si la etapa ya está en curso, el plan nombra su rama: se sigue en esa rama (`git checkout <rama>` y `git pull`), sin crear otra. Una etapa puede ocupar más de una sesión.
-2. **Durante la etapa**: cada funcionalidad pasa por el [ciclo de agentes](#ciclo-por-funcionalidad-agentes). Una funcionalidad es un punto del "Incluye" de la etapa, o un grupo chico de puntos relacionados. Lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
+1. **Al empezar**: leer el estado en `docs/plan.md`. Se toma la mejora que pida el usuario o, si no dice, la marcada como "Próxima" en la tabla de "Después del MVP". Si no está en la tabla, se agrega. Se crea su rama desde `main` actualizado (`mejora-<tema>`) y se escribe su subsección en el plan (objetivo, qué incluye y "Terminada cuando"), con el OK del usuario sobre el alcance. Si la mejora ya está en curso, el plan nombra su rama: se sigue en esa rama (`git checkout <rama>` y `git pull`), sin crear otra. Una mejora puede ocupar más de una sesión.
+2. **Durante la mejora**: cada funcionalidad pasa por el [ciclo de agentes](#ciclo-por-funcionalidad-agentes). Una funcionalidad es un punto del "Incluye" de la mejora, o un grupo chico de puntos relacionados. Lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
 3. **Al terminar**:
    - pasar los chequeos de la sección Comandos;
-   - marcar los "Terminada cuando" del plan;
-   - actualizar el encabezado y la tabla de resumen del plan;
+   - si hay migraciones, Edge Function o secrets nuevos, llevarlos a `prod` como dice [Cambios que llegan a prod](#cambios-que-llegan-a-prod);
+   - marcar los "Terminada cuando" de la mejora y actualizar su fila en la tabla y el encabezado del plan;
    - registrar las decisiones nuevas en `docs/decisiones.md` y actualizar las secciones del spec que correspondan.
 4. **Pedir confirmación antes de cada commit, push y PR.** No se hacen sin el OK explícito del usuario.
-5. Los mensajes de commit van en inglés. La descripción del PR va en español: un resumen de lo hecho y una sección "Decisiones para revisar" con todo lo que se resolvió donde el spec no decía nada.
+5. Los mensajes de commit van en inglés. La descripción del PR va en español: un resumen de lo hecho, cómo se probó, qué hay que hacer en `prod` (si hay algo) y una sección "Decisiones para revisar" con todo lo que se resolvió donde el spec no decía nada.
 6. El usuario revisa y mergea el PR. Después se vuelve a `main` con `git checkout main` y `git pull`. Las ramas mergeadas se conservan.
 
+Con el MVP en uso, cambia una cosa importante: **lo que se mergea a `main` le llega enseguida a la app que el usuario usa todos los días.** Cada cambio se prueba antes en la versión de prueba de la rama (Vercel *Preview*, sobre `dev`), en el iPhone cuando toca pantallas.
+
 Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.md` (por ejemplo, Codex), el contenido de este archivo pasa a `AGENTS.md`, y acá queda una sola línea, `@AGENTS.md`, que lo importa. Así hay una sola fuente de reglas.
+
+### Cambios que llegan a prod
+
+`prod` tiene los datos reales del usuario y la app instalada apunta ahí. Vercel despliega `main` en producción (sobre `prod`) apenas se mergea un PR; las versiones de prueba de las ramas usan `dev`.
+
+- **Se desarrolla y se prueba siempre en `dev`.** `prod` recibe solo lo que ya pasó por `dev`, con el OK del usuario en cada paso.
+- **Orden con migraciones**: (1) se aplican y se prueban en `dev`; (2) con el PR aprobado y **antes de mergear**, la sesión principal las aplica en `prod` (vincular `prod`, `db push --remote`, volver a vincular `dev`; ver Comandos); (3) si la migración crea una tabla o cambia RLS, corre `scripts/rls-check/` contra `prod` (con `.env.prod.local` y dos usuarios descartables creados en `prod` y borrados al terminar); (4) el usuario mergea.
+- **Toda migración tiene que ser compatible con la versión publicada**, porque entre el paso (2) y el (4) la app de producción corre el código viejo contra la base nueva. Agregar (columnas que aceptan `null` o tienen default, funciones, tablas) está bien. Renombrar, borrar o volver obligatorio algo que la versión publicada usa se hace en dos PR: primero el código deja de usarlo, después la migración.
+- **Edge Function y secrets**: se despliegan y se prueban en `dev`; antes de mergear, se despliegan en `prod` (también compatibles con la versión publicada). Un secret nuevo se carga en los dos proyectos; si es una key, el comando lo corre el usuario.
+- **Si algo se rompe en producción**: el frontend se vuelve a la versión anterior desde Vercel (*Instant Rollback* del deploy anterior) mientras se arregla. La base no se toca desde el panel: un arreglo es una migración nueva.
+- **Nunca** se usan el usuario real ni sus datos para probar, se cargan datos de prueba (salvo `rls-check`, con usuarios descartables) ni se borran datos en `prod`. Después del merge, el usuario confirma en el iPhone que todo sigue andando.
+- Un usuario nuevo se crea siempre **después** de las migraciones: el trigger `on_auth_user_created` crea su configuración.
 
 ### Ciclo por funcionalidad (agentes)
 
@@ -51,8 +65,8 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
   - Los tests se escriben para lo que tiene riesgo (el cálculo, la base, el guardado). No se testean textos uno por uno ni se hacen barridos masivos ni mutaciones fuera del cálculo.
 - **Cada pedido a un agente nombra las secciones del spec que hacen falta** (por ejemplo, "§6.1 y §9.3"), para que no lea el spec entero. El pedido es breve: el agente lee el resto del repo por su cuenta.
 - **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos importantes. La segunda vuelta del reviewer va solo si el arreglo cambia lógica; si es chico (unas líneas, un botón, un texto), la sesión principal revisa el diff (y vuelve al tester si se tocó el cálculo). Los detalles menores de docs los arregla la sesión principal sin otra vuelta. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
-- **Migraciones**: el implementer las crea, pero no las aplica. Antes del tester, la sesión principal las aplica en `dev` (`npx supabase db push --remote`), con el OK del usuario, o le pide que corra el comando.
-- **Los agentes nunca** hacen commit, push ni PR, ni corren `db push`, `secrets set` o `config push`, ni cambian la configuración de Supabase o Vercel. Eso lo hace la sesión principal, con el OK del usuario (punto 4 del flujo).
+- **Migraciones**: el implementer las crea, pero no las aplica. Antes del tester, la sesión principal las aplica en `dev` (`npx supabase db push --remote`), con el OK del usuario, o le pide que corra el comando. En `prod`, solo como dice [Cambios que llegan a prod](#cambios-que-llegan-a-prod).
+- **Los agentes nunca** hacen commit, push ni PR, ni corren `db push`, `link`, `secrets set`, `functions deploy` o `config push`, ni cambian la configuración de Supabase o Vercel, ni tocan `prod` de ninguna forma (tampoco con `.env.prod.local`). Eso lo hace la sesión principal, con el OK del usuario (punto 4 del flujo).
 - Las restricciones de `Bash` del implementer y del reviewer están escritas en sus definiciones. La herramienta no permite limitar `Bash` a ciertos comandos.
 - **Cambios chicos** (corregir un texto, un comentario, un typo o una línea de documentación) no pasan por el ciclo: los hace la sesión principal, pasando igual los chequeos.
 
@@ -60,7 +74,7 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
 
 1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Los proyectos tienen desactivada la exposición automática de tablas, así que la misma migración da los permisos explícitos (`revoke all ... from anon, authenticated` y después solo los `grant` necesarios, por columna cuando corresponde). Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
 2. **Las cuentas viven solo en `src/domain/`**: el cálculo de HC y dosis, el formato para mostrarlos y la conversión y el formato de lo que tipea el usuario, en `dose/`; la conversión del texto de una etiqueta a número y de porción a 100 g, en `label/`. Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman a esos módulos. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
-3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, que es pública por diseño. En la app, la `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Los scripts locales leen `GEMINI_API_KEY` y las credenciales de los usuarios de prueba de `.env.local`, que no se commitea. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
+3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, que es pública por diseño. En la app, la `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Los scripts locales leen `GEMINI_API_KEY` y las credenciales de los usuarios de prueba de `.env.local` (de `dev`) o de `.env.prod.local` (solo para correr `rls-check` contra `prod`), que no se commitean. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
 4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español. **Sin términos técnicos en la pantalla**: nada de "factor", "estado", "HC asimilables" ni nombres parecidos; se dice con palabras de todos los días ("100 g crudo rinden 260 g cocido") y, si hace falta, con un ícono de información (ⓘ) que lo explique en una o dos frases (spec §14 #48).
 5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados. Las credenciales del usuario real no se guardan en ningún archivo, ni siquiera en `.env.local`: las pruebas usan usuarios descartables. El repo es privado por ahora, pero se va a hacer público: todo lo que se commitea se trata como público.
 6. **Cambios de esquema solo por migraciones.** Nunca se cambia el esquema desde el panel. Una migración ya aplicada no se edita: se crea una nueva.
@@ -82,7 +96,7 @@ npm test              # vitest run (lo mismo que corre la CI)
 npm run test:watch    # vitest en modo watch
 ```
 
-Supabase (no hay Docker: siempre se trabaja contra el proyecto `dev` en la nube). La CLI está instalada como dependencia del proyecto, por eso se usa con `npx`. Los proyectos y sus *refs* están en spec §12.1. En esta máquina la CLI ya está vinculada a `dev`.
+Supabase (no hay Docker: se desarrolla contra el proyecto `dev` en la nube; `prod` solo recibe lo ya probado, ver [Cambios que llegan a prod](#cambios-que-llegan-a-prod)). La CLI está instalada como dependencia del proyecto, por eso se usa con `npx`. Los proyectos y sus *refs* están en spec §12.1. En esta máquina la CLI está vinculada a `dev`, y tiene que quedar así. Desde Claude Code, la CLI pide `--yes` para cambiar un proyecto remoto (`db push`, `functions deploy`): se agrega solo después del OK del usuario.
 
 ```bash
 npx supabase link --project-ref xyolhiklqqoejkapqbxt        # vincular dev (ya hecho)
@@ -92,6 +106,17 @@ npx supabase migration list --remote                        # qué migraciones e
 npx supabase gen types typescript --project-id xyolhiklqqoejkapqbxt > src/lib/database.types.ts
 npx supabase functions deploy transcribe-label --use-api
 npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
+```
+
+En `prod` (solo la sesión principal, con el OK del usuario, antes de mergear; al terminar, siempre volver a vincular `dev`):
+
+```bash
+npx supabase link --project-ref zoxlvutjqolwfjcsbtog        # vincular prod (si está pausado, se reactiva desde el panel)
+npx supabase migration list --remote                        # confirmar el proyecto y qué falta aplicar
+npx supabase db push --remote
+npx supabase functions deploy transcribe-label --use-api   # solo si cambió la función
+npx supabase link --project-ref xyolhiklqqoejkapqbxt        # volver a dev
+node --env-file=.env.prod.local scripts/rls-check/check.ts  # si cambió una tabla o RLS; usuarios descartables de prod
 ```
 
 **No usar `npx supabase config push`**: `supabase/config.toml` es solo para un stack local que no se usa, y pisaría la configuración real de Auth (por ejemplo, podría reabrir el registro). La configuración de Auth se cambia desde el panel.
