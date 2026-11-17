@@ -160,51 +160,83 @@ function withResults(
 }
 
 /**
+ * The warnings of one item (spec §8.5), with their values formatted, in the
+ * order calculateMeal gives them. They are shown under its quantity as soon
+ * as the calculation gives them, without waiting for the blur (they do not
+ * block), and asked for again before saving. An item that is not valid has
+ * none; a valid one has them even if another item of the meal is not valid
+ * (calculateMeal keeps each item's result). The comparison with the alerts
+ * is calculateMeal's: this only formats.
+ */
+export function itemWarnings(
+  item: MealItemDraft,
+  calc: ItemResult | undefined,
+  settings: Settings,
+): MealSaveWarning[] {
+  if (calc === undefined || !calc.ok) return []
+  const warnings: MealSaveWarning[] = []
+  for (const code of calc.warnings) {
+    if (code === 'ITEM_GRAMS_ABOVE_THRESHOLD') {
+      warnings.push({
+        code,
+        foodName: item.food.name,
+        grams: formatGrams(calc.grams),
+        threshold: formatUserNumber(settings.max_item_grams_warning),
+      })
+    } else if (item.food.cooking_factor !== null) {
+      // COOKING_FACTOR_UNUSUAL only comes with a factor. It is said as how
+      // much 100 g raw yield (null if that cannot be shown).
+      const cookedGrams = cookedGramsPer100gRaw(item.food.cooking_factor)
+      warnings.push({
+        code,
+        foodName: item.food.name,
+        cookedGrams: cookedGrams === null ? null : formatGrams(cookedGrams),
+      })
+    }
+  }
+  return warnings
+}
+
+/**
+ * The dose warning (spec §8.5), or null: only with a valid meal whose
+ * calculated dose is above the alert, as calculateMeal evaluates it (the
+ * applied dose does not warn). Shown in the dose display as soon as it
+ * appears, and asked for again before saving.
+ */
+export function doseWarning(
+  result: MealResult,
+  settings: Settings,
+): MealSaveWarning | null {
+  // DOSE_ABOVE_THRESHOLD only comes with a threshold.
+  if (
+    !result.ok ||
+    !result.warnings.includes('DOSE_ABOVE_THRESHOLD') ||
+    settings.max_dose_warning_units === null
+  ) {
+    return null
+  }
+  return {
+    code: 'DOSE_ABOVE_THRESHOLD',
+    dose: formatDose(result.doseUnits),
+    threshold: formatUserNumber(settings.max_dose_warning_units),
+  }
+}
+
+/**
  * The warnings to confirm before saving (spec §8.5), with their values
- * formatted: the items' ones in the order of the items (and, in each, in
- * the order calculateMeal gives them), then the dose one. The dose warning
- * is about the calculated dose, as calculateMeal evaluates it; the applied
- * dose does not warn.
+ * formatted: the items' ones in the order of the items (itemWarnings), then
+ * the dose one (doseWarning).
  */
 export function saveWarnings(
   items: readonly MealItemDraft[],
   result: MealSuccess,
   settings: Settings,
 ): MealSaveWarning[] {
-  const warnings: MealSaveWarning[] = []
-  for (const { item, calc } of withResults(items, result)) {
-    for (const code of calc.warnings) {
-      if (code === 'ITEM_GRAMS_ABOVE_THRESHOLD') {
-        warnings.push({
-          code,
-          foodName: item.food.name,
-          grams: formatGrams(calc.grams),
-          threshold: formatUserNumber(settings.max_item_grams_warning),
-        })
-      } else if (item.food.cooking_factor !== null) {
-        // COOKING_FACTOR_UNUSUAL only comes with a factor. It is said as
-        // how much 100 g raw yield (null if that cannot be shown).
-        const cookedGrams = cookedGramsPer100gRaw(item.food.cooking_factor)
-        warnings.push({
-          code,
-          foodName: item.food.name,
-          cookedGrams: cookedGrams === null ? null : formatGrams(cookedGrams),
-        })
-      }
-    }
-  }
-  // DOSE_ABOVE_THRESHOLD only comes with a threshold.
-  if (
-    result.warnings.includes('DOSE_ABOVE_THRESHOLD') &&
-    settings.max_dose_warning_units !== null
-  ) {
-    warnings.push({
-      code: 'DOSE_ABOVE_THRESHOLD',
-      dose: formatDose(result.doseUnits),
-      threshold: formatUserNumber(settings.max_dose_warning_units),
-    })
-  }
-  return warnings
+  const warnings = withResults(items, result).flatMap(({ item, calc }) =>
+    itemWarnings(item, calc, settings),
+  )
+  const dose = doseWarning(result, settings)
+  return dose === null ? warnings : [...warnings, dose]
 }
 
 function toNewMealItem(

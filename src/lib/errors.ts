@@ -2,11 +2,12 @@ import {
   isAuthApiError,
   isAuthRetryableFetchError,
 } from '@supabase/supabase-js'
-import type {
-  CarbsPer100gError,
-  ItemErrorCode,
-  PositiveNumberError,
-  TypedNumberNotice,
+import {
+  withUnitsWord,
+  type CarbsPer100gError,
+  type ItemErrorCode,
+  type PositiveNumberError,
+  type TypedNumberNotice,
 } from '../domain/dose/index.ts'
 
 // Single place where error codes become Spanish messages (CLAUDE.md,
@@ -167,8 +168,9 @@ export function mealItemErrorMessage(code: MealItemFoodError): string {
 }
 
 /**
- * A warning that asks for confirmation before saving a meal (spec §8.5),
- * with its values already formatted (src/features/meals/mealDraft.ts,
+ * A warning of a meal (spec §8.5), shown in sight as soon as it appears and
+ * asked for again before saving, with its values already formatted
+ * (src/features/meals/mealDraft.ts: itemWarnings, doseWarning and
  * saveWarnings). Declared here, and not in the feature, because lib does
  * not import features.
  */
@@ -187,16 +189,67 @@ export type MealSaveWarning =
     }
   | { code: 'DOSE_ABOVE_THRESHOLD'; dose: string; threshold: string }
 
-export function mealSaveWarningMessage(warning: MealSaveWarning): string {
+/**
+ * A message with the number to check in bold: `before`, then `strong` (in
+ * bold, empty if there is none) and `after`.
+ */
+export type EmphasizedMessage = {
+  before: string
+  strong: string
+  after: string
+}
+
+/**
+ * A warning in the confirmation before saving a meal (spec §8.5), with the
+ * number to check in bold: "Arroz: **650 g**. Tu alerta es de 500 g por
+ * alimento.".
+ */
+export function mealSaveWarningMessage(
+  warning: MealSaveWarning,
+): EmphasizedMessage {
   switch (warning.code) {
     case 'ITEM_GRAMS_ABOVE_THRESHOLD':
-      return `${warning.foodName}: ${warning.grams} g, más que tu alerta de ${warning.threshold} g por alimento.`
+      return {
+        before: `${warning.foodName}: `,
+        strong: `${warning.grams} g`,
+        after: `. Tu alerta es de ${warning.threshold} g por alimento.`,
+      }
     case 'COOKING_FACTOR_UNUSUAL':
       return warning.cookedGrams === null
-        ? `${warning.foodName}: lo que rinde al cocinarlo está muy lejos de lo habitual.`
-        : `${warning.foodName}: 100 g crudo rinden ${warning.cookedGrams} g cocido, y lo habitual es entre 100 y 400 g.`
+        ? {
+            before: `${warning.foodName}: lo que rinde al cocinarlo está muy lejos de lo habitual.`,
+            strong: '',
+            after: '',
+          }
+        : {
+            before: `${warning.foodName}: 100 g crudo rinden `,
+            strong: `${warning.cookedGrams} g`,
+            after: ' cocido, y lo habitual es entre 100 y 400 g.',
+          }
     case 'DOSE_ABOVE_THRESHOLD':
-      return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
+      return {
+        before: 'La dosis calculada da ',
+        strong: withUnitsWord(warning.dose),
+        after: `. Tu alerta es de ${withUnitsWord(warning.threshold)}.`,
+      }
+  }
+}
+
+/**
+ * A warning in sight as soon as it appears, without waiting for "Guardar"
+ * (spec §6.6): the ones of an item go under its quantity, so they do not
+ * repeat its name; the dose one goes in the dose display.
+ */
+export function mealLiveWarningMessage(warning: MealSaveWarning): string {
+  switch (warning.code) {
+    case 'ITEM_GRAMS_ABOVE_THRESHOLD':
+      return `Más que tu alerta de ${warning.threshold} g por alimento.`
+    case 'COOKING_FACTOR_UNUSUAL':
+      return warning.cookedGrams === null
+        ? 'Lo que rinde al cocinarlo está muy lejos de lo habitual.'
+        : `100 g crudo rinden ${warning.cookedGrams} g cocido, y lo habitual es entre 100 y 400 g.`
+    case 'DOSE_ABOVE_THRESHOLD':
+      return `Más que tu alerta de ${withUnitsWord(warning.threshold)}.`
   }
 }
 

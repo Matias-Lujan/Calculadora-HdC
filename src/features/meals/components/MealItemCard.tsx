@@ -32,6 +32,11 @@ type Props = {
   result: ItemResult | undefined
   /** The quantity error found on the last blur, or null. */
   shownError: PositiveNumberError | null
+  /**
+   * The warnings of the item, already worded (mealLiveWarningMessage). They
+   * are shown as soon as the calculation gives them, not on blur.
+   */
+  warnings: readonly string[]
   onQuantityChange: (text: string) => void
   onQuantityBlur: () => void
   onModeChange: (mode: QuantityMode) => void
@@ -53,6 +58,7 @@ export function MealItemCard({
   input,
   result,
   shownError,
+  warnings,
   onQuantityChange,
   onQuantityBlur,
   onModeChange,
@@ -61,7 +67,12 @@ export function MealItemCard({
   const { food } = item
   const inputId = `meal-item-${item.key}-quantity`
   const errorId = `${inputId}-error`
+  const warningId = (index: number) => `${inputId}-warning-${index}`
   const showError = shownError !== null
+  const describedBy = [
+    ...(showError ? [errorId] : []),
+    ...warnings.map((_, index) => warningId(index)),
+  ].join(' ')
   const errors = result === undefined ? [] : foodErrors(result)
   const valid = result !== undefined && result.ok ? result : null
   const carbsText = valid === null ? null : itemCarbsText(valid.carbsG)
@@ -129,13 +140,22 @@ export function MealItemCard({
           onValueChange={onQuantityChange}
           onBlur={onQuantityBlur}
           invalid={showError}
-          describedBy={showError ? errorId : undefined}
+          describedBy={describedBy === '' ? undefined : describedBy}
         />
         {shownError !== null && (
           <FieldMessage id={errorId}>
             {positiveNumberErrorMessage(shownError)}
           </FieldMessage>
         )}
+        {/* Always in the page, so a warning is announced when it shows
+            (WCAG 4.1.3); empty, it takes no room. */}
+        <div role="status" className="flex flex-col gap-1 empty:-mt-1">
+          {warnings.map((warning, index) => (
+            <FieldMessage key={index} id={warningId(index)} tone="warning">
+              {warning}
+            </FieldMessage>
+          ))}
+        </div>
       </div>
 
       {errors.map((code) => (

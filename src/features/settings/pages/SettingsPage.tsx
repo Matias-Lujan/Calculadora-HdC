@@ -17,9 +17,10 @@ export function SettingsPage() {
       <h1 className={pageTitle}>Configuración</h1>
 
       {/* With data, the form stays even if a later refetch fails, so what
-          the user is editing is not lost. */}
+          the user is editing is not lost. The data takes the row of each
+          save right away (afterSettingsSaved). */}
       {settings.data !== undefined ? (
-        <SettingsForm initial={settings.data} />
+        <SettingsForm saved={settings.data} />
       ) : settings.isError ? (
         <div className="flex flex-col gap-3">
           <Notice tone="error" role="alert">

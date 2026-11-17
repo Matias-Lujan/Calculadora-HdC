@@ -56,7 +56,7 @@ export function MealDetail({ meal }: Props) {
         <p className="font-display text-xl font-semibold tabular-nums">
           {doseText(meal.calculated_dose_units)}
         </p>
-        <p className="font-display tabular-nums">
+        <p className="font-display font-semibold tabular-nums">
           Dosis aplicada: {appliedDoseText(meal.applied_dose_units)}
         </p>
         <CalculationDetails

@@ -21,6 +21,11 @@ type NumberInputProps = {
   onBlur: () => void
   invalid: boolean
   describedBy?: string
+  /**
+   * Extra classes for the <input>, that do not change the ones of the field
+   * (size, border, colors): for example, the letter of a dose.
+   */
+  className?: string
 }
 
 /**
@@ -41,6 +46,7 @@ export function NumberInput({
   onBlur,
   invalid,
   describedBy,
+  className,
 }: NumberInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   // The last text this component accepted: what the field had before the
@@ -138,7 +144,7 @@ export function NumberInput({
         ref={inputRef}
         id={id}
         name={name}
-        className={`${field} tabular-nums`}
+        className={`${field} tabular-nums${className === undefined ? '' : ` ${className}`}`}
         type="text"
         inputMode="decimal"
         autoComplete="off"

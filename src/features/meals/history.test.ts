@@ -470,17 +470,28 @@ describe('"← Historial" with the scroll restoration of react-router', () => {
 })
 
 describe('appliedDoseText', () => {
+  // Without trailing zeros: "7,00" can be read as "700" (UX-02).
   it.each([
-    [8.5, '8,50 U'],
-    [128.24 / 15, '8,55 U'],
-    [0, '0,00 U'],
-    [1.005, '1,01 U'],
+    [8.5, '8,5\u00a0unidades'],
+    [7, '7\u00a0unidades'],
+    [128.24 / 15, '8,55\u00a0unidades'],
+    [0, '0\u00a0unidades'],
+    [1.005, '1,01\u00a0unidades'],
+    [8.999, '9\u00a0unidades'],
+    [0.5, '0,5\u00a0unidades'],
+    [10, '10\u00a0unidades'],
+    [1, '1\u00a0unidad'],
+    [1.004, '1\u00a0unidad'],
   ])('%s → %s', (units, text) => {
     expect(appliedDoseText(units)).toBe(text)
   })
 
   it('null → "—"', () => {
     expect(appliedDoseText(null)).toBe('—')
+  })
+
+  it('never says "U"', () => {
+    expect(appliedDoseText(7)).not.toMatch(/\bU\b/)
   })
 })
 
@@ -494,7 +505,23 @@ describe('mealSummaryText', () => {
           applied_dose_units: 8.5,
         }),
       ),
-    ).toBe('HC 128,2 g · Dosis 8,55 U · Aplicada 8,50 U')
+    ).toBe(
+      'HC 128,2 g · Dosis\u00a08,55\u00a0unidades · Aplicada\u00a08,5\u00a0unidades',
+    )
+  })
+
+  it('the calculated dose keeps two decimals; the applied one, none of more', () => {
+    expect(
+      mealSummaryText(
+        meal(0, {
+          total_carbs_g: 105,
+          calculated_dose_units: 7,
+          applied_dose_units: 7,
+        }),
+      ),
+    ).toBe(
+      'HC 105,0 g · Dosis\u00a07,00\u00a0unidades · Aplicada\u00a07\u00a0unidades',
+    )
   })
 
   it('everything 0', () => {
@@ -506,12 +533,14 @@ describe('mealSummaryText', () => {
           applied_dose_units: 0,
         }),
       ),
-    ).toBe('HC 0,0 g · Dosis 0,00 U · Aplicada 0,00 U')
+    ).toBe(
+      'HC 0,0 g · Dosis\u00a00,00\u00a0unidades · Aplicada\u00a00\u00a0unidades',
+    )
   })
 
   it('without an applied dose', () => {
     expect(mealSummaryText(meal(0, { applied_dose_units: null }))).toBe(
-      'HC 30,0 g · Dosis 2,00 U · Aplicada —',
+      'HC 30,0 g · Dosis\u00a02,00\u00a0unidades · Aplicada\u00a0—',
     )
   })
 
@@ -519,6 +548,18 @@ describe('mealSummaryText', () => {
     expect(mealSummaryText(meal(0, { total_carbs_g: 1234.5 }))).toMatch(
       /^HC 1234,5 g · /,
     )
+  })
+
+  it('"Dosis" and "Aplicada" never end up apart from their doses', () => {
+    for (const applied of [8.5, 1, null]) {
+      const text = mealSummaryText(meal(0, { applied_dose_units: applied }))
+      const [, dose = '', appliedPart = ''] = text.split(' · ')
+      // The only plain spaces of each part are the ones around " · ".
+      expect(dose).not.toContain(' ')
+      expect(appliedPart).not.toContain(' ')
+      expect(dose.startsWith('Dosis\u00a0')).toBe(true)
+      expect(appliedPart.startsWith('Aplicada\u00a0')).toBe(true)
+    }
   })
 })
 

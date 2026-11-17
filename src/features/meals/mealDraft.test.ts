@@ -12,7 +12,9 @@ import {
   appliedDose,
   appliedDoseFieldText,
   canUseUnits,
+  doseWarning,
   foodErrors,
+  itemWarnings,
   newItemDraft,
   quantityError,
   saveWarnings,
@@ -953,6 +955,167 @@ describe('saveWarnings', () => {
   it('throws if the result does not match the items', () => {
     const result = calcOk(mealOf83())
     expect(() => saveWarnings(mealOf83().slice(0, 2), result, row)).toThrow()
+  })
+
+  it('is the items warnings in order, then the dose one', () => {
+    const s = { ...row, max_dose_warning_units: 1 }
+    const food = { ...rice, cooking_factor: 0.9, carbs_per_100g: 50 }
+    const items = [draft(food, '600'), draft(base, '700', 'grams', 1)]
+    const result = calcOk(items, s)
+    const dose = doseWarning(result, s)
+    expect(dose).not.toBeNull()
+    expect(saveWarnings(items, result, s)).toEqual([
+      ...items.flatMap((item, index) =>
+        itemWarnings(item, result.items[index], s),
+      ),
+      dose,
+    ])
+  })
+})
+
+// --- The warnings in sight, before "Guardar" (spec §6.6, UX-03) ---
+
+/** calculateMeal on the drafts, as MealForm does, valid or not. */
+function calc(items: MealItemDraft[], s: Settings = row) {
+  return calculateMeal(items.map(toMealItemInput), toDoseSettings(s))
+}
+
+describe('itemWarnings', () => {
+  it('an item above the grams alert warns, with its values formatted', () => {
+    const item = draft(base, '650')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Banana de prueba',
+        grams: '650',
+        threshold: '500',
+      },
+    ])
+  })
+
+  it('exactly the alert does not warn', () => {
+    const item = draft(base, '500')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([])
+  })
+
+  it('an item that is not valid never warns (an empty or incomplete quantity)', () => {
+    for (const text of ['', '6.', '0', '-']) {
+      const item = draft(base, text)
+      expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([])
+    }
+  })
+
+  it('without the result of its item, none', () => {
+    expect(itemWarnings(draft(base, '650'), undefined, row)).toEqual([])
+  })
+
+  it('a valid item warns even if another item of the meal is not valid', () => {
+    const items = [draft(base, '650', 'grams', 0), draft(base, '', 'grams', 1)]
+    const result = calc(items)
+    expect(result.ok).toBe(false)
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], row),
+    ).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Banana de prueba',
+        grams: '650',
+        threshold: '500',
+      },
+    ])
+    expect(
+      itemWarnings(items[1] as MealItemDraft, result.items[1], row),
+    ).toEqual([])
+  })
+
+  it('a valid item warns even if the dose of the meal overflows', () => {
+    const items = [draft(base, '650')]
+    const tiny = { ...row, carb_ratio_g_per_unit: Number.MIN_VALUE }
+    const result = calc(items, tiny)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], tiny),
+    ).toHaveLength(1)
+  })
+
+  it('a valid item warns even if the ratio is not valid', () => {
+    const items = [draft(base, '650')]
+    const zero = { ...row, carb_ratio_g_per_unit: 0 }
+    const result = calc(items, zero)
+    expect(result.ok).toBe(false)
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], zero),
+    ).toHaveLength(1)
+  })
+
+  it('units above the alert (11 alfajores of 50 g) warn with the grams eaten', () => {
+    const item = draft(alfajor, '11', 'units')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Alfajor de prueba',
+        grams: '550',
+        threshold: '500',
+      },
+    ])
+  })
+
+  it('an unusual yield warns at any quantity', () => {
+    const food = { ...rice, cooking_factor: 4.5 }
+    const item = draft(food, '1')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        cookedGrams: '450',
+      },
+    ])
+  })
+
+  it('both warnings of one item, in the order of calculateMeal', () => {
+    const food = { ...rice, cooking_factor: 0.9, carbs_per_100g: 50 }
+    const item = draft(food, '600')
+    expect(
+      itemWarnings(item, calc([item]).items[0], row).map((w) => w.code),
+    ).toEqual(['ITEM_GRAMS_ABOVE_THRESHOLD', 'COOKING_FACTOR_UNUSUAL'])
+  })
+})
+
+describe('doseWarning', () => {
+  it('a dose above the alert warns, with the calculated dose formatted', () => {
+    const s = { ...row, max_dose_warning_units: 8 }
+    expect(doseWarning(calc(mealOf83(), s), s)).toEqual({
+      code: 'DOSE_ABOVE_THRESHOLD',
+      dose: '8,55',
+      threshold: '8',
+    })
+  })
+
+  it('a dose equal to the alert does not warn', () => {
+    const s = { ...row, max_dose_warning_units: 2 }
+    const food = { ...base, carbs_per_100g: 15 }
+    expect(doseWarning(calc([draft(food, '200')], s), s)).toBeNull()
+  })
+
+  it('without the alert configured, none', () => {
+    expect(
+      doseWarning(calc(mealOf83(), noDoseThreshold), noDoseThreshold),
+    ).toBeNull()
+  })
+
+  it('a meal that is not valid never warns: never a partial dose', () => {
+    const s = { ...row, max_dose_warning_units: 1 }
+    const items = [draft(base, '650', 'grams', 0), draft(base, '', 'grams', 1)]
+    const result = calc(items, s)
+    expect(result.ok).toBe(false)
+    expect(doseWarning(result, s)).toBeNull()
+  })
+
+  it('a dose that overflows does not warn', () => {
+    const s = { ...row, carb_ratio_g_per_unit: Number.MIN_VALUE }
+    expect(doseWarning(calc([draft(base, '650')], s), s)).toBeNull()
   })
 })
 

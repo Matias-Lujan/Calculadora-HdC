@@ -62,5 +62,8 @@
   html {
     background-color: var(--color-paper);
     color: var(--color-ink);
+    /* What scrolls into view (a focused button or field) stays above the
+       fixed bar at the bottom: 3.5rem and its line, plus 1rem of air. */
+    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
 }

@@ -1,4 +1,5 @@
-import type { FormEvent } from 'react'
+import { useRef, type FormEvent } from 'react'
+import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { Notice } from '../../../components/Notice.tsx'
@@ -47,6 +48,7 @@ export function FoodForm(props: Props) {
       validateFoodForm(texts, savedCookingFactor, food ?? undefined),
   })
   const { texts, update, result, shownErrors, showErrorsOf } = form
+  const saveButtonRef = useRef<HTMLButtonElement>(null)
 
   function save(values: FoodFormValues) {
     form.setConfirmingFactor(false)
@@ -69,6 +71,13 @@ export function FoodForm(props: Props) {
       return
     }
     save(result.values)
+  }
+
+  // "Revisar" closes the confirmation and gives the focus back to "Guardar",
+  // which comes back in its place.
+  function review() {
+    flushSync(() => form.setConfirmingFactor(false))
+    saveButtonRef.current?.focus()
   }
 
   const confirmationText =
@@ -122,38 +131,44 @@ export function FoodForm(props: Props) {
         }
       />
 
-      {confirmationText !== null && (
+      {/* The confirmation takes the place of "Guardar" and "Cancelar" (spec
+          §6.4). Without a submit button, the form is not sent with Enter;
+          any change closes it and brings "Guardar" back. */}
+      {confirmationText !== null ? (
         <UnusualYieldConfirmation
           text={confirmationText}
           disabled={mutation.isPending}
           onConfirm={() => {
             if (result.values !== null) save(result.values)
           }}
-          onReview={() => form.setConfirmingFactor(false)}
+          onReview={review}
         />
-      )}
+      ) : (
+        <>
+          {mutation.isError && (
+            <Notice tone="error" role="alert">
+              <p>{SAVE_ERROR_MESSAGE}</p>
+            </Notice>
+          )}
 
-      {mutation.isError && (
-        <Notice tone="error" role="alert">
-          <p>{SAVE_ERROR_MESSAGE}</p>
-        </Notice>
+          <div className="flex flex-col gap-3">
+            <button
+              ref={saveButtonRef}
+              type="submit"
+              className={button.primary}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? 'Guardando…' : 'Guardar'}
+            </button>
+            <Link
+              to={food === null ? '/foods' : `/foods/${food.id}`}
+              className={button.secondary}
+            >
+              Cancelar
+            </Link>
+          </div>
+        </>
       )}
-
-      <div className="flex flex-col gap-3">
-        <button
-          type="submit"
-          className={button.primary}
-          disabled={mutation.isPending}
-        >
-          {mutation.isPending ? 'Guardando…' : 'Guardar'}
-        </button>
-        <Link
-          to={food === null ? '/foods' : `/foods/${food.id}`}
-          className={button.secondary}
-        >
-          Cancelar
-        </Link>
-      </div>
     </form>
   )
 }

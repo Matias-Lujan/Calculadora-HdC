@@ -4,6 +4,7 @@ import {
   formatDose,
   formatGrams,
   formatUserNumber,
+  withUnitsWord,
   type ItemSuccess,
   type MealItemInput,
 } from '../../domain/dose/index.ts'
@@ -31,9 +32,22 @@ export function totalCarbsText(totalCarbsG: number): string {
   return `HC total ${formatCarbs(totalCarbsG)} g`
 }
 
-/** The calculated dose, in sight: "Dosis 8,55 U". */
+/** The meal total in the dose display, under "Hidratos": "128,2 g". */
+export function displayCarbsText(totalCarbsG: number): string {
+  return `${formatCarbs(totalCarbsG)} g`
+}
+
+/** The calculated dose, in sight: "Dosis 8,55 unidades". */
 export function doseText(doseUnits: number): string {
-  return `Dosis ${formatDose(doseUnits)} U`
+  return `Dosis ${withUnitsWord(formatDose(doseUnits))}`
+}
+
+/**
+ * The ratio the dose is calculated with, always in sight in the dose
+ * display: "Ratio: 1 unidad cada 15 g de HC", with the ratio exact.
+ */
+export function ratioText(carbRatioGPerUnit: number): string {
+  return `Ratio: 1 unidad cada ${formatUserNumber(carbRatioGPerUnit)} g de HC`
 }
 
 /**
@@ -152,11 +166,11 @@ export function savedItemLines(item: SavedMealItem): string[] {
  * The calculation of the meal, under "Ver la cuenta" of the total. There is
  * no line with the sum of the items: each addend is rounded on its own and
  * the sum would not always add up to the rounded total (spec §14 #52).
- * "Dosis = 128,2 ÷ 15 = 8,55 U", with the ratio exact. */
+ * "Dosis = 128,2 ÷ 15 = 8,55 unidades", with the ratio exact. */
 export function doseLine(
   totalCarbsG: number,
   carbRatioGPerUnit: number,
   doseUnits: number,
 ): string {
-  return `Dosis = ${formatCarbs(totalCarbsG)} ÷ ${formatUserNumber(carbRatioGPerUnit)} = ${formatDose(doseUnits)} U`
+  return `Dosis = ${formatCarbs(totalCarbsG)} ÷ ${formatUserNumber(carbRatioGPerUnit)} = ${withUnitsWord(formatDose(doseUnits))}`
 }

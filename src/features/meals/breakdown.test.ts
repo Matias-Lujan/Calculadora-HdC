@@ -13,6 +13,7 @@ import {
 import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
 import {
+  displayCarbsText,
   doseLine,
   doseText,
   foodCarbsLine,
@@ -20,6 +21,7 @@ import {
   foodYieldLine,
   itemCalculationLines,
   itemCarbsText,
+  ratioText,
   savedItemLines,
   totalCarbsText,
 } from './breakdown.ts'
@@ -120,9 +122,9 @@ describe('the breakdown of spec §8.3, line by line', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(totalCarbsText(result.totalCarbsG)).toBe('HC total 128,2 g')
-    expect(doseText(result.doseUnits)).toBe('Dosis 8,55 U')
+    expect(doseText(result.doseUnits)).toBe('Dosis 8,55\u00a0unidades')
     expect(doseLine(result.totalCarbsG, 15, result.doseUnits)).toBe(
-      'Dosis = 128,2 ÷ 15 = 8,55 U',
+      'Dosis = 128,2 ÷ 15 = 8,55\u00a0unidades',
     )
   })
 })
@@ -285,26 +287,65 @@ describe('the texts in sight', () => {
   })
 
   it.each([
-    [8.546666666666667, 'Dosis 8,55 U'],
-    [0, 'Dosis 0,00 U'],
-    [1.005, 'Dosis 1,01 U'],
-    [2.675, 'Dosis 2,68 U'],
+    [8.546666666666667, 'Dosis 8,55\u00a0unidades'],
+    [0, 'Dosis 0,00\u00a0unidades'],
+    [1.005, 'Dosis 1,01\u00a0unidades'],
+    [2.675, 'Dosis 2,68\u00a0unidades'],
   ])('doseText(%s) → %j', (dose, text) => {
     expect(doseText(dose)).toBe(text)
+  })
+
+  it('a calculated dose of exactly 1 keeps its two decimals, in plural', () => {
+    expect(doseText(1)).toBe('Dosis 1,00\u00a0unidades')
+  })
+
+  it.each([
+    [128.24, '128,2 g'],
+    [0, '0,0 g'],
+    [-0, '0,0 g'],
+    [15.05, '15,1 g'],
+    [1234.56, '1234,6 g'],
+  ])('displayCarbsText(%s) → %j', (total, text) => {
+    expect(displayCarbsText(total)).toBe(text)
+  })
+
+  it.each([
+    [15, 'Ratio: 1 unidad cada 15 g de HC'],
+    [12.5, 'Ratio: 1 unidad cada 12,5 g de HC'],
+    [7.125, 'Ratio: 1 unidad cada 7,125 g de HC'],
+    [0.5, 'Ratio: 1 unidad cada 0,5 g de HC'],
+    [1500, 'Ratio: 1 unidad cada 1.500 g de HC'],
+  ])('ratioText(%s) → %j, with the ratio exact', (ratio, text) => {
+    expect(ratioText(ratio)).toBe(text)
+  })
+
+  it('the dose texts never say "U"', () => {
+    for (const text of [
+      doseText(8.55),
+      doseText(1),
+      doseLine(128.2, 15, 128.2 / 15),
+      ratioText(15),
+    ]) {
+      expect(text).not.toMatch(/\bU\b/)
+    }
   })
 })
 
 describe('doseLine', () => {
   it('a ratio with decimals is shown exact', () => {
-    expect(doseLine(25, 12.5, 2)).toBe('Dosis = 25,0 ÷ 12,5 = 2,00 U')
+    expect(doseLine(25, 12.5, 2)).toBe(
+      'Dosis = 25,0 ÷ 12,5 = 2,00\u00a0unidades',
+    )
   })
 
   it('the dose is rounded half up (1,005 → 1,01)', () => {
-    expect(doseLine(15.075, 15, 1.005)).toBe('Dosis = 15,1 ÷ 15 = 1,01 U')
+    expect(doseLine(15.075, 15, 1.005)).toBe(
+      'Dosis = 15,1 ÷ 15 = 1,01\u00a0unidades',
+    )
   })
 
   it('a total of 0', () => {
-    expect(doseLine(0, 15, 0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(0, 15, 0)).toBe('Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades')
   })
 })
 
@@ -362,10 +403,10 @@ describe('the lines show the numbers of calculateMeal', () => {
       `HC total ${formatCarbs(result.totalCarbsG)} g`,
     )
     expect(doseText(result.doseUnits)).toBe(
-      `Dosis ${formatDose(result.doseUnits)} U`,
+      `Dosis ${formatDose(result.doseUnits)}\u00a0unidades`,
     )
     expect(doseLine(result.totalCarbsG, 7.5, result.doseUnits)).toBe(
-      `Dosis = ${formatCarbs(result.totalCarbsG)} ÷ 7,5 = ${formatDose(result.doseUnits)} U`,
+      `Dosis = ${formatCarbs(result.totalCarbsG)} ÷ 7,5 = ${formatDose(result.doseUnits)}\u00a0unidades`,
     )
   })
 })
@@ -456,36 +497,44 @@ describe('foodCarbsLine: bordes', () => {
 describe('doseLine: bordes', () => {
   it('a ratio with many decimals is shown exact', () => {
     expect(doseLine(30, 12.25, 30 / 12.25)).toBe(
-      'Dosis = 30,0 ÷ 12,25 = 2,45 U',
+      'Dosis = 30,0 ÷ 12,25 = 2,45\u00a0unidades',
     )
   })
 
-  it('2,675 U rounds half up to 2,68', () => {
-    expect(doseLine(40.125, 15, 2.675)).toBe('Dosis = 40,1 ÷ 15 = 2,68 U')
+  it('a dose of 2,675 rounds half up to 2,68', () => {
+    expect(doseLine(40.125, 15, 2.675)).toBe(
+      'Dosis = 40,1 ÷ 15 = 2,68\u00a0unidades',
+    )
   })
 
   it('never shows "-0"', () => {
-    expect(doseLine(-0, 15, -0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(-0, 15, -0)).toBe('Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades')
   })
 
   it('a ratio below 1 and one with three decimals are shown exact', () => {
-    expect(doseLine(10, 0.5, 20)).toBe('Dosis = 10,0 ÷ 0,5 = 20,00 U')
+    expect(doseLine(10, 0.5, 20)).toBe(
+      'Dosis = 10,0 ÷ 0,5 = 20,00\u00a0unidades',
+    )
     expect(doseLine(10, 7.125, 10 / 7.125)).toBe(
-      'Dosis = 10,0 ÷ 7,125 = 1,40 U',
+      'Dosis = 10,0 ÷ 7,125 = 1,40\u00a0unidades',
     )
   })
 
   it('a dose that does not end (50 ÷ 3) is rounded only when shown', () => {
-    expect(doseLine(50, 3, 50 / 3)).toBe('Dosis = 50,0 ÷ 3 = 16,67 U')
+    expect(doseLine(50, 3, 50 / 3)).toBe(
+      'Dosis = 50,0 ÷ 3 = 16,67\u00a0unidades',
+    )
   })
 
   it('tiny values round to zero, without "-" or exponent', () => {
-    expect(doseLine(0.04, 15, 0.04 / 15)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(0.04, 15, 0.04 / 15)).toBe(
+      'Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades',
+    )
   })
 
   it('large values, without thousands separator', () => {
     expect(doseLine(12345.67, 1, 12345.67)).toBe(
-      'Dosis = 12345,7 ÷ 1 = 12345,67 U',
+      'Dosis = 12345,7 ÷ 1 = 12345,67\u00a0unidades',
     )
   })
 
@@ -838,7 +887,7 @@ describe('the texts in sight: -0', () => {
   it('never show "-0"', () => {
     expect(itemCarbsText(-0)).toBe('0,0 g de HC')
     expect(totalCarbsText(-0)).toBe('HC total 0,0 g')
-    expect(doseText(-0)).toBe('Dosis 0,00 U')
+    expect(doseText(-0)).toBe('Dosis 0,00\u00a0unidades')
   })
 })
 

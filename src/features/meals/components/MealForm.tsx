@@ -2,6 +2,7 @@ import { Camera } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { Confirmation } from '../../../components/Confirmation.tsx'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
@@ -15,10 +16,9 @@ import {
 } from '../../../domain/dose/index.ts'
 import {
   EATEN_AT_ERROR_MESSAGE,
-  INVALID_RATIO_MESSAGE,
   MEAL_BLOCKED_MESSAGE,
-  MEAL_OUT_OF_RANGE_MESSAGE,
   SAVE_ERROR_MESSAGE,
+  mealLiveWarningMessage,
   mealSaveWarningMessage,
   positiveNumberErrorMessage,
 } from '../../../lib/errors.ts'
@@ -30,11 +30,12 @@ import {
 } from '../../../lib/mealDraftStorage.ts'
 import { FROM_MEAL_STATE, foodToAddToMeal } from '../../../lib/mealHandoff.ts'
 import type { Settings } from '../../../lib/settings.ts'
-import { doseLine, doseText, totalCarbsText } from '../breakdown.ts'
 import { dateTimeInputValue, eatenAtFromInput } from '../eatenAt.ts'
 import {
   appliedDose,
   appliedDoseFieldText,
+  doseWarning,
+  itemWarnings,
   newItemDraft,
   quantityError,
   saveWarnings,
@@ -50,7 +51,7 @@ import {
 } from '../storedDraft.ts'
 import { tableFoodAsMealFood } from '../tableFoods.ts'
 import type { MealFood, MealItemDraft, ReferenceFood } from '../types.ts'
-import { CalculationDetails } from './CalculationDetails.tsx'
+import { DoseDisplay } from './DoseDisplay.tsx'
 import { FoodPicker } from './FoodPicker.tsx'
 import { MealItemCard } from './MealItemCard.tsx'
 
@@ -69,8 +70,8 @@ function errorOf<E>(result: { value: number } | { error: E }): E | null {
 }
 
 /**
- * The meal being entered (spec §6.6): the items, the live breakdown (§8.3),
- * the exact dose, the applied dose, the date and time, and saving. The
+ * The meal being entered (spec §6.6): the dose display, the items, the live
+ * breakdown (§8.3), the applied dose, the date and time, and saving. The
  * calculation is derived in the render from the form state, with
  * calculateMeal (CLAUDE.md: no react-query for the dose).
  */
@@ -109,8 +110,12 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     initial.eatenAtText,
   )
   const [eatenAtShownError, setEatenAtShownError] = useState(false)
-  // The warnings confirmation is open (spec §8.5).
+  // The warnings confirmation is open (spec §8.5). It takes the place of
+  // "Guardar": the focus goes to "Revisar" when it opens (Confirmation) and
+  // back to "Guardar" when "Revisar" closes it.
   const [confirming, setConfirming] = useState(false)
+  const reviewButtonRef = useRef<HTMLButtonElement>(null)
+  const saveButtonRef = useRef<HTMLButtonElement>(null)
   // The last "Guardar" found errors.
   const [blocked, setBlocked] = useState(false)
   // The id of the meal just saved ("Comida guardada." and its link to the
@@ -280,13 +285,24 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
     save()
   }
 
+  function review() {
+    flushSync(() => setConfirming(false))
+    saveButtonRef.current?.focus()
+  }
+
   const warnings =
     confirming && result.ok ? saveWarnings(items, result, settings) : []
+  const confirmationOpen = warnings.length > 0
   const appliedDoseInvalid = appliedDoseShownError !== null
+  const liveDoseWarning = doseWarning(result, settings)
 
   return (
+    // What gets the focus scrolls into view below the dose display, which
+    // stays stuck to the top (WCAG 2.4.11): the display is at most about
+    // 13rem tall, and 5rem more leave the name of a food in grams (or the
+    // "1 alfajor = 50 g" hint of one in units) in sight.
     <fieldset
-      className="flex min-w-0 flex-col gap-4"
+      className="flex min-w-0 flex-col gap-4 [&_:is(input,button,a,select)]:scroll-mt-[calc(18rem+env(safe-area-inset-top))]"
       disabled={createMeal.isPending}
     >
       {settings.max_dose_warning_units === null && (
@@ -327,6 +343,19 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         </Notice>
       )}
 
+      {/* Without items there is no dose display: the search comes first. */}
+      {items.length > 0 && (
+        <DoseDisplay
+          result={result}
+          carbRatioGPerUnit={settings.carb_ratio_g_per_unit}
+          warning={
+            liveDoseWarning === null
+              ? null
+              : mealLiveWarningMessage(liveDoseWarning)
+          }
+        />
+      )}
+
       {items.length > 0 && (
         <ul className="flex flex-col gap-3">
           {items.map((item, index) => (
@@ -336,6 +365,9 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               input={inputs[index] ?? toMealItemInput(item)}
               result={result.items[index]}
               shownError={shownErrors[item.key] ?? null}
+              warnings={itemWarnings(item, result.items[index], settings).map(
+                mealLiveWarningMessage,
+              )}
               onQuantityChange={(text) =>
                 updateItem(item.key, { quantityText: text })
               }
@@ -350,40 +382,6 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
             />
           ))}
         </ul>
-      )}
-
-      {/* Without items there is no total box: the search comes first. */}
-      {items.length > 0 && (
-        <div className="flex flex-col gap-1 rounded-card bg-sunken p-4">
-          {result.ok ? (
-            <>
-              <p className="font-display tabular-nums">
-                {totalCarbsText(result.totalCarbsG)}
-              </p>
-              <p className="font-display text-xl font-semibold tabular-nums">
-                {doseText(result.doseUnits)}
-              </p>
-              <CalculationDetails
-                lines={[
-                  doseLine(
-                    result.totalCarbsG,
-                    settings.carb_ratio_g_per_unit,
-                    result.doseUnits,
-                  ),
-                ]}
-              />
-            </>
-          ) : result.errors.includes('INVALID_RATIO') ? (
-            <FieldMessage>{INVALID_RATIO_MESSAGE}</FieldMessage>
-          ) : result.errors.includes('INVALID_QUANTITY') ? (
-            <FieldMessage>{MEAL_OUT_OF_RANGE_MESSAGE}</FieldMessage>
-          ) : (
-            <p>
-              Para ver el total y la dosis, completá o corregí los alimentos de
-              arriba.
-            </p>
-          )}
-        </div>
       )}
 
       <div className="flex flex-col gap-3">
@@ -417,7 +415,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor={APPLIED_DOSE_ID} className={fieldLabel}>
-              Dosis aplicada (U)
+              Dosis aplicada (unidades)
             </label>
             {/* NumberInput writes a value that changes from outside to the
                 field, so while it follows the calculated dose it updates
@@ -441,6 +439,7 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
               describedBy={
                 appliedDoseInvalid ? `${APPLIED_DOSE_ID}-error` : undefined
               }
+              className="font-display font-semibold"
             />
             {appliedDoseShownError !== null && (
               <FieldMessage id={`${APPLIED_DOSE_ID}-error`}>
@@ -524,49 +523,72 @@ export function MealForm({ foods, referenceFoods, settings }: Props) {
             )}
           </div>
 
-          {confirming && warnings.length > 0 ? (
-            <Notice tone="warning" role="alert">
-              <p>Revisá antes de guardar:</p>
+          {/* The confirmation takes the place of "Guardar" (spec §8.5), with
+              "Revisar" as the main button. */}
+          {confirmationOpen ? (
+            <Confirmation focusRef={reviewButtonRef}>
+              <p className="font-semibold">Revisá antes de guardar</p>
               <ul className="flex list-disc flex-col gap-1 pl-5">
-                {warnings.map((warning, index) => (
-                  <li key={index}>{mealSaveWarningMessage(warning)}</li>
-                ))}
+                {warnings.map((warning, index) => {
+                  const { before, strong, after } =
+                    mealSaveWarningMessage(warning)
+                  return (
+                    <li key={index}>
+                      {before}
+                      {strong !== '' && (
+                        <strong className="font-display font-bold tabular-nums">
+                          {strong}
+                        </strong>
+                      )}
+                      {after}
+                    </li>
+                  )
+                })}
               </ul>
-              <p>¿La guardás igual?</p>
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3">
+                <button
+                  ref={reviewButtonRef}
+                  type="button"
+                  className={`${button.primary} w-full`}
+                  onClick={review}
+                >
+                  Revisar
+                </button>
                 <button
                   type="button"
-                  className={button.secondary}
+                  className={`${button.secondary} w-full`}
                   onClick={save}
                 >
                   Guardar igual
                 </button>
-                <button
-                  type="button"
-                  className={button.secondary}
-                  onClick={() => setConfirming(false)}
-                >
-                  Revisar
-                </button>
               </div>
-            </Notice>
-          ) : blocked ? (
-            <Notice tone="error" role="alert">
-              <p>{MEAL_BLOCKED_MESSAGE}</p>
-            </Notice>
+            </Confirmation>
           ) : (
-            createMeal.isError && (
-              <Notice tone="error" role="alert">
-                <p>{SAVE_ERROR_MESSAGE}</p>
-              </Notice>
-            )
-          )}
+            <>
+              {blocked ? (
+                <Notice tone="error" role="alert">
+                  <p>{MEAL_BLOCKED_MESSAGE}</p>
+                </Notice>
+              ) : (
+                createMeal.isError && (
+                  <Notice tone="error" role="alert">
+                    <p>{SAVE_ERROR_MESSAGE}</p>
+                  </Notice>
+                )
+              )}
 
-          {/* type="button" and outside a <form>: the "Ir" key of the
-              search keyboard never saves. */}
-          <button type="button" className={button.primary} onClick={handleSave}>
-            {createMeal.isPending ? 'Guardando…' : 'Guardar'}
-          </button>
+              {/* type="button" and outside a <form>: the "Ir" key of the
+                  search keyboard never saves. */}
+              <button
+                ref={saveButtonRef}
+                type="button"
+                className={button.primary}
+                onClick={handleSave}
+              >
+                {createMeal.isPending ? 'Guardando…' : 'Guardar'}
+              </button>
+            </>
+          )}
         </div>
       )}
     </fieldset>

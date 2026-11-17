@@ -1,6 +1,12 @@
 import type { InfiniteData } from '@tanstack/react-query'
 import { z } from 'zod'
-import { formatCarbs, formatDose, sumCarbs } from '../../domain/dose/index.ts'
+import {
+  formatCarbs,
+  formatDose,
+  formatDoseCompact,
+  sumCarbs,
+  withUnitsWord,
+} from '../../domain/dose/index.ts'
 import { eatenDay } from './eatenAt.ts'
 import type { ListedMeal, MealSummary, MealsPage } from './types.ts'
 
@@ -79,14 +85,22 @@ export function withoutMeal(
   }
 }
 
-/** The applied dose, "8,50 U", or "—" if there is none. */
+/**
+ * The applied dose, without trailing zeros ("8,5 unidades", "7 unidades",
+ * "1 unidad"), or "—" if there is none: it is the number marked on the pen.
+ */
 export function appliedDoseText(units: number | null): string {
-  return units === null ? '—' : `${formatDose(units)} U`
+  return units === null ? '—' : withUnitsWord(formatDoseCompact(units))
 }
 
-/** "HC 128,2 g · Dosis 8,55 U · Aplicada 8,50 U". */
+/**
+ * "HC 128,2 g · Dosis 8,55 unidades · Aplicada 8,5 unidades". "Dosis" and
+ * "Aplicada" are joined to their numbers with a space that does not break
+ * (U+00A0), so the line only breaks at " · " and a word never ends up
+ * apart from its dose.
+ */
 export function mealSummaryText(meal: MealSummary): string {
-  return `HC ${formatCarbs(meal.total_carbs_g)} g · Dosis ${formatDose(meal.calculated_dose_units)} U · Aplicada ${appliedDoseText(meal.applied_dose_units)}`
+  return `HC ${formatCarbs(meal.total_carbs_g)} g · Dosis\u00a0${withUnitsWord(formatDose(meal.calculated_dose_units))} · Aplicada\u00a0${appliedDoseText(meal.applied_dose_units)}`
 }
 
 /**

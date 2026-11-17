@@ -749,6 +749,8 @@ function buildStates(
   foods: DemoFoods,
   settings: Settings,
   clearDoseAlert: () => Promise<void>,
+  // The states after the --sin-alerta ones need the dose alert back.
+  putDoseAlertBack: () => Promise<void>,
 ): State[] {
   const go = async (page: Page, route: string) => {
     await page.goto(`${baseUrl}${route}`)
@@ -841,6 +843,18 @@ function buildStates(
 
   const breadQuery = firstWord(foods.bread?.name ?? 'pan').toLowerCase()
 
+  // Cooked grams of a food that, alone, give more than the dose alert with
+  // the demo ratio: the meal of buildMeal adds two more foods, so its dose
+  // is above the alert. Only to type the quantity; the app calculates.
+  const cookedGramsAbove = (food: Food) => {
+    const alert = settings.max_dose_warning_units ?? DOSE_ALERT_UNITS
+    const perGram = food.carbs_per_100g / (food.cooking_factor ?? 1) / 100
+    if (!(perGram > 0)) {
+      throw new Error(`«${food.name}» no tiene HC: no sirve para la alerta.`)
+    }
+    return Math.ceil((alert * settings.carb_ratio_g_per_unit) / perGram) + 1
+  }
+
   return [
     {
       name: 'login',
@@ -891,7 +905,7 @@ function buildStates(
     {
       name: 'inicio-items',
       description:
-        'Inicio con tres alimentos y sus cantidades (uno en unidades, uno cocido y uno de la tabla), el total, la dosis, la dosis aplicada, la fecha y «Guardar».',
+        'Inicio con tres alimentos y sus cantidades (uno en unidades, uno cocido y uno de la tabla), el visor con los hidratos, la dosis y el ratio, la dosis aplicada, la fecha y «Guardar».',
       run: async (page) => {
         await buildMeal(page)
         await page
@@ -902,21 +916,24 @@ function buildStates(
     {
       name: 'inicio-ver-la-cuenta',
       description:
-        'Inicio con «Ver la cuenta» abierto en el alimento cocido y en el total.',
+        'Inicio con «Ver la cuenta» abierto en el alimento cocido y en el visor de la dosis.',
       run: async (page) => {
         await buildMeal(page)
         const cooked = need(foods.cooked, 'que se cocina, con cuánto rinde')
         await itemCard(page, cooked)
           .getByRole('button', { name: 'Ver la cuenta' })
           .click()
-        // The total box comes after the items: its button is the last one.
-        await page.getByRole('button', { name: 'Ver la cuenta' }).last().click()
+        // The arrow of the dose display, the one that controls its
+        // calculation.
+        await page
+          .locator('button[aria-controls="meal-dose-calculation"]')
+          .click()
       },
     },
     {
       name: 'inicio-error-cantidad',
       description:
-        'Inicio con la cantidad de un alimento borrada, después de salir del campo: «Completá este campo.» y el total sin calcular.',
+        'Inicio con la cantidad de un alimento borrada, después de salir del campo: «Completá este campo.» y el visor con «—» en lugar de los números.',
       run: async (page) => {
         await buildMeal(page)
         const field = itemCard(
@@ -932,7 +949,7 @@ function buildStates(
     {
       name: 'inicio-advertencias',
       description:
-        'Inicio después de tocar «Guardar» con un alimento por encima de la alerta de gramos: el recuadro «Revisá antes de guardar:» con «Guardar igual» y «Revisar».',
+        'Inicio después de tocar «Guardar» con un alimento por encima de la alerta de gramos: el aviso en vivo debajo de su cantidad y el recuadro «Revisá antes de guardar», en lugar de «Guardar», con «Revisar» (principal) y «Guardar igual».',
       run: async (page) => {
         // More grams than the alert, so at least that warning shows up.
         await buildMeal(
@@ -942,7 +959,7 @@ function buildStates(
         await saveButton(page).click()
         const box = page
           .getByRole('alert')
-          .filter({ hasText: 'Revisá antes de guardar:' })
+          .filter({ hasText: 'Revisá antes de guardar' })
         await box.waitFor()
         await center(box)
       },
@@ -1190,6 +1207,69 @@ function buildStates(
           .waitFor()
       },
     },
+
+    // --- Added in tanda 2 of M1, at the end so the numbers above do not
+    // move. None of them saves anything. ---
+    {
+      name: 'configuracion-cambiar-ratio',
+      description:
+        'Configuración después de escribir otro ratio y tocar «Guardar»: el recuadro «¿Cambiar el ratio…?», en lugar de «Guardar», con «Cambiar el ratio» y «No cambiar», sin confirmar (no se guarda nada; al salir de la pantalla, el campo vuelve al ratio guardado).',
+      run: async (page) => {
+        await putDoseAlertBack()
+        await go(page, '/settings')
+        const field = page.locator('#settings-carb_ratio_g_per_unit')
+        await field.waitFor()
+        await clearField(field)
+        await field.pressSequentially(
+          settings.carb_ratio_g_per_unit === 12 ? '15' : '12',
+        )
+        await field.blur()
+        await saveButton(page).click()
+        await page.getByRole('button', { name: 'No cambiar' }).waitFor()
+        await center(page.getByText('¿Cambiar el ratio de'))
+      },
+    },
+    {
+      name: 'inicio-alerta-dosis',
+      description:
+        'Inicio con una comida cuya dosis calculada supera la alerta de dosis máxima: el visor con «Más que tu alerta de … unidades.» (sin tocar «Guardar»).',
+      run: async (page) => {
+        await putDoseAlertBack()
+        await buildMeal(
+          page,
+          String(cookedGramsAbove(need(foods.cooked, 'que se cocina'))),
+        )
+        await page
+          .getByText(/Más que tu alerta de [\d.,]+\sunidad/)
+          .first()
+          .waitFor()
+        await page.evaluate('window.scrollTo(0, 0)')
+      },
+    },
+    {
+      name: 'alimento-rinde-raro',
+      description:
+        'Editar un alimento que se cocina con un rinde fuera de lo habitual (100 g crudo, 600 g cocido) y tocar «Guardar»: el recuadro en lugar de «Guardar» y «Cancelar», con «Revisar» (principal) y «Guardar igual», sin confirmar (no se guarda nada).',
+      run: async (page) => {
+        const food = need(foods.cooked, 'que se cocina, con cuánto rinde')
+        await go(page, `/foods/${food.id}/edit`)
+        await saveButton(page).waitFor()
+        const more = page.getByRole('button', { name: 'Más opciones' })
+        if ((await more.getAttribute('aria-expanded')) !== 'true') {
+          await more.click()
+        }
+        const raw = page.locator('#food-rawWeight')
+        const cooked = page.locator('#food-cookedWeight')
+        await clearField(raw)
+        await raw.pressSequentially('100')
+        await clearField(cooked)
+        await cooked.pressSequentially('600')
+        await cooked.blur()
+        await saveButton(page).click()
+        await page.getByRole('button', { name: 'Guardar igual' }).waitFor()
+        await center(page.getByRole('button', { name: 'Revisar' }))
+      },
+    },
   ]
 }
 
@@ -1258,6 +1338,11 @@ try {
       await setDoseAlert(supabase, userId, previous)
     }
   }
+  const putDoseAlertBack = async () => {
+    if (restoreDoseAlert === null) return
+    await restoreDoseAlert()
+    restoreDoseAlert = null
+  }
 
   // The app: the Vite dev server, or the URL given.
   if (remoteUrl === null) {
@@ -1308,7 +1393,13 @@ try {
       'La app pidió datos al proyecto de prod (bloqueado): no se captura.'
   }
 
-  const states = buildStates(baseUrl, foods, settings, clearDoseAlert)
+  const states = buildStates(
+    baseUrl,
+    foods,
+    settings,
+    clearDoseAlert,
+    putDoseAlertBack,
+  )
   for (const [position, state] of states.entries()) {
     const base = `${String(position + 1).padStart(2, '0')}-${state.name}`
     if (state.omitted !== undefined) {

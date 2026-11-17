@@ -14,6 +14,7 @@ import {
   yieldLine,
 } from './features/foods/foodForm.ts'
 import {
+  displayCarbsText,
   doseLine,
   doseText,
   foodCarbsLine,
@@ -21,6 +22,7 @@ import {
   foodYieldLine,
   itemCalculationLines,
   itemCarbsText,
+  ratioText,
   savedItemLines,
   totalCarbsText,
 } from './features/meals/breakdown.ts'
@@ -39,7 +41,17 @@ import {
   daySummaryText,
   mealSummaryText,
 } from './features/meals/history.ts'
-import { SETTINGS_FIELDS } from './features/settings/fields.ts'
+import {
+  ALERT_FIELDS,
+  RATIO_LABEL_REST,
+  RATIO_PHRASE_END,
+  RATIO_PHRASE_START,
+} from './features/settings/fields.ts'
+import {
+  ratioChangeTexts,
+  ratioExampleText,
+  ratioSavedText,
+} from './features/settings/ratio.ts'
 import * as errors from './lib/errors.ts'
 import { TABLE_VALUE_INFO, cookedPer100gText } from './lib/foodText.ts'
 
@@ -153,7 +165,13 @@ describe('plain words on the screen', () => {
       { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'Arroz', cookedGrams: null },
       { code: 'DOSE_ABOVE_THRESHOLD', dose: '8,55', threshold: '8' },
     ]
-    expectPlain(warnings.map(errors.mealSaveWarningMessage))
+    expectPlain(
+      warnings.map((warning) => {
+        const { before, strong, after } = errors.mealSaveWarningMessage(warning)
+        return `${before}${strong}${after}`
+      }),
+    )
+    expectPlain(warnings.map(errors.mealLiveWarningMessage))
   })
 
   it('the sign in messages', () => {
@@ -283,8 +301,10 @@ describe('plain words on the screen', () => {
     })
     texts.push(
       totalCarbsText(result.totalCarbsG),
+      displayCarbsText(result.totalCarbsG),
       doseText(result.doseUnits),
       doseLine(result.totalCarbsG, 12.5, result.doseUnits),
+      ratioText(12.5),
     )
     expectPlain(texts)
   })
@@ -316,9 +336,24 @@ describe('plain words on the screen', () => {
   })
 
   it('the settings labels and their ⓘ', () => {
-    expectPlain(
-      SETTINGS_FIELDS.flatMap(({ label, info }) => [label, info ?? null]),
-    )
+    expectPlain([
+      RATIO_PHRASE_START,
+      RATIO_LABEL_REST,
+      RATIO_PHRASE_END,
+      ...ALERT_FIELDS.flatMap(({ label, info }) => [label, info]),
+    ])
+  })
+
+  it('the texts of the ratio', () => {
+    const change = ratioChangeTexts(15, 12)
+    expectPlain([
+      ratioExampleText(15),
+      ratioExampleText(60),
+      change.question,
+      change.detail,
+      ratioChangeTexts(15, 15.0001).detail,
+      ratioSavedText(12),
+    ])
   })
 
   it('the check itself catches the words it looks for', () => {
