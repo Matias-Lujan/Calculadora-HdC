@@ -8,8 +8,9 @@ App web personal para contar hidratos de carbono y calcular el bolo de insulina 
 - **[docs/spec.md](docs/spec.md)**: qué hace la app. Es la fuente de verdad para alcance, modelo de datos, cálculo y Edge Function. La arquitectura está en §4, §7, §8, §9 y §12.2; los entornos (proyectos de Supabase, Vercel), en §12.1. Dice **qué** hace la app, no cómo está escrito el código.
 - **[docs/decisiones.md](docs/decisiones.md)**: la tabla de decisiones tomadas (antes spec §14; las referencias "§14 #N" apuntan ahí). Se lee solo cuando hace falta el porqué de una decisión puntual.
 - **[docs/notas/](docs/notas/)**: resultados de pruebas. Hoy, [gemini-probe.md](docs/notas/gemini-probe.md), la prueba de Gemini con etiquetas reales (etapa 1b).
-- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real; `usda-seed/` arma la migración del seed de `reference_foods` desde SR Legacy de USDA (la lista curada es `selection.json`; los CSV van en `scripts/usda-seed/data/`, que no se commitea). Si cambia la lista, se genera una migración nueva (spec §14 #50).
-- **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer). Ver "Flujo de trabajo".
+- **`scripts/`**: herramientas que no son parte de la app. `gemini-probe/` prueba la transcripción con fotos reales; `rls-check/` prueba el aislamiento de datos contra la API real; `usda-seed/` arma la migración del seed de `reference_foods` desde SR Legacy de USDA (la lista curada es `selection.json`; los CSV van en `scripts/usda-seed/data/`, que no se commitea). Si cambia la lista, se genera una migración nueva (spec §14 #50). `ux-screens/` saca capturas de todas las pantallas y sus estados, con WebKit y el tamaño de un iPhone, logueado con un usuario de demo de `dev` (las capturas van en `scripts/ux-screens/out/`, que no se commitea).
+- **`.claude/agents/`**: los cuatro agentes del ciclo por funcionalidad (planner, implementer, tester y reviewer) y el `ux-designer`, que revisa la UI y la UX con capturas reales y propone mejoras (ver "Ciclo por funcionalidad").
+- **[docs/ux/](docs/ux/)**: los informes de revisión de UX (`revision-<n>.md`), con las propuestas `UX-xx` y lo que decidió el usuario.
 
 Si un pedido contradice el spec, frená y preguntá. No implementes la contradicción. Cuando se toma una decisión nueva, se actualizan el spec, `docs/decisiones.md` (una fila corta) y, si corresponde, el plan.
 
@@ -62,6 +63,7 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
   - **Cálculo de HC o de dosis (`src/domain/`), migraciones o RLS**: implementer, tester y reviewer (planner según el punto anterior).
   - **Lógica de un feature sin cuentas** (queries, guardado, validación de un formulario): implementer y reviewer; sin tester.
   - **Textos, pantallas o docs**: los hace la sesión principal, o un implementer si son muchos archivos. Sin planner, tester ni reviewer.
+  - **Diseño (UI y UX)**: el `ux-designer` revisa con capturas y escribe un informe en `docs/ux/` con propuestas numeradas; **el usuario elige** cuáles se hacen (se anota en el informe). Las elegidas se implementan en tandas, con el ciclo que corresponda a lo que tocan, y al final de cada tanda el `ux-designer` verifica con capturas de antes y después. Después, el usuario las prueba en el iPhone con la versión de prueba de la rama.
   - Los tests se escriben para lo que tiene riesgo (el cálculo, la base, el guardado). No se testean textos uno por uno ni se hacen barridos masivos ni mutaciones fuera del cálculo.
 - **Cada pedido a un agente nombra las secciones del spec que hacen falta** (por ejemplo, "§6.1 y §9.3"), para que no lea el spec entero. El pedido es breve: el agente lee el resto del repo por su cuenta.
 - **Si el reviewer encuentra problemas**, la funcionalidad vuelve al implementer con los hallazgos importantes. La segunda vuelta del reviewer va solo si el arreglo cambia lógica; si es chico (unas líneas, un botón, un texto), la sesión principal revisa el diff (y vuelve al tester si se tocó el cálculo). Los detalles menores de docs los arregla la sesión principal sin otra vuelta. **Máximo 2 vueltas**: si siguen los problemas, se frena y se consulta al usuario.
@@ -129,6 +131,8 @@ node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-fl
 node scripts/gemini-probe/summarize.ts <corrida>
 node scripts/pwa/generate-icons.ts                                    # regenera los íconos desde public/icon.svg
 node scripts/usda-seed/build.ts <carpeta con los CSV> <migración nueva y vacía>   # seed USDA; nunca pisa una migración con contenido
+node --env-file=.env.local scripts/ux-screens/capture.ts [--out <carpeta>] [--device "iPhone 15"] [--url <url>]   # capturas para el ux-designer; solo dev
+npx playwright install webkit                                         # una vez por máquina, para ux-screens
 ```
 
 Antes de dar una tarea por terminada tienen que pasar `npm run typecheck`, `npm run lint`, `npm run format:check` y `npm test`. Prettier no formatea los `.md`, que se editan a mano.

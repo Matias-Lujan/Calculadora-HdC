@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). Próxima: M1, revisión de UI/UX.** Última actualización: 2026-11-17.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). En curso: M1, revisión de UI/UX, en la rama `mejora-ux`.** Última actualización: 2026-11-17.
 
 ---
 
@@ -339,9 +339,26 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 
 | # | Mejora | De dónde sale | Estado |
 |---|---|---|---|
-| M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | Próxima |
+| M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | En curso (`mejora-ux`) |
 | M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | Pendiente |
 | M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Pendiente |
+
+### M1 — Revisión de UI/UX
+
+**Objetivo**: que la app sea más clara, más rápida de usar y más linda, con identidad propia. El usuario no es diseñador: un agente diseñador propone y el usuario elige.
+
+Incluye (alcance acordado con el usuario, 2026-11-17, spec §14 #64):
+1. **El agente `ux-designer`** (`.claude/agents/ux-designer.md`): revisa con capturas reales y propone sin límites todo lo que sea UI y UX, con criterios y fuentes explícitos (Apple HIG, heurísticas de Nielsen, Laws of UX, *Refactoring UI*, GOV.UK, WCAG 2.2, ISMP y factores humanos de la FDA, entre otros). **No imita el estilo de una app de salud**: busca una identidad propia y prioriza lo que haga mejor la app; la lectura segura de la dosis es un criterio que no se negocia. Propone; no implementa.
+2. **El script de capturas** `scripts/ux-screens/`: levanta la app, se loguea con un usuario de demo de `dev` (`UX_DEMO_EMAIL` y `UX_DEMO_PASSWORD` en `.env.local`), le carga datos inventados y saca capturas de cada pantalla y estado con WebKit y el tamaño de un iPhone (Playwright 1.64.1). Nunca corre contra `prod`.
+3. **Primera revisión**: el informe `docs/ux/revision-1.md` (resumen, identidad y sistema visual, propuestas `UX-xx`, flujos, a probar en el iPhone, fuentes), que se le muestra al usuario como página con las capturas. **El usuario elige** qué propuestas se hacen; se anota en el informe.
+4. **Implementar lo elegido**, en tandas ordenadas por prioridad, cada una con el ciclo que corresponda a lo que toca y verificada por el `ux-designer` con capturas de antes y después.
+
+**Terminada cuando**:
+- [x] Existen el agente y el script, y el script corre de punta a punta contra `dev` (2026-11-17: 29 estados, 45 capturas; las 2 de "sin alerta" se sacan con `--sin-alerta`).
+- [ ] El usuario vio el informe de la primera revisión y eligió qué se hace.
+- [ ] Lo elegido está implementado, verificado con capturas y probado por el usuario en el iPhone.
+
+**Próximo paso (para la sesión que siga con M1)**: correr la primera revisión con el agente `ux-designer` en modo revisión (secciones del spec: §6.1 y §6.5 a §6.8), mostrarle al usuario el informe `docs/ux/revision-1.md` como página con las capturas, y anotar en el informe lo que el usuario elija. El permiso para correr el script de capturas está en `.claude/settings.json`. Detalle conocido del script: si corta temprano por un error (por ejemplo, credenciales mal puestas), en Windows Node termina con "Assertion failed … UV_HANDLE_CLOSING" y el código 127 en lugar de 1; cuando todo sale bien, termina limpio.
