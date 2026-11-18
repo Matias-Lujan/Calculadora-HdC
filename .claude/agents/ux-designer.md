@@ -58,7 +58,7 @@ Las capturas quedan en `scripts/ux-screens/out/` (no se commitean): referenciala
 
 ## Modo verificación
 
-El pedido trae la carpeta de capturas de "antes" y las propuestas implementadas (`UX-xx`). Sacá capturas nuevas en otra carpeta con `--out`, compará los mismos estados y respondé, por cada propuesta: cumplida, parcial o no cumplida, con la captura que lo muestra. Después, cualquier cosa que haya empeorado en otras pantallas, los contrastes y tamaños de lo nuevo, y una lista corta de qué probar en el iPhone. En este modo no escribís archivos.
+El pedido trae la carpeta de capturas de "antes" y las propuestas implementadas (`UX-xx`). Sacá capturas nuevas en otra carpeta con `--out` (si el pedido nombra los estados que cambiaron, solo esos, con `--solo`), compará los mismos estados y respondé, por cada propuesta: cumplida, parcial o no cumplida, con la captura que lo muestra. Después, cualquier cosa que haya empeorado en otras pantallas, los contrastes y tamaños de lo nuevo, y una lista corta de qué probar en el iPhone. En este modo no escribís archivos.
 
 ## Límites
 
