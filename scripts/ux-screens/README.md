@@ -24,12 +24,13 @@ En `.env.local` (ver `.env.example`):
 ## Cómo se corre
 
 ```bash
-node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta] [--oscuro]
+node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta] [--oscuro] [--solo <estado,estado>]
 ```
 
 - `--device`: un dispositivo de Playwright (por defecto, `"iPhone 15"`). Siempre con WebKit.
 - `--url`: captura otra versión de la app, por ejemplo un *preview* de Vercel (que usa dev), sin levantar Vite.
 - `--out`: la carpeta de salida, por ejemplo `--out scripts/ux-screens/out/antes` y después `--out scripts/ux-screens/out/despues`, para comparar.
+- `--solo`: saca solo los estados nombrados, separados por coma y sin su número (por ejemplo, `--solo inicio-items,historial`). Los demás quedan como omitidos, así los números no cambian. Si un estado necesita uno anterior y falla solo, se corre sin `--solo`.
 - `--sin-alerta`: suma, al final, Inicio y Configuración sin la alerta de dosis máxima. Le saca la alerta al usuario de demo y la vuelve a poner al terminar.
 - `--oscuro`: saca todas las capturas en modo oscuro (emula `prefers-color-scheme: dark`, como el iPhone en modo oscuro). Conviene con `--out`, por ejemplo `--out scripts/ux-screens/out/oscuro`, para no mezclarlas con las claras.
 

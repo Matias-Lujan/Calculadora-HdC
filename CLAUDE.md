@@ -20,7 +20,7 @@ Si el spec no cubre un caso, elegí la opción más simple que lo resuelva y dej
 
 Cada mejora se trabaja en una **sesión nueva**, que arranca solo con lo que está escrito en el repo. Por eso el estado tiene que quedar siempre al día. (Hasta el MVP la unidad de trabajo fue la etapa, con ramas `etapa-<n>-<tema>`; esas secciones del plan quedan como historia.)
 
-1. **Al empezar**: leer el estado en `docs/plan.md`. Se toma la mejora que pida el usuario o, si no dice, la marcada como "Próxima" en la tabla de "Después del MVP". Si no está en la tabla, se agrega. Se crea su rama desde `main` actualizado (`mejora-<tema>`) y se escribe su subsección en el plan (objetivo, qué incluye y "Terminada cuando"), con el OK del usuario sobre el alcance. Si la mejora ya está en curso, el plan nombra su rama: se sigue en esa rama (`git checkout <rama>` y `git pull`), sin crear otra. Una mejora puede ocupar más de una sesión.
+1. **Al empezar**: leer el estado en `docs/plan.md`. Se toma la mejora que pida el usuario o, si no dice, la marcada como "Próxima" en la tabla de "Después del MVP". Si no está en la tabla, se agrega. Se crea su rama desde `main` actualizado (`mejora-<tema>`) y se escribe su subsección en el plan (objetivo, qué incluye y "Terminada cuando"), con el OK del usuario sobre el alcance. Si la mejora ya está en curso, el plan nombra su rama: se sigue en esa rama (`git checkout <rama>` y `git pull`), sin crear otra. Una mejora puede ocupar más de una sesión: si se hace en tandas (como las de diseño), **cada tanda va en una sesión nueva**, porque una sesión larga relee toda la conversación en cada respuesta y gasta mucho más.
 2. **Durante la mejora**: cada funcionalidad pasa por el [ciclo de agentes](#ciclo-por-funcionalidad-agentes). Una funcionalidad es un punto del "Incluye" de la mejora, o un grupo chico de puntos relacionados. Lo que el spec no cubra se resuelve con la opción más simple y se anota para el PR.
 3. **Al terminar**:
    - pasar los chequeos de la sección Comandos;
@@ -131,7 +131,7 @@ node --env-file=.env.local scripts/gemini-probe/probe.ts <corrida> gemini-3.5-fl
 node scripts/gemini-probe/summarize.ts <corrida>
 node scripts/pwa/generate-icons.ts                                    # regenera los íconos desde public/icon.svg
 node scripts/usda-seed/build.ts <carpeta con los CSV> <migración nueva y vacía>   # seed USDA; nunca pisa una migración con contenido
-node --env-file=.env.local scripts/ux-screens/capture.ts [--out <carpeta>] [--device "iPhone 15"] [--url <url>]   # capturas para el ux-designer; solo dev
+node --env-file=.env.local scripts/ux-screens/capture.ts [--out <carpeta>] [--device "iPhone 15"] [--url <url>] [--sin-alerta] [--oscuro] [--solo <estado,estado>]   # capturas para el ux-designer; solo dev
 npx playwright install webkit                                         # una vez por máquina, para ux-screens
 ```
 

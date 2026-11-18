@@ -56,7 +56,7 @@ const MEAL_DRAFT_KEY = 'meal-draft'
 const DOSE_ALERT_UNITS = 15
 
 const USAGE =
-  'Uso: node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta] [--oscuro]'
+  'Uso: node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta] [--oscuro] [--solo <estado,estado>]'
 
 function fail(message: string): never {
   console.error(message)
@@ -74,6 +74,7 @@ function readArgs() {
         out: { type: 'string' },
         'sin-alerta': { type: 'boolean', default: false },
         oscuro: { type: 'boolean', default: false },
+        solo: { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
       },
     }).values
@@ -1545,8 +1546,31 @@ try {
     clearDoseAlert,
     putDoseAlertBack,
   )
+  // --solo: only the named states (without their number). The others are
+  // listed as omitted, so the numbers do not move. A state that needs one
+  // before it may fail alone: then run without --solo.
+  const only =
+    args.solo === undefined
+      ? null
+      : new Set(args.solo.split(',').map((name) => name.trim()))
+  if (only !== null) {
+    const unknown = [...only].filter(
+      (name) => !states.some((state) => state.name === name),
+    )
+    if (unknown.length > 0) {
+      fail(`--solo: no existe el estado ${unknown.join(', ')}.\n${USAGE}`)
+    }
+  }
   for (const [position, state] of states.entries()) {
     const base = `${String(position + 1).padStart(2, '0')}-${state.name}`
+    if (only !== null && !only.has(state.name)) {
+      index.omitted.push({
+        state: base,
+        description: state.description,
+        reason: 'No se pidió con --solo.',
+      })
+      continue
+    }
     if (state.omitted !== undefined) {
       index.omitted.push({
         state: base,
