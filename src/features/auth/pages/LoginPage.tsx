@@ -1,12 +1,16 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
 import { LoadingScreen } from '../../../components/LoadingScreen.tsx'
+import { Notice } from '../../../components/Notice.tsx'
+import {
+  button,
+  field,
+  fieldLabel,
+  pageTitle,
+} from '../../../components/styles.ts'
 import { authErrorMessage } from '../../../lib/errors.ts'
 import { useSignIn } from '../queries.ts'
 import { useSession } from '../useSession.ts'
-
-const inputClass =
-  'min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base focus:border-slate-500 focus:outline-none'
 
 export function LoginPage() {
   const session = useSession()
@@ -32,14 +36,27 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))] text-slate-900">
-      <h1 className="text-2xl font-semibold">Calculadora de HdC</h1>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      {/* The icon of the app, its name and its phrase (UX-23). */}
+      <header className="flex flex-col items-start gap-3">
+        <img
+          src="/icon.svg"
+          alt=""
+          width={64}
+          height={64}
+          className="size-16 rounded-card shadow-level-1"
+        />
+        <div className="flex flex-col gap-1">
+          <h1 className={pageTitle}>Calculadora de HdC</h1>
+          <p className="text-ink-soft">Pesás, cargás y listo.</p>
+        </div>
+      </header>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">Email</span>
+          <span className={fieldLabel}>Email</span>
           <input
-            className={inputClass}
+            className={field}
             type="email"
             name="email"
             autoComplete="username"
@@ -52,9 +69,9 @@ export function LoginPage() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-slate-700">Contraseña</span>
+          <span className={fieldLabel}>Contraseña</span>
           <input
-            className={inputClass}
+            className={field}
             type="password"
             name="password"
             autoComplete="current-password"
@@ -65,21 +82,21 @@ export function LoginPage() {
         </label>
 
         {signIn.isError && (
-          <p role="alert" className="text-sm text-red-700">
-            {authErrorMessage(signIn.error)}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{authErrorMessage(signIn.error)}</p>
+          </Notice>
         )}
 
         <button
           type="submit"
-          className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.primary}
           disabled={signIn.isPending}
         >
           {signIn.isPending ? 'Entrando…' : 'Entrar'}
         </button>
       </form>
 
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-ink-soft">
         Proyecto personal. No es un dispositivo médico y no reemplaza la
         indicación médica.
       </p>

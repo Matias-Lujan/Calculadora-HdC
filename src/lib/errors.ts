@@ -2,11 +2,14 @@ import {
   isAuthApiError,
   isAuthRetryableFetchError,
 } from '@supabase/supabase-js'
-import type {
-  CarbsPer100gError,
-  ItemErrorCode,
-  PositiveNumberError,
-  TypedNumberNotice,
+import {
+  withUnitsWord,
+  type CarbsPer100gError,
+  type ItemErrorCode,
+  type NonNegativeNumberError,
+  type PositiveNumberError,
+  type QuantityMode,
+  type TypedNumberNotice,
 } from '../domain/dose/index.ts'
 
 // Single place where error codes become Spanish messages (CLAUDE.md,
@@ -100,6 +103,34 @@ export function positiveNumberErrorMessage(code: PositiveNumberError): string {
 }
 
 /**
+ * The error of the quantity of a meal item (spec §6.6): an empty field says
+ * what to write, in grams or in units; the rest, as any number > 0.
+ */
+export function quantityErrorMessage(
+  code: PositiveNumberError,
+  mode: QuantityMode,
+): string {
+  if (code !== 'REQUIRED') return positiveNumberErrorMessage(code)
+  return mode === 'units'
+    ? 'Poné cuántas unidades comiste.'
+    : 'Poné cuántos gramos comiste.'
+}
+
+/** The error of the applied dose of a meal (spec §6.6), which can be 0. */
+export function appliedDoseErrorMessage(code: NonNegativeNumberError): string {
+  return code === 'REQUIRED'
+    ? 'Poné cuánto te aplicaste. Puede ser 0.'
+    : positiveNumberErrorMessage(code)
+}
+
+/** The error of the ratio in Configuración (spec §6.8). */
+export function ratioErrorMessage(code: PositiveNumberError): string {
+  return code === 'REQUIRED'
+    ? 'Poné tu ratio.'
+    : positiveNumberErrorMessage(code)
+}
+
+/**
  * Validation errors of the food form fields (src/features/foods/foodForm.ts).
  * Declared here, and not in the feature, because lib does not import
  * features.
@@ -107,6 +138,7 @@ export function positiveNumberErrorMessage(code: PositiveNumberError): string {
 export type FoodFieldError =
   | PositiveNumberError
   | CarbsPer100gError
+  | 'NAME_REQUIRED'
   | 'STATE_REQUIRED'
   | 'UNIT_WEIGHT_REQUIRED'
   | 'FACTOR_NOT_COMPUTABLE'
@@ -119,17 +151,44 @@ export type FoodFieldError =
 const FOOD_FIELD_ERRORS: Record<FoodFieldError, string> = {
   ...POSITIVE_NUMBER_ERRORS,
   ABOVE_100: 'No puede ser más de 100 g cada 100 g.',
-  STATE_REQUIRED: 'Elegí una opción.',
+  NAME_REQUIRED: 'Poné el nombre del alimento.',
+  STATE_REQUIRED: 'Elegí si se cocina antes de comer.',
   UNIT_WEIGHT_REQUIRED: 'Completá el peso de la unidad, o borrá el nombre.',
   FACTOR_NOT_COMPUTABLE:
     'Con estos pesos no se puede calcular cuánto rinde. Revisalos.',
   CARBS_EXCEED_PORTION: 'No puede ser más que la porción.',
   FIBER_EXCEEDS_CARBS: 'No puede ser más que los HC.',
   COLUMN_REQUIRED: 'Elegí qué columna usar.',
-  BASIS_REQUIRED: 'Elegí una opción.',
+  BASIS_REQUIRED: 'Elegí si los HC son de una porción o cada 100 g.',
 }
 
-export function foodFieldErrorMessage(code: FoodFieldError): string {
+/**
+ * The number fields of a food form that are required, each with its own
+ * message when it is empty, in the words of its label (UX-14).
+ */
+export type RequiredFoodField =
+  'carbsPer100g' | 'rawWeight' | 'cookedWeight' | 'portion' | 'portionCarbs'
+
+const REQUIRED_FOOD_FIELDS: Record<RequiredFoodField, string> = {
+  carbsPer100g: 'Poné cuántos g de HC tiene cada 100 g.',
+  rawWeight: 'Poné el peso crudo.',
+  cookedWeight: 'Poné el peso cocido.',
+  portion: 'Poné cuántos gramos es la porción.',
+  portionCarbs: 'Poné cuántos g de HC tiene la porción.',
+}
+
+/**
+ * The message of an error of a food form field. An empty field (REQUIRED)
+ * says what to write in it if `field` is given; otherwise, "Completá este
+ * campo.".
+ */
+export function foodFieldErrorMessage(
+  code: FoodFieldError,
+  field?: RequiredFoodField,
+): string {
+  if (code === 'REQUIRED' && field !== undefined) {
+    return REQUIRED_FOOD_FIELDS[field]
+  }
   return FOOD_FIELD_ERRORS[code]
 }
 
@@ -137,7 +196,7 @@ export function foodFieldErrorMessage(code: FoodFieldError): string {
 // said as how much 100 g raw yield. Receives the cooked grams already
 // formatted (foodForm.ts, unusualYieldText).
 export function cookingFactorUnusualMessage(cookedGrams: string): string {
-  return `Con estos datos, 100 g crudo rinden ${cookedGrams} g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?`
+  return `Con estos datos, 100 g crudo rinden ${cookedGrams} g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?`
 }
 
 /**
@@ -167,8 +226,9 @@ export function mealItemErrorMessage(code: MealItemFoodError): string {
 }
 
 /**
- * A warning that asks for confirmation before saving a meal (spec §8.5),
- * with its values already formatted (src/features/meals/mealDraft.ts,
+ * A warning of a meal (spec §8.5), shown in sight as soon as it appears and
+ * asked for again before saving, with its values already formatted
+ * (src/features/meals/mealDraft.ts: itemWarnings, doseWarning and
  * saveWarnings). Declared here, and not in the feature, because lib does
  * not import features.
  */
@@ -187,16 +247,67 @@ export type MealSaveWarning =
     }
   | { code: 'DOSE_ABOVE_THRESHOLD'; dose: string; threshold: string }
 
-export function mealSaveWarningMessage(warning: MealSaveWarning): string {
+/**
+ * A message with the number to check in bold: `before`, then `strong` (in
+ * bold, empty if there is none) and `after`.
+ */
+export type EmphasizedMessage = {
+  before: string
+  strong: string
+  after: string
+}
+
+/**
+ * A warning in the confirmation before saving a meal (spec §8.5), with the
+ * number to check in bold: "Arroz: **650 g**. Tu alerta es de 500 g por
+ * alimento.".
+ */
+export function mealSaveWarningMessage(
+  warning: MealSaveWarning,
+): EmphasizedMessage {
   switch (warning.code) {
     case 'ITEM_GRAMS_ABOVE_THRESHOLD':
-      return `${warning.foodName}: ${warning.grams} g, más que tu alerta de ${warning.threshold} g por alimento.`
+      return {
+        before: `${warning.foodName}: `,
+        strong: `${warning.grams} g`,
+        after: `. Tu alerta es de ${warning.threshold} g por alimento.`,
+      }
     case 'COOKING_FACTOR_UNUSUAL':
       return warning.cookedGrams === null
-        ? `${warning.foodName}: lo que rinde al cocinarlo está muy lejos de lo habitual.`
-        : `${warning.foodName}: 100 g crudo rinden ${warning.cookedGrams} g cocido, y lo habitual es entre 100 y 400 g.`
+        ? {
+            before: `${warning.foodName}: lo que rinde al cocinarlo está muy lejos de lo habitual.`,
+            strong: '',
+            after: '',
+          }
+        : {
+            before: `${warning.foodName}: 100 g crudo rinden `,
+            strong: `${warning.cookedGrams} g`,
+            after: ' cocido, y lo habitual es entre 100 y 400 g.',
+          }
     case 'DOSE_ABOVE_THRESHOLD':
-      return `La dosis calculada da ${warning.dose} U, más que tu alerta de ${warning.threshold} U.`
+      return {
+        before: 'La dosis calculada da ',
+        strong: withUnitsWord(warning.dose),
+        after: `. Tu alerta es de ${withUnitsWord(warning.threshold)}.`,
+      }
+  }
+}
+
+/**
+ * A warning in sight as soon as it appears, without waiting for "Guardar"
+ * (spec §6.6): the ones of an item go under its quantity, so they do not
+ * repeat its name; the dose one goes in the dose display.
+ */
+export function mealLiveWarningMessage(warning: MealSaveWarning): string {
+  switch (warning.code) {
+    case 'ITEM_GRAMS_ABOVE_THRESHOLD':
+      return `Más que tu alerta de ${warning.threshold} g por alimento.`
+    case 'COOKING_FACTOR_UNUSUAL':
+      return warning.cookedGrams === null
+        ? 'Lo que rinde al cocinarlo está muy lejos de lo habitual.'
+        : `100 g crudo rinden ${warning.cookedGrams} g cocido, y lo habitual es entre 100 y 400 g.`
+    case 'DOSE_ABOVE_THRESHOLD':
+      return `Más que tu alerta de ${withUnitsWord(warning.threshold)}.`
   }
 }
 
@@ -259,9 +370,78 @@ export const PHOTO_LOAD_ERROR_MESSAGE = 'No se pudo cargar la foto.'
 // The date and time field of a meal, when it is empty or not a real date.
 export const EATEN_AT_ERROR_MESSAGE = 'Elegí la fecha y la hora.'
 
-// "Guardar" on a meal with errors (an item, the applied dose or the date).
+// "Guardar comida" on a meal whose only problem is the total or the dose
+// (shown in the dose display), with no field to go to.
 export const MEAL_BLOCKED_MESSAGE =
   'Corregí los datos marcados para poder guardar.'
+
+/**
+ * The first thing to fix when "Guardar comida" finds errors (spec §6.6), in
+ * the order of the screen (src/features/meals/mealDraft.ts,
+ * firstMealProblem). Declared here, and not in the feature, because lib
+ * does not import features.
+ */
+export type MealProblem =
+  | { code: 'QUANTITY'; foodName: string; error: PositiveNumberError }
+  | { code: 'FOOD'; foodName: string }
+  | { code: 'APPLIED_DOSE'; error: NonNegativeNumberError }
+  | { code: 'EATEN_AT'; empty: boolean }
+  | { code: 'MEAL' }
+
+/**
+ * The message next to "Guardar comida" that names the first problem: what
+ * is missing ("Falta la cantidad de Banana.") or, if something was written
+ * but is not valid, what to check ("Revisá la cantidad de Banana.").
+ */
+export function mealProblemMessage(problem: MealProblem): string {
+  switch (problem.code) {
+    case 'QUANTITY':
+      return problem.error === 'REQUIRED'
+        ? `Falta la cantidad de ${problem.foodName}.`
+        : `Revisá la cantidad de ${problem.foodName}.`
+    case 'FOOD':
+      return `Revisá ${problem.foodName}.`
+    case 'APPLIED_DOSE':
+      return problem.error === 'REQUIRED'
+        ? 'Falta cuánto te aplicaste.'
+        : 'Revisá cuánto te aplicaste.'
+    case 'EATEN_AT':
+      return problem.empty
+        ? 'Falta la fecha y la hora.'
+        : 'Revisá la fecha y la hora.'
+    case 'MEAL':
+      return MEAL_BLOCKED_MESSAGE
+  }
+}
+
+/**
+ * Why an item of a saved meal is not brought back by "Repetir" or
+ * "Corregir" (spec §6.6; src/features/meals/mealCopy.ts). Declared here, and
+ * not in the feature, because lib does not import features.
+ */
+export type MealCopySkipReason =
+  'NOT_IN_CATALOG' | 'MISSING_COOKING_FACTOR' | 'NO_UNIT_WEIGHT'
+
+/** The notice of an item that "Repetir" or "Corregir" could not bring. */
+export function mealCopySkipMessage(
+  foodName: string,
+  reason: MealCopySkipReason,
+): string {
+  const start = `No se pudo traer «${foodName}»: `
+  switch (reason) {
+    case 'NOT_IN_CATALOG':
+      return `${start}ya no está en Mis alimentos.`
+    case 'MISSING_COOKING_FACTOR':
+      return `${start}falta cuánto rinde al cocinarlo.`
+    case 'NO_UNIT_WEIGHT':
+      return `${start}ya no tiene peso por unidad.`
+  }
+}
+
+// A correction saved, but the corrected meal could not be deleted (spec
+// §6.7, "Corregir").
+export const CORRECTION_DELETE_ERROR_MESSAGE =
+  'Se guardó la corrección, pero no se pudo borrar la comida anterior. Borrala desde el historial.'
 
 // The meal total when the ratio is not valid (INVALID_RATIO, spec §8.4).
 export const INVALID_RATIO_MESSAGE =

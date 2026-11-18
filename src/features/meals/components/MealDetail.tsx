@@ -1,14 +1,16 @@
+import { useState } from 'react'
+import { pageTitle } from '../../../components/styles.ts'
 import {
-  doseLine,
-  doseText,
   itemCarbsText,
+  savedDoseNoteText,
   savedItemLines,
-  totalCarbsText,
+  savedItemQuantityText,
 } from '../breakdown.ts'
-import { formatEatenAt } from '../eatenAt.ts'
+import { formatMealDateTime } from '../eatenAt.ts'
 import { appliedDoseText } from '../history.ts'
 import type { SavedMeal } from '../types.ts'
 import { CalculationDetails } from './CalculationDetails.tsx'
+import { CopyMealSection } from './CopyMealSection.tsx'
 import { DeleteMealSection } from './DeleteMealSection.tsx'
 
 type Props = {
@@ -16,57 +18,70 @@ type Props = {
 }
 
 /**
- * A saved meal (spec §6.7): the breakdown as it was calculated, from the
- * values saved in the record and not from the current catalog. Nothing is
- * calculated again: the saved numbers are formatted with the same texts as
- * the meal screen, with the calculation folded under "Ver la cuenta".
+ * A saved meal (spec §6.7, UX-12): first a summary with the look of the dose
+ * display (the carbs, the applied dose, and the calculated dose and the
+ * ratio, small), then each food with how much was eaten and its carbs in
+ * sight and its calculation folded under "Ver la cuenta", and at the end
+ * the actions. Everything comes from the values saved in the record, not
+ * from the current catalog: nothing is calculated again.
  */
 export function MealDetail({ meal }: Props) {
+  // "Hoy" and "Ayer" are relative to when the detail was opened.
+  const [now] = useState(() => new Date())
   return (
     <article className="flex flex-col gap-4">
       <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Comida</h1>
-        <p className="text-slate-500">{formatEatenAt(meal.eaten_at)}</p>
+        <h1 className={pageTitle}>Comida</h1>
+        <p className="text-ink-soft tabular-nums">
+          {formatMealDateTime(meal.eaten_at, now)}
+        </p>
       </header>
 
-      <ul className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2 rounded-display border border-transparent bg-display p-4 text-on-display shadow-level-2 dark:border-accent">
+        <p className="font-display text-2xl font-semibold tabular-nums">
+          {itemCarbsText(meal.total_carbs_g)}
+        </p>
+        <p className="text-base">
+          {meal.applied_dose_units === null ? (
+            'No anotaste cuánto te aplicaste.'
+          ) : (
+            <>
+              Te aplicaste{' '}
+              <strong className="font-display text-3xl font-bold whitespace-nowrap tabular-nums">
+                {appliedDoseText(meal.applied_dose_units)}
+              </strong>
+            </>
+          )}
+        </p>
+        <p className="text-xs text-on-display-soft tabular-nums">
+          {savedDoseNoteText(
+            meal.calculated_dose_units,
+            meal.carb_ratio_g_per_unit,
+          )}
+        </p>
+      </div>
+
+      <ul className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface px-4 shadow-level-1">
         {meal.meal_items.map((item) => (
-          <li
-            key={item.position}
-            className="flex flex-col gap-1 rounded-lg border border-slate-200 p-3"
-          >
-            <div className="flex flex-col">
-              <span className="font-medium">{item.food_name}</span>
-              {item.food_brand !== null && (
-                <span className="text-sm text-slate-500">
-                  {item.food_brand}
-                </span>
-              )}
+          <li key={item.position} className="flex flex-col py-3">
+            <span className="font-semibold">{item.food_name}</span>
+            {item.food_brand !== null && (
+              <span className="text-sm text-ink-soft">{item.food_brand}</span>
+            )}
+            <div className="flex items-baseline justify-between gap-3 pt-1">
+              <span className="tabular-nums">
+                {savedItemQuantityText(item)}
+              </span>
+              <span className="shrink-0 font-display font-semibold tabular-nums">
+                {itemCarbsText(item.carbs_g)}
+              </span>
             </div>
-            <p className="font-medium">{itemCarbsText(item.carbs_g)}</p>
             <CalculationDetails lines={savedItemLines(item)} />
           </li>
         ))}
       </ul>
 
-      <div className="flex flex-col gap-1 rounded-lg bg-slate-100 p-3">
-        <p className="text-slate-700">{totalCarbsText(meal.total_carbs_g)}</p>
-        <p className="text-xl font-semibold">
-          {doseText(meal.calculated_dose_units)}
-        </p>
-        <p className="text-slate-700">
-          Dosis aplicada: {appliedDoseText(meal.applied_dose_units)}
-        </p>
-        <CalculationDetails
-          lines={[
-            doseLine(
-              meal.total_carbs_g,
-              meal.carb_ratio_g_per_unit,
-              meal.calculated_dose_units,
-            ),
-          ]}
-        />
-      </div>
+      <CopyMealSection meal={meal} />
 
       <DeleteMealSection meal={meal} />
     </article>

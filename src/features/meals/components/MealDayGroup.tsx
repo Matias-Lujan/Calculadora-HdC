@@ -1,4 +1,6 @@
 import { useId } from 'react'
+import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { enter } from '../../../components/styles.ts'
 import { formatDayTitle } from '../eatenAt.ts'
 import { daySummaryText, type MealDay } from '../history.ts'
 import { MealListItem } from './MealListItem.tsx'
@@ -26,19 +28,26 @@ export function MealDayGroup({ day, open, onToggle, now }: Props) {
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        className="flex min-h-11 items-center gap-2 py-2 text-left"
+        className="flex min-h-14 items-center gap-2 py-2 text-left"
         onClick={onToggle}
       >
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+        <span className="text-ink-soft">
+          <DisclosureIcon open={open} />
+        </span>
         <span className="flex flex-col">
           <span className="font-semibold">{formatDayTitle(day.day, now)}</span>
           {summary !== null && (
-            <span className="text-sm text-slate-700">{summary}</span>
+            <span className="text-sm text-ink-soft tabular-nums">
+              {summary}
+            </span>
           )}
         </span>
       </button>
       {open && (
-        <ul id={id} className="flex flex-col divide-y divide-slate-200 pl-6">
+        <ul
+          id={id}
+          className={`flex flex-col divide-y divide-line pl-7 ${enter}`}
+        >
           {day.meals.map((meal) => (
             <li key={meal.id}>
               <MealListItem meal={meal} />

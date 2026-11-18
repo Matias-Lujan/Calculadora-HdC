@@ -6,13 +6,15 @@ import {
 import { createMemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import {
+  appliedDoseParts,
   appliedDoseText,
   daySummaryText,
   groupMealsByDay,
   isFromHistoryList,
   isPlainLeftClick,
   mealFoodsText,
-  mealSummaryText,
+  mealRowDetailText,
+  mealRowLabel,
   nextMealsOffset,
   openDaysFromState,
   toggledDays,
@@ -470,11 +472,18 @@ describe('"← Historial" with the scroll restoration of react-router', () => {
 })
 
 describe('appliedDoseText', () => {
+  // Without trailing zeros: "7,00" can be read as "700" (UX-02).
   it.each([
-    [8.5, '8,50 U'],
-    [128.24 / 15, '8,55 U'],
-    [0, '0,00 U'],
-    [1.005, '1,01 U'],
+    [8.5, '8,5\u00a0unidades'],
+    [7, '7\u00a0unidades'],
+    [128.24 / 15, '8,55\u00a0unidades'],
+    [0, '0\u00a0unidades'],
+    [1.005, '1,01\u00a0unidades'],
+    [8.999, '9\u00a0unidades'],
+    [0.5, '0,5\u00a0unidades'],
+    [10, '10\u00a0unidades'],
+    [1, '1\u00a0unidad'],
+    [1.004, '1\u00a0unidad'],
   ])('%s → %s', (units, text) => {
     expect(appliedDoseText(units)).toBe(text)
   })
@@ -482,43 +491,139 @@ describe('appliedDoseText', () => {
   it('null → "—"', () => {
     expect(appliedDoseText(null)).toBe('—')
   })
+
+  it('never says "U"', () => {
+    expect(appliedDoseText(7)).not.toMatch(/\bU\b/)
+  })
 })
 
-describe('mealSummaryText', () => {
-  it('the meal of spec §8.3, applied 8,5', () => {
+// --- A row of the list (UX-11) ---
+
+describe('appliedDoseParts', () => {
+  it.each([
+    [5.5, '5,5', 'unidades'],
+    [7, '7', 'unidades'],
+    [1, '1', 'unidad'],
+    [1.004, '1', 'unidad'],
+    [1.005, '1,01', 'unidades'],
+    [0, '0', 'unidades'],
+    [128.24 / 15, '8,55', 'unidades'],
+  ])('%s → %s %s', (units, number, word) => {
+    expect(appliedDoseParts(units)).toEqual({ number, word })
+  })
+
+  it('without an applied dose: null (the row shows "—")', () => {
+    expect(appliedDoseParts(null)).toBeNull()
+  })
+})
+
+describe('mealRowDetailText', () => {
+  it('the carbs and the calculated dose, with 2 decimals', () => {
     expect(
-      mealSummaryText(
+      mealRowDetailText(
         meal(0, {
-          total_carbs_g: 128.24,
-          calculated_dose_units: 128.24 / 15,
+          total_carbs_g: 80.84,
+          calculated_dose_units: 80.84 / 15,
+          applied_dose_units: 5.5,
+        }),
+      ),
+    ).toBe('80,8 g de HC · calculada 5,39')
+  })
+
+  it('applied equal to the calculated one: only the carbs', () => {
+    expect(
+      mealRowDetailText(
+        meal(0, {
+          total_carbs_g: 105,
+          calculated_dose_units: 7,
+          applied_dose_units: 7,
+        }),
+      ),
+    ).toBe('105,0 g de HC')
+  })
+
+  it('equal as shown with 2 decimals counts as equal', () => {
+    // 8,4966… shows "8,50", as the applied 8,5.
+    expect(
+      mealRowDetailText(
+        meal(0, {
+          total_carbs_g: 127.45,
+          calculated_dose_units: 127.45 / 15,
           applied_dose_units: 8.5,
         }),
       ),
-    ).toBe('HC 128,2 g · Dosis 8,55 U · Aplicada 8,50 U')
+    ).toBe('127,5 g de HC')
   })
 
-  it('everything 0', () => {
+  it('a difference in the second decimal shows the calculated one', () => {
     expect(
-      mealSummaryText(
+      mealRowDetailText(
+        meal(0, { calculated_dose_units: 8.54, applied_dose_units: 8.55 }),
+      ),
+    ).toBe('30,0 g de HC · calculada 8,54')
+  })
+
+  it('without an applied dose, the calculated one shows', () => {
+    expect(mealRowDetailText(meal(0, { applied_dose_units: null }))).toBe(
+      '30,0 g de HC · calculada 2,00',
+    )
+  })
+
+  it('everything 0: only the carbs', () => {
+    expect(
+      mealRowDetailText(
         meal(0, {
           total_carbs_g: 0,
           calculated_dose_units: 0,
           applied_dose_units: 0,
         }),
       ),
-    ).toBe('HC 0,0 g · Dosis 0,00 U · Aplicada 0,00 U')
+    ).toBe('0,0 g de HC')
+  })
+})
+
+describe('mealRowLabel', () => {
+  // 16:05 UTC is 13:05 in Buenos Aires.
+  it('everything the row says, with the calculated dose when it shows', () => {
+    expect(
+      mealRowLabel(
+        meal(0, {
+          total_carbs_g: 80.84,
+          calculated_dose_units: 80.84 / 15,
+          applied_dose_units: 5.5,
+          meal_items: [
+            { position: 1, food_name: 'Pan de campo' },
+            { position: 0, food_name: 'Arroz largo fino' },
+          ],
+        }),
+      ),
+    ).toBe(
+      '13:05. Arroz largo fino, Pan de campo. 80,8 g de HC. Te aplicaste 5,5 unidades. Calculada: 5,39 unidades.',
+    )
+  })
+
+  it('applied equal to the calculated one: without the calculated dose', () => {
+    expect(mealRowLabel(meal(0))).toBe(
+      '13:05. Arroz de prueba. 30,0 g de HC. Te aplicaste 2 unidades.',
+    )
   })
 
   it('without an applied dose', () => {
-    expect(mealSummaryText(meal(0, { applied_dose_units: null }))).toBe(
-      'HC 30,0 g · Dosis 2,00 U · Aplicada —',
+    expect(mealRowLabel(meal(0, { applied_dose_units: null }))).toBe(
+      '13:05. Arroz de prueba. 30,0 g de HC. No anotaste cuánto te aplicaste. Calculada: 2,00 unidades.',
     )
   })
 
-  it('no thousands separator in the carbs', () => {
-    expect(mealSummaryText(meal(0, { total_carbs_g: 1234.5 }))).toMatch(
-      /^HC 1234,5 g · /,
-    )
+  it('one unit', () => {
+    expect(
+      mealRowLabel(
+        meal(0, {
+          total_carbs_g: 15,
+          calculated_dose_units: 1,
+          applied_dose_units: 1,
+        }),
+      ),
+    ).toContain('Te aplicaste 1 unidad.')
   })
 })
 
@@ -742,17 +847,34 @@ describe('daySummaryText', () => {
   })
 })
 
+// "Hoy" and "Ayer" (todayAndYesterday), open when the list opens (UX-11).
+const AT_START = ['2026-11-16', '2026-11-15']
+
 describe('openDaysFromState', () => {
   it('the open days of the entry', () => {
     expect(
-      openDaysFromState({ openDays: ['2026-11-14', '2026-11-12'] }),
+      openDaysFromState({ openDays: ['2026-11-14', '2026-11-12'] }, AT_START),
     ).toEqual(['2026-11-14', '2026-11-12'])
   })
 
   it('after the browser history clones it', () => {
     expect(
-      openDaysFromState(structuredClone({ openDays: ['2026-11-14'] })),
+      openDaysFromState(
+        structuredClone({ openDays: ['2026-11-14'] }),
+        AT_START,
+      ),
     ).toEqual(['2026-11-14'])
+  })
+
+  it('the entry with every day folded wins over "Hoy" and "Ayer"', () => {
+    expect(openDaysFromState({ openDays: [] }, AT_START)).toEqual([])
+  })
+
+  it('the days at start are a copy', () => {
+    const atStart = ['2026-11-16']
+    const open = openDaysFromState(null, atStart)
+    open.push('2026-11-14')
+    expect(atStart).toEqual(['2026-11-16'])
   })
 
   it.each([
@@ -763,8 +885,8 @@ describe('openDaysFromState', () => {
     ['openDays as text', { openDays: '2026-11-14' }],
     ['openDays with a number', { openDays: [1] }],
     ['an array', ['2026-11-14']],
-  ])('%s: none open', (_, state) => {
-    expect(openDaysFromState(state)).toEqual([])
+  ])('%s: "Hoy" and "Ayer" open', (_, state) => {
+    expect(openDaysFromState(state, AT_START)).toEqual(AT_START)
   })
 })
 
@@ -806,7 +928,7 @@ describe('the open days with the scroll restoration of react-router', () => {
   type Router = ReturnType<typeof setup>['router']
 
   function toggle(router: Router, day: string) {
-    const open = openDaysFromState(router.state.location.state)
+    const open = openDaysFromState(router.state.location.state, AT_START)
     return router.navigate('/history', {
       replace: true,
       state: { openDays: toggledDays(open, day) },
@@ -820,7 +942,8 @@ describe('the open days with the scroll restoration of react-router', () => {
     await toggle(router, '2026-11-14')
     expect(router.state.historyAction).toBe('REPLACE')
     expect(router.state.preventScrollReset).toBe(true)
-    expect(openDaysFromState(router.state.location.state)).toEqual([
+    expect(openDaysFromState(router.state.location.state, AT_START)).toEqual([
+      ...AT_START,
       '2026-11-14',
     ])
     // Back leaves /history: no entry was added.
@@ -830,26 +953,29 @@ describe('the open days with the scroll restoration of react-router', () => {
 
   it('back from a meal: the same days open and the same scroll', async () => {
     const { router, scroll } = setup()
-    await toggle(router, '2026-11-14')
+    await toggle(router, '2026-11-16') // folds "Hoy"
     await toggle(router, '2026-11-12')
     scroll.y = 2400
     await router.navigate('/history/x', { state: { fromHistory: true } })
     scroll.y = 0
     await router.navigate(-1)
     expect(router.state.location.pathname).toBe('/history')
-    expect(openDaysFromState(router.state.location.state)).toEqual([
-      '2026-11-14',
+    expect(openDaysFromState(router.state.location.state, AT_START)).toEqual([
+      '2026-11-15',
       '2026-11-12',
     ])
     expect(router.state.restoreScrollPosition).toBe(2400)
   })
 
-  it('"Historial" in the bar: every day folded, at the top', async () => {
+  it('"Historial" in the bar: "Hoy" and "Ayer" open, at the top', async () => {
     const { router } = setup()
-    await toggle(router, '2026-11-14')
+    await toggle(router, '2026-11-16')
+    await toggle(router, '2026-11-15')
     await router.navigate('/history/x', { state: { fromHistory: true } })
     await router.navigate('/history') // the NavLink
-    expect(openDaysFromState(router.state.location.state)).toEqual([])
+    expect(openDaysFromState(router.state.location.state, AT_START)).toEqual(
+      AT_START,
+    )
     expect(router.state.restoreScrollPosition).toBeNull()
   })
 })

@@ -13,6 +13,7 @@ import {
 import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
 import {
+  displayCarbsText,
   doseLine,
   doseText,
   foodCarbsLine,
@@ -20,7 +21,11 @@ import {
   foodYieldLine,
   itemCalculationLines,
   itemCarbsText,
+  ratioText,
+  savedDoseNoteText,
+  savedMealText,
   savedItemLines,
+  savedItemQuantityText,
   totalCarbsText,
 } from './breakdown.ts'
 import { toMealItemInput, toNewMealRecord } from './mealDraft.ts'
@@ -28,6 +33,7 @@ import {
   savedMealItemSchema,
   savedMealSchema,
   type MealItemDraft,
+  type NewMealItem,
   type SavedMealItem,
 } from './types.ts'
 
@@ -110,7 +116,7 @@ describe('the breakdown of spec §8.3, line by line', () => {
 
   it('alfajor (1 unit of 50 g)', () => {
     expect(lines(alfajor)).toEqual([
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
       '50 g × 58,0 ÷ 100 = 29,0 g HC',
     ])
   })
@@ -120,9 +126,9 @@ describe('the breakdown of spec §8.3, line by line', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(totalCarbsText(result.totalCarbsG)).toBe('HC total 128,2 g')
-    expect(doseText(result.doseUnits)).toBe('Dosis 8,55 U')
+    expect(doseText(result.doseUnits)).toBe('Dosis 8,55\u00a0unidades')
     expect(doseLine(result.totalCarbsG, 15, result.doseUnits)).toBe(
-      'Dosis = 128,2 ÷ 15 = 8,55 U',
+      'Dosis = 128,2 ÷ 15 = 8,55\u00a0unidades',
     )
   })
 })
@@ -132,36 +138,57 @@ describe('itemCalculationLines, units', () => {
 
   it('0,5 units of 45 g', () => {
     expect(lines(half)).toEqual([
-      '0,5 unidades × 45 g = 22,5 g',
+      '0,5 × unidad de 45 g = 22,5 g',
       '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
     ])
   })
 
   it.each([
-    [2, '2 unidades'],
-    [1.5, '1,5 unidades'],
-    [1, '1 unidad'],
-  ])('%s → "%s"', (quantity, text) => {
+    [2, '2 ×'],
+    [1.5, '1,5 ×'],
+    [1, '1 ×'],
+  ])('%s → "%s", never "unidades" (kept for insulin)', (quantity, text) => {
     const first = lines({ ...alfajor, quantity })[0]
-    expect(first?.startsWith(`${text} ×`)).toBe(true)
+    expect(first?.startsWith(`${text} unidad de `)).toBe(true)
+    expect(first).not.toContain('unidades')
+  })
+
+  it('with the name of the unit: "0,5 × alfajor de 45 g = 22,5 g"', () => {
+    expect(itemCalculationLines(half, success(half), 'alfajor')).toEqual([
+      '0,5 × alfajor de 45 g = 22,5 g',
+      '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
+    ])
+    expect(
+      itemCalculationLines(
+        { ...alfajor, quantity: 2 },
+        success({ ...alfajor, quantity: 2 }),
+        'galletita',
+      )[0],
+    ).toBe('2 × galletita de 50 g = 100 g')
+  })
+
+  it('the name of the unit is ignored outside units mode', () => {
+    expect(itemCalculationLines(banana, success(banana), 'alfajor')).toEqual(
+      lines(banana),
+    )
   })
 
   it('"1,0" typed is 1 unit (the parsed number is shown)', () => {
     // parseUserNumber("1,0") is 1, so the item gets quantity 1.
     expect(lines({ ...alfajor, quantity: 1.0 })[0]).toBe(
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
     )
   })
 
   it('a unit weight with decimals is shown with formatGrams', () => {
     expect(lines({ ...alfajor, unitWeightG: 9.5, quantity: 3 })[0]).toBe(
-      '3 unidades × 9,5 g = 28,5 g',
+      '3 × unidad de 9,5 g = 28,5 g',
     )
   })
 
   it('a typed quantity of units is exact (thousands grouped)', () => {
     expect(lines({ ...alfajor, unitWeightG: 1, quantity: 1500 })[0]).toBe(
-      '1.500 unidades × 1 g = 1500 g',
+      '1.500 × unidad de 1 g = 1500 g',
     )
   })
 })
@@ -285,26 +312,65 @@ describe('the texts in sight', () => {
   })
 
   it.each([
-    [8.546666666666667, 'Dosis 8,55 U'],
-    [0, 'Dosis 0,00 U'],
-    [1.005, 'Dosis 1,01 U'],
-    [2.675, 'Dosis 2,68 U'],
+    [8.546666666666667, 'Dosis 8,55\u00a0unidades'],
+    [0, 'Dosis 0,00\u00a0unidades'],
+    [1.005, 'Dosis 1,01\u00a0unidades'],
+    [2.675, 'Dosis 2,68\u00a0unidades'],
   ])('doseText(%s) → %j', (dose, text) => {
     expect(doseText(dose)).toBe(text)
+  })
+
+  it('a calculated dose of exactly 1 keeps its two decimals, in plural', () => {
+    expect(doseText(1)).toBe('Dosis 1,00\u00a0unidades')
+  })
+
+  it.each([
+    [128.24, '128,2 g'],
+    [0, '0,0 g'],
+    [-0, '0,0 g'],
+    [15.05, '15,1 g'],
+    [1234.56, '1234,6 g'],
+  ])('displayCarbsText(%s) → %j', (total, text) => {
+    expect(displayCarbsText(total)).toBe(text)
+  })
+
+  it.each([
+    [15, 'Ratio: 1 unidad cada 15 g de HC'],
+    [12.5, 'Ratio: 1 unidad cada 12,5 g de HC'],
+    [7.125, 'Ratio: 1 unidad cada 7,125 g de HC'],
+    [0.5, 'Ratio: 1 unidad cada 0,5 g de HC'],
+    [1500, 'Ratio: 1 unidad cada 1.500 g de HC'],
+  ])('ratioText(%s) → %j, with the ratio exact', (ratio, text) => {
+    expect(ratioText(ratio)).toBe(text)
+  })
+
+  it('the dose texts never say "U"', () => {
+    for (const text of [
+      doseText(8.55),
+      doseText(1),
+      doseLine(128.2, 15, 128.2 / 15),
+      ratioText(15),
+    ]) {
+      expect(text).not.toMatch(/\bU\b/)
+    }
   })
 })
 
 describe('doseLine', () => {
   it('a ratio with decimals is shown exact', () => {
-    expect(doseLine(25, 12.5, 2)).toBe('Dosis = 25,0 ÷ 12,5 = 2,00 U')
+    expect(doseLine(25, 12.5, 2)).toBe(
+      'Dosis = 25,0 ÷ 12,5 = 2,00\u00a0unidades',
+    )
   })
 
   it('the dose is rounded half up (1,005 → 1,01)', () => {
-    expect(doseLine(15.075, 15, 1.005)).toBe('Dosis = 15,1 ÷ 15 = 1,01 U')
+    expect(doseLine(15.075, 15, 1.005)).toBe(
+      'Dosis = 15,1 ÷ 15 = 1,01\u00a0unidades',
+    )
   })
 
   it('a total of 0', () => {
-    expect(doseLine(0, 15, 0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(0, 15, 0)).toBe('Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades')
   })
 })
 
@@ -362,10 +428,10 @@ describe('the lines show the numbers of calculateMeal', () => {
       `HC total ${formatCarbs(result.totalCarbsG)} g`,
     )
     expect(doseText(result.doseUnits)).toBe(
-      `Dosis ${formatDose(result.doseUnits)} U`,
+      `Dosis ${formatDose(result.doseUnits)}\u00a0unidades`,
     )
     expect(doseLine(result.totalCarbsG, 7.5, result.doseUnits)).toBe(
-      `Dosis = ${formatCarbs(result.totalCarbsG)} ÷ 7,5 = ${formatDose(result.doseUnits)} U`,
+      `Dosis = ${formatCarbs(result.totalCarbsG)} ÷ 7,5 = ${formatDose(result.doseUnits)}\u00a0unidades`,
     )
   })
 })
@@ -402,19 +468,19 @@ describe('itemCalculationLines: bordes', () => {
 
   it('a quarter unit', () => {
     expect(lines({ ...alfajor, quantity: 0.25 })[0]).toBe(
-      '0,25 unidades × 50 g = 12,5 g',
+      '0,25 × unidad de 50 g = 12,5 g',
     )
   })
 
   it('a quantity close to 1 is not "1 unidad"', () => {
     expect(lines({ ...alfajor, quantity: 1.0001 })[0]).toBe(
-      '1,0001 unidades × 50 g = 50 g',
+      '1,0001 × unidad de 50 g = 50 g',
     )
   })
 
   it('a unit weight with many decimals is rounded to 1 decimal', () => {
     expect(lines({ ...alfajor, unitWeightG: 45.25, quantity: 1 })[0]).toBe(
-      '1 unidad × 45,3 g = 45,3 g',
+      '1 × unidad de 45,3 g = 45,3 g',
     )
   })
 
@@ -456,36 +522,44 @@ describe('foodCarbsLine: bordes', () => {
 describe('doseLine: bordes', () => {
   it('a ratio with many decimals is shown exact', () => {
     expect(doseLine(30, 12.25, 30 / 12.25)).toBe(
-      'Dosis = 30,0 ÷ 12,25 = 2,45 U',
+      'Dosis = 30,0 ÷ 12,25 = 2,45\u00a0unidades',
     )
   })
 
-  it('2,675 U rounds half up to 2,68', () => {
-    expect(doseLine(40.125, 15, 2.675)).toBe('Dosis = 40,1 ÷ 15 = 2,68 U')
+  it('a dose of 2,675 rounds half up to 2,68', () => {
+    expect(doseLine(40.125, 15, 2.675)).toBe(
+      'Dosis = 40,1 ÷ 15 = 2,68\u00a0unidades',
+    )
   })
 
   it('never shows "-0"', () => {
-    expect(doseLine(-0, 15, -0)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(-0, 15, -0)).toBe('Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades')
   })
 
   it('a ratio below 1 and one with three decimals are shown exact', () => {
-    expect(doseLine(10, 0.5, 20)).toBe('Dosis = 10,0 ÷ 0,5 = 20,00 U')
+    expect(doseLine(10, 0.5, 20)).toBe(
+      'Dosis = 10,0 ÷ 0,5 = 20,00\u00a0unidades',
+    )
     expect(doseLine(10, 7.125, 10 / 7.125)).toBe(
-      'Dosis = 10,0 ÷ 7,125 = 1,40 U',
+      'Dosis = 10,0 ÷ 7,125 = 1,40\u00a0unidades',
     )
   })
 
   it('a dose that does not end (50 ÷ 3) is rounded only when shown', () => {
-    expect(doseLine(50, 3, 50 / 3)).toBe('Dosis = 50,0 ÷ 3 = 16,67 U')
+    expect(doseLine(50, 3, 50 / 3)).toBe(
+      'Dosis = 50,0 ÷ 3 = 16,67\u00a0unidades',
+    )
   })
 
   it('tiny values round to zero, without "-" or exponent', () => {
-    expect(doseLine(0.04, 15, 0.04 / 15)).toBe('Dosis = 0,0 ÷ 15 = 0,00 U')
+    expect(doseLine(0.04, 15, 0.04 / 15)).toBe(
+      'Dosis = 0,0 ÷ 15 = 0,00\u00a0unidades',
+    )
   })
 
   it('large values, without thousands separator', () => {
     expect(doseLine(12345.67, 1, 12345.67)).toBe(
-      'Dosis = 12345,7 ÷ 1 = 12345,67 U',
+      'Dosis = 12345,7 ÷ 1 = 12345,67\u00a0unidades',
     )
   })
 
@@ -499,8 +573,18 @@ describe('doseLine: bordes', () => {
 // --- The lines of a saved item (history detail, spec §6.7) ---
 
 // Saved items with the values of spec §8.3, as the history reads them.
+// The row the base keeps for an item: food_id instead of the food it
+// points to (a table food not copied yet gets an invented id).
+function asStoredItem({ food, ...row }: NewMealItem) {
+  return {
+    ...row,
+    food_id: 'id' in food ? food.id : '00000000-0000-4000-8000-0000000000ff',
+  }
+}
+
 const savedRice: SavedMealItem = {
   position: 0,
+  food_id: '00000000-0000-4000-8000-000000000001',
   food_name: 'Arroz de prueba',
   food_brand: null,
   food_state: 'raw_cooked',
@@ -516,6 +600,7 @@ const savedRice: SavedMealItem = {
 
 const savedBanana: SavedMealItem = {
   position: 1,
+  food_id: '00000000-0000-4000-8000-000000000002',
   food_name: 'Banana de prueba',
   food_brand: null,
   food_state: 'as_eaten',
@@ -531,6 +616,7 @@ const savedBanana: SavedMealItem = {
 
 const savedAlfajor: SavedMealItem = {
   position: 2,
+  food_id: '00000000-0000-4000-8000-000000000003',
   food_name: 'Alfajor de prueba',
   food_brand: 'Marca Inventada',
   food_state: 'as_eaten',
@@ -564,7 +650,7 @@ describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
   it('alfajor (1 unit of 50 g)', () => {
     expect(savedItemLines(savedAlfajor)).toEqual([
       '58,0 g de HC cada 100 g',
-      '1 unidad × 50 g = 50 g',
+      '1 × unidad de 50 g = 50 g',
       '50 g × 58,0 ÷ 100 = 29,0 g HC',
     ])
   })
@@ -580,7 +666,7 @@ describe('savedItemLines: the breakdown of spec §8.3, saved', () => {
       }),
     ).toEqual([
       '58,0 g de HC cada 100 g',
-      '0,5 unidades × 45 g = 22,5 g',
+      '0,5 × unidad de 45 g = 22,5 g',
       '22,5 g × 58,0 ÷ 100 = 13,1 g HC',
     ])
   })
@@ -611,7 +697,7 @@ describe('savedItemLines: does not calculate again', () => {
       savedItemLines({ ...savedAlfajor, grams: 52, carbs_g: 30.16 }),
     ).toEqual([
       '58,0 g de HC cada 100 g',
-      '1 unidad × 50 g = 52 g',
+      '1 × unidad de 50 g = 52 g',
       '52 g × 58,0 ÷ 100 = 30,2 g HC',
     ])
   })
@@ -730,7 +816,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
       const calc = result.items[index]
       if (draft === undefined || calc === undefined) throw new Error('missing')
       const saved = savedMealItemSchema.parse(
-        JSON.parse(JSON.stringify(item)) as unknown,
+        JSON.parse(JSON.stringify(asStoredItem(item))) as unknown,
       )
       expect(savedItemLines(saved)).toEqual([
         ...foodLines(draft.food),
@@ -790,7 +876,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
           JSON.stringify({
             id: '00000000-0000-4000-8000-0000000000aa',
             ...record.meal,
-            meal_items: record.items,
+            meal_items: record.items.map(asStoredItem),
           }),
         ) as unknown,
       )
@@ -838,7 +924,7 @@ describe('the texts in sight: -0', () => {
   it('never show "-0"', () => {
     expect(itemCarbsText(-0)).toBe('0,0 g de HC')
     expect(totalCarbsText(-0)).toBe('HC total 0,0 g')
-    expect(doseText(-0)).toBe('Dosis 0,00 U')
+    expect(doseText(-0)).toBe('Dosis 0,00\u00a0unidades')
   })
 })
 
@@ -857,5 +943,69 @@ describe('foodYieldLine: bounds of the usual range', () => {
     expect(
       foodYieldLine({ state: 'as_eaten', cooking_factor: null }),
     ).toBeNull()
+  })
+})
+
+// --- The history detail (UX-12) ---
+
+describe('savedItemQuantityText', () => {
+  it('eaten cooked: the cooked grams', () => {
+    expect(savedItemQuantityText(savedRice)).toBe('250 g cocidos')
+  })
+
+  it('in grams: the grams', () => {
+    expect(savedItemQuantityText(savedBanana)).toBe('120 g')
+  })
+
+  it('in units: the units exact and the weight of the unit', () => {
+    expect(savedItemQuantityText(savedAlfajor)).toBe('1 × unidad de 50 g')
+    expect(
+      savedItemQuantityText({
+        ...savedAlfajor,
+        units: 0.25,
+        unit_weight_g: 9.5,
+        grams: 2.375,
+      }),
+    ).toBe('0,25 × unidad de 9,5 g')
+  })
+
+  it('the grams with up to 1 decimal, without a trailing ",0"', () => {
+    expect(savedItemQuantityText({ ...savedBanana, grams: 249.96 })).toBe(
+      '250 g',
+    )
+    expect(savedItemQuantityText({ ...savedRice, grams: 22.45 })).toBe(
+      '22,5 g cocidos',
+    )
+  })
+
+  it('in units without what it needs (the base does not allow it): the grams', () => {
+    expect(
+      savedItemQuantityText({ ...savedAlfajor, unit_weight_g: null }),
+    ).toBe('50 g')
+  })
+})
+
+describe('savedDoseNoteText', () => {
+  it('the calculated dose with 2 decimals and the ratio exact', () => {
+    expect(savedDoseNoteText(80.84 / 15, 15)).toBe(
+      'Calculada: 5,39 unidades · Ratio: 1 unidad cada 15 g de HC',
+    )
+    expect(savedDoseNoteText(1, 12.5)).toBe(
+      'Calculada: 1,00 unidades · Ratio: 1 unidad cada 12,5 g de HC',
+    )
+  })
+})
+
+describe('savedMealText', () => {
+  it('says the total and the applied dose without trailing zeros (UX-23)', () => {
+    expect(savedMealText(128.25, 8.5, false)).toBe(
+      'Listo, guardada. 128,3 g de HC · te aplicaste 8,5 unidades.',
+    )
+    expect(savedMealText(15, 1, true)).toBe(
+      'Listo, corregida. 15,0 g de HC · te aplicaste 1 unidad.',
+    )
+    expect(savedMealText(0, 0, false)).toBe(
+      'Listo, guardada. 0,0 g de HC · te aplicaste 0 unidades.',
+    )
   })
 })

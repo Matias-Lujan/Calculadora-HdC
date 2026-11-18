@@ -217,10 +217,10 @@ describe('validateFoodForm, basics', () => {
     expect(validateFoodForm(texts(), null)).toEqual({ values, errors: {} })
   })
 
-  it.each(['', '   ', ' '])('name %j is REQUIRED', (name) => {
+  it.each(['', '   ', ' '])('name %j is NAME_REQUIRED', (name) => {
     const result = validateFoodForm(texts({ name }), null)
     expect(result.values).toBeNull()
-    expect(result.errors).toEqual({ name: 'REQUIRED' })
+    expect(result.errors).toEqual({ name: 'NAME_REQUIRED' })
   })
 
   it('trims name, brand and note', () => {
@@ -334,7 +334,7 @@ describe('validateFoodForm, state', () => {
       null,
     )
     expect(result.errors).toEqual({
-      name: 'REQUIRED',
+      name: 'NAME_REQUIRED',
       state: 'STATE_REQUIRED',
       carbsPer100g: 'ABOVE_100',
     })
@@ -555,7 +555,7 @@ describe('validateFoodForm, cooking factor (raw_cooked)', () => {
     )
     expect(result.values).toBeNull()
     expect(result.errors).toEqual({
-      name: 'REQUIRED',
+      name: 'NAME_REQUIRED',
       carbsPer100g: 'REQUIRED',
     })
   })
@@ -708,7 +708,7 @@ describe('validateFoodForm, several errors', () => {
     )
     expect(result.values).toBeNull()
     expect(result.errors).toEqual({
-      name: 'REQUIRED',
+      name: 'NAME_REQUIRED',
       carbsPer100g: 'REQUIRED',
       rawWeight: 'NOT_POSITIVE',
       cookedWeight: 'REQUIRED',
@@ -786,10 +786,10 @@ describe('yieldLine', () => {
 describe('unusualYieldText', () => {
   it('says how much 100 g raw yield, formatted', () => {
     expect(unusualYieldText(0.9)).toBe(
-      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
+      'Con estos datos, 100 g crudo rinden 90 g cocido, y lo habitual es entre 100 y 400 g. Puede ser un error de tipeo. ¿Lo guardás igual?',
     )
-    expect(unusualYieldText(4.0001)).toContain('rinden 400 g cocido')
-    expect(unusualYieldText(0.12345)).toContain('rinden 12,3 g cocido')
+    expect(unusualYieldText(4.0001)).toContain('rinden 400 g cocido')
+    expect(unusualYieldText(0.12345)).toContain('rinden 12,3 g cocido')
   })
 
   it.each([0, -1, NaN, Infinity])('%s → null', (factor) => {
@@ -895,7 +895,7 @@ describe('hasMoreOptionsErrors', () => {
     { rawWeight: 'REQUIRED' },
     { cookedWeight: 'NOT_POSITIVE' },
     { measuredFactor: 'FACTOR_NOT_COMPUTABLE' },
-    { name: 'REQUIRED', rawWeight: 'REQUIRED' },
+    { name: 'NAME_REQUIRED', rawWeight: 'REQUIRED' },
     { carbsPer100g: 'ABOVE_100', unitWeight: 'NOT_POSITIVE' },
   ])('%o → true', (errors) => {
     expect(hasMoreOptionsErrors(errors)).toBe(true)
@@ -903,7 +903,7 @@ describe('hasMoreOptionsErrors', () => {
 
   it.each<FoodFormErrors>([
     {},
-    { name: 'REQUIRED' },
+    { name: 'NAME_REQUIRED' },
     { carbsPer100g: 'ABOVE_100' },
     { state: 'STATE_REQUIRED' },
   ])('%o → false', (errors) => {

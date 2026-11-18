@@ -10,11 +10,12 @@ import {
 import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
 import {
-  createMeal,
   deleteMeal,
   fetchMeal,
   fetchMealsPage,
+  fetchRecentMeals,
   fetchReferenceFoods,
+  saveMeal,
 } from './api.ts'
 import { nextMealsOffset, withoutMeal } from './history.ts'
 import type { MealsPage } from './types.ts'
@@ -23,6 +24,8 @@ export const mealsKeys = {
   all: ['meals'] as const,
   list: ['meals', 'list'] as const,
   detail: (id: string) => ['meals', 'detail', id] as const,
+  // The last meals, for the shortcuts of an empty Inicio (spec §6.6).
+  recent: ['meals', 'recent'] as const,
 }
 
 // Outside mealsKeys.all on purpose: saving a meal invalidates that prefix,
@@ -49,10 +52,12 @@ export function useReferenceFoods() {
 // list is read again too. The meal kept while the app is open is cleared
 // here, and not only by the form: this runs even if the user left Inicio
 // while saving, so a saved meal is never restored (spec §6.6, §14 #61).
+// It also saves a correction (saveMeal): the corrected meal leaves the
+// history and the shortcuts of Inicio with the same invalidation.
 export function useCreateMeal() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: createMeal,
+    mutationFn: saveMeal,
     onSuccess: () => {
       clearMealDraft()
       return Promise.all([
@@ -85,6 +90,14 @@ export function useMealList() {
   return useInfiniteQuery(mealListOptions)
 }
 
+/**
+ * The last meals, for "Recientes" and "A esta hora comiste" (spec §6.6).
+ * Under the meals prefix: saving a meal reads them again.
+ */
+export function useRecentMeals() {
+  return useQuery({ queryKey: mealsKeys.recent, queryFn: fetchRecentMeals })
+}
+
 export function useMeal(id: string) {
   return useQuery({
     queryKey: mealsKeys.detail(id),
@@ -97,6 +110,7 @@ export function useMeal(id: string) {
 // too (otherwise, going back would show it until the list is read again),
 // and the list is read again. The detail being shown is not invalidated: it
 // would show "No encontramos esta comida." before navigating to the list.
+// The shortcuts of Inicio are read again too.
 export function useDeleteMeal() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -106,7 +120,10 @@ export function useDeleteMeal() {
         mealsKeys.list,
         (old) => old && withoutMeal(old, id),
       )
-      return queryClient.invalidateQueries({ queryKey: mealsKeys.list })
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: mealsKeys.list }),
+        queryClient.invalidateQueries({ queryKey: mealsKeys.recent }),
+      ])
     },
   })
 }

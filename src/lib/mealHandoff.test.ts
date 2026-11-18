@@ -4,7 +4,9 @@ import {
   FROM_MEAL_STATE,
   addToMealState,
   foodToAddToMeal,
+  fromMealState,
   isFromMeal,
+  nameFromMeal,
 } from './mealHandoff.ts'
 
 vi.mock('./supabase.ts', () => ({ supabase: {} }))
@@ -35,6 +37,26 @@ describe('isFromMeal', () => {
     expect(isFromMeal(undefined)).toBe(false)
     expect(isFromMeal({ fromMeal: 'true' })).toBe(false)
     expect(isFromMeal({})).toBe(false)
+  })
+})
+
+describe('fromMealState and nameFromMeal ("Agregar a mano")', () => {
+  it('opened from Inicio, with what was searched as the name', () => {
+    const state: unknown = JSON.parse(JSON.stringify(fromMealState('milanesa')))
+    expect(isFromMeal(state)).toBe(true)
+    expect(nameFromMeal(state)).toBe('milanesa')
+  })
+
+  it('without a name: the same state as the photo, and an empty name', () => {
+    expect(fromMealState()).toEqual(FROM_MEAL_STATE)
+    expect(nameFromMeal(FROM_MEAL_STATE)).toBe('')
+  })
+
+  it('an empty name, or a state that is not from Inicio', () => {
+    expect(nameFromMeal(null)).toBe('')
+    expect(nameFromMeal({ name: 'milanesa' })).toBe('')
+    expect(isFromMeal({ fromMeal: true, name: 3 })).toBe(false)
+    expect(nameFromMeal({ fromMeal: true, name: 3 })).toBe('')
   })
 })
 

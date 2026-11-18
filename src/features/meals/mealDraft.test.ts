@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  appliedDoseShortcuts,
   CALC_VERSION,
   calculateMeal,
+  formatUserNumber,
   type DoseSettings,
   type ItemResult,
   type MealSuccess,
@@ -10,11 +12,18 @@ import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
 import {
   appliedDose,
+  eatenAtToSave,
   appliedDoseFieldText,
   canUseUnits,
+  doseWarning,
+  firstMealProblem,
   foodErrors,
+  isAppliedDoseShortcut,
+  itemWarnings,
   newItemDraft,
   quantityError,
+  removeItem,
+  restoreItem,
   saveWarnings,
   toDoseSettings,
   toMealItemInput,
@@ -742,11 +751,206 @@ describe('appliedDoseFieldText', () => {
     expect(appliedDoseFieldText('7,5', result)).toBe('7,5')
   })
 
-  it('a dose of 0 is shown as "0,00"', () => {
+  it('a dose of 0 is shown as "0", without trailing zeros', () => {
     const food = { ...base, carbs_per_100g: 0 }
-    expect(appliedDoseFieldText(null, calcOk([draft(food, '120')]))).toBe(
-      '0,00',
-    )
+    expect(appliedDoseFieldText(null, calcOk([draft(food, '120')]))).toBe('0')
+  })
+
+  it('a whole dose is shown as "7", not "7,00"', () => {
+    // 105 g of carbs ÷ 15 = 7.
+    const food = { ...base, carbs_per_100g: 100 }
+    expect(appliedDoseFieldText(null, calcOk([draft(food, '105')]))).toBe('7')
+  })
+})
+
+describe('isAppliedDoseShortcut', () => {
+  it('never while the field follows the calculated dose', () => {
+    expect(isAppliedDoseShortcut(null, 8)).toBe(false)
+    expect(isAppliedDoseShortcut(null, 0)).toBe(false)
+  })
+
+  it.each([
+    ['8', 8, true],
+    ['8,0', 8, true],
+    ['8,5', 8.5, true],
+    ['0', 0, true],
+    ['1.000', 1000, true],
+    ['8,5', 8, false],
+    ['8,', 8, false],
+    ['', 0, false],
+  ])('%j with the shortcut %s → %s', (text, units, chosen) => {
+    expect(isAppliedDoseShortcut(text, units)).toBe(chosen)
+  })
+
+  // MealForm: a tap on a shortcut sets the field to formatUserNumber(units).
+  it.each([0, 0.004, 0.5, 8, 8.5, 8.994, 8.995, 8.999, 999.6, 1234.5])(
+    'a tapped shortcut of the dose %s saves exactly its value, and only it is chosen',
+    (dose) => {
+      const { penUnits } = appliedDoseShortcuts(dose)
+      expect(penUnits.length).toBeGreaterThan(0)
+      for (const units of penUnits) {
+        const text = formatUserNumber(units)
+        expect(appliedDose(text, dose)).toEqual({ value: units })
+        const chosen = penUnits.filter((other) =>
+          isAppliedDoseShortcut(text, other),
+        )
+        expect(chosen).toEqual([units])
+      }
+    },
+  )
+})
+
+describe('firstMealProblem', () => {
+  const at = '2026-11-14T13:05'
+
+  it('a meal that can be saved has none', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), null, null)).toBeNull()
+    expect(firstMealProblem(items, calcOk(items), '8,5', at)).toBeNull()
+    expect(firstMealProblem(items, calcOk(items), '0', null)).toBeNull()
+  })
+
+  it('an empty quantity: what is missing, with the name and the item', () => {
+    const items = [draft(base, '120', 'grams', 0), draft(rice, '', 'grams', 4)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: {
+        code: 'QUANTITY',
+        foodName: 'Arroz de prueba',
+        error: 'REQUIRED',
+      },
+      itemKey: 4,
+    })
+  })
+
+  it('the first item with a problem, in the order of the screen', () => {
+    const items = [draft(base, '12,', 'grams', 3), draft(rice, '', 'grams', 1)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, '', '')).toEqual({
+      problem: {
+        code: 'QUANTITY',
+        foodName: 'Banana de prueba',
+        error: 'INVALID_NUMBER',
+      },
+      itemKey: 3,
+    })
+  })
+
+  it('a quantity of 0 is NOT_POSITIVE', () => {
+    const items = [draft(base, '0')]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)?.problem).toEqual({
+      code: 'QUANTITY',
+      foodName: 'Banana de prueba',
+      error: 'NOT_POSITIVE',
+    })
+  })
+
+  it('an error of the food comes before its quantity', () => {
+    const noFactor = { ...rice, cooking_factor: null }
+    const items = [draft(noFactor, '', 'grams', 2)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: { code: 'FOOD', foodName: 'Arroz de prueba' },
+      itemKey: 2,
+    })
+  })
+
+  it('then the applied dose: empty or not a number', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), '', at)).toEqual({
+      problem: { code: 'APPLIED_DOSE', error: 'REQUIRED' },
+      itemKey: null,
+    })
+    expect(firstMealProblem(items, calcOk(items), '8,', at)).toEqual({
+      problem: { code: 'APPLIED_DOSE', error: 'INVALID_NUMBER' },
+      itemKey: null,
+    })
+  })
+
+  it('then the date: empty or not a real date', () => {
+    const items = mealOf83()
+    expect(firstMealProblem(items, calcOk(items), null, '')).toEqual({
+      problem: { code: 'EATEN_AT', empty: true },
+      itemKey: null,
+    })
+    expect(
+      firstMealProblem(items, calcOk(items), null, '2026-02-30T10:00'),
+    ).toEqual({ problem: { code: 'EATEN_AT', empty: false }, itemKey: null })
+  })
+
+  it('a meal whose total or dose overflow, with valid fields: the meal', () => {
+    const items = mealOf83()
+    const result = calculateMeal(items.map(toMealItemInput), {
+      ...settings,
+      carbRatioGPerUnit: 0,
+    })
+    expect(result.ok).toBe(false)
+    expect(firstMealProblem(items, result, null, null)).toEqual({
+      problem: { code: 'MEAL' },
+      itemKey: null,
+    })
+  })
+
+  it('a huge quantity whose item overflows is a quantity to check', () => {
+    const items = [draft(base, HUGE_TEXT)]
+    const result = calculateMeal(items.map(toMealItemInput), settings)
+    expect(firstMealProblem(items, result, null, null)?.problem).toEqual({
+      code: 'QUANTITY',
+      foodName: 'Banana de prueba',
+      error: 'INVALID_NUMBER',
+    })
+  })
+})
+
+describe('removeItem and restoreItem (undo)', () => {
+  const a = draft(base, '120', 'grams', 0)
+  const b = draft(alfajor, '0,5', 'units', 1)
+  const c = draft(rice, '250', 'grams', 2)
+
+  it('removes the item and keeps it with its place', () => {
+    expect(removeItem([a, b, c], 1)).toEqual({
+      items: [a, c],
+      removed: { item: b, index: 1 },
+    })
+  })
+
+  it('an unknown key removes nothing', () => {
+    expect(removeItem([a, b], 9)).toEqual({ items: [a, b], removed: null })
+  })
+
+  it('undo puts it back in its place, as it was', () => {
+    const { items, removed } = removeItem([a, b, c], 1)
+    if (removed === null) throw new Error('missing')
+    expect(restoreItem(items, removed)).toEqual([a, b, c])
+  })
+
+  it('undo of the last item of the meal', () => {
+    const { items, removed } = removeItem([a], 0)
+    expect(items).toEqual([])
+    if (removed === null) throw new Error('missing')
+    expect(restoreItem(items, removed)).toEqual([a])
+  })
+
+  it('with fewer items in the meantime, it goes at the end at most', () => {
+    expect(restoreItem([a], { item: c, index: 2 })).toEqual([a, c])
+    expect(restoreItem([], { item: c, index: 2 })).toEqual([c])
+  })
+
+  it('with an item added in the meantime, it keeps its index', () => {
+    const d = draft(base, '50', 'grams', 3)
+    expect(restoreItem([a, c, d], { item: b, index: 1 })).toEqual([a, b, c, d])
+  })
+
+  it('an item already back is not added twice', () => {
+    expect(restoreItem([a, b], { item: b, index: 1 })).toEqual([a, b])
+  })
+
+  it('does not modify the list it receives', () => {
+    const items = [a, b, c]
+    removeItem(items, 1)
+    restoreItem(items, { item: draft(base, '1', 'grams', 7), index: 0 })
+    expect(items).toEqual([a, b, c])
   })
 })
 
@@ -953,6 +1157,167 @@ describe('saveWarnings', () => {
   it('throws if the result does not match the items', () => {
     const result = calcOk(mealOf83())
     expect(() => saveWarnings(mealOf83().slice(0, 2), result, row)).toThrow()
+  })
+
+  it('is the items warnings in order, then the dose one', () => {
+    const s = { ...row, max_dose_warning_units: 1 }
+    const food = { ...rice, cooking_factor: 0.9, carbs_per_100g: 50 }
+    const items = [draft(food, '600'), draft(base, '700', 'grams', 1)]
+    const result = calcOk(items, s)
+    const dose = doseWarning(result, s)
+    expect(dose).not.toBeNull()
+    expect(saveWarnings(items, result, s)).toEqual([
+      ...items.flatMap((item, index) =>
+        itemWarnings(item, result.items[index], s),
+      ),
+      dose,
+    ])
+  })
+})
+
+// --- The warnings in sight, before "Guardar" (spec §6.6, UX-03) ---
+
+/** calculateMeal on the drafts, as MealForm does, valid or not. */
+function calc(items: MealItemDraft[], s: Settings = row) {
+  return calculateMeal(items.map(toMealItemInput), toDoseSettings(s))
+}
+
+describe('itemWarnings', () => {
+  it('an item above the grams alert warns, with its values formatted', () => {
+    const item = draft(base, '650')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Banana de prueba',
+        grams: '650',
+        threshold: '500',
+      },
+    ])
+  })
+
+  it('exactly the alert does not warn', () => {
+    const item = draft(base, '500')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([])
+  })
+
+  it('an item that is not valid never warns (an empty or incomplete quantity)', () => {
+    for (const text of ['', '6.', '0', '-']) {
+      const item = draft(base, text)
+      expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([])
+    }
+  })
+
+  it('without the result of its item, none', () => {
+    expect(itemWarnings(draft(base, '650'), undefined, row)).toEqual([])
+  })
+
+  it('a valid item warns even if another item of the meal is not valid', () => {
+    const items = [draft(base, '650', 'grams', 0), draft(base, '', 'grams', 1)]
+    const result = calc(items)
+    expect(result.ok).toBe(false)
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], row),
+    ).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Banana de prueba',
+        grams: '650',
+        threshold: '500',
+      },
+    ])
+    expect(
+      itemWarnings(items[1] as MealItemDraft, result.items[1], row),
+    ).toEqual([])
+  })
+
+  it('a valid item warns even if the dose of the meal overflows', () => {
+    const items = [draft(base, '650')]
+    const tiny = { ...row, carb_ratio_g_per_unit: Number.MIN_VALUE }
+    const result = calc(items, tiny)
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors).toEqual(['INVALID_QUANTITY'])
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], tiny),
+    ).toHaveLength(1)
+  })
+
+  it('a valid item warns even if the ratio is not valid', () => {
+    const items = [draft(base, '650')]
+    const zero = { ...row, carb_ratio_g_per_unit: 0 }
+    const result = calc(items, zero)
+    expect(result.ok).toBe(false)
+    expect(
+      itemWarnings(items[0] as MealItemDraft, result.items[0], zero),
+    ).toHaveLength(1)
+  })
+
+  it('units above the alert (11 alfajores of 50 g) warn with the grams eaten', () => {
+    const item = draft(alfajor, '11', 'units')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'ITEM_GRAMS_ABOVE_THRESHOLD',
+        foodName: 'Alfajor de prueba',
+        grams: '550',
+        threshold: '500',
+      },
+    ])
+  })
+
+  it('an unusual yield warns at any quantity', () => {
+    const food = { ...rice, cooking_factor: 4.5 }
+    const item = draft(food, '1')
+    expect(itemWarnings(item, calc([item]).items[0], row)).toEqual([
+      {
+        code: 'COOKING_FACTOR_UNUSUAL',
+        foodName: 'Arroz de prueba',
+        cookedGrams: '450',
+      },
+    ])
+  })
+
+  it('both warnings of one item, in the order of calculateMeal', () => {
+    const food = { ...rice, cooking_factor: 0.9, carbs_per_100g: 50 }
+    const item = draft(food, '600')
+    expect(
+      itemWarnings(item, calc([item]).items[0], row).map((w) => w.code),
+    ).toEqual(['ITEM_GRAMS_ABOVE_THRESHOLD', 'COOKING_FACTOR_UNUSUAL'])
+  })
+})
+
+describe('doseWarning', () => {
+  it('a dose above the alert warns, with the calculated dose formatted', () => {
+    const s = { ...row, max_dose_warning_units: 8 }
+    expect(doseWarning(calc(mealOf83(), s), s)).toEqual({
+      code: 'DOSE_ABOVE_THRESHOLD',
+      dose: '8,55',
+      threshold: '8',
+    })
+  })
+
+  it('a dose equal to the alert does not warn', () => {
+    const s = { ...row, max_dose_warning_units: 2 }
+    const food = { ...base, carbs_per_100g: 15 }
+    expect(doseWarning(calc([draft(food, '200')], s), s)).toBeNull()
+  })
+
+  it('without the alert configured, none', () => {
+    expect(
+      doseWarning(calc(mealOf83(), noDoseThreshold), noDoseThreshold),
+    ).toBeNull()
+  })
+
+  it('a meal that is not valid never warns: never a partial dose', () => {
+    const s = { ...row, max_dose_warning_units: 1 }
+    const items = [draft(base, '650', 'grams', 0), draft(base, '', 'grams', 1)]
+    const result = calc(items, s)
+    expect(result.ok).toBe(false)
+    expect(doseWarning(result, s)).toBeNull()
+  })
+
+  it('a dose that overflows does not warn', () => {
+    const s = { ...row, carb_ratio_g_per_unit: Number.MIN_VALUE }
+    expect(doseWarning(calc([draft(base, '650')], s), s)).toBeNull()
   })
 })
 
@@ -1840,5 +2205,62 @@ describe('a food of the reference table (spec §6.2, §14 #51)', () => {
     const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
     expect(itemAt(record, 0).food).toEqual({ id: copy.id })
     expect(itemAt(record, 0).food_source).toBe('reference')
+  })
+})
+
+// "Corregir" (spec §6.7): while a field keeps the text it was loaded with,
+// the exact loaded value is saved.
+describe('appliedDose with a loaded value', () => {
+  const loaded = { text: '8,55', value: 8.546666666666667 }
+
+  it('the field as it was loaded: the exact value', () => {
+    expect(appliedDose('8,55', 10, loaded)).toEqual({
+      value: 8.546666666666667,
+    })
+  })
+
+  it('edited: what was typed, even if it is the same number', () => {
+    expect(appliedDose('8,5', 10, loaded)).toEqual({ value: 8.5 })
+    expect(appliedDose('8,550', 10, loaded)).toEqual({ value: 8.55 })
+    expect(appliedDose('', 10, loaded)).toEqual({ error: 'REQUIRED' })
+  })
+
+  it('following the calculated dose (null) wins over the loaded value', () => {
+    expect(appliedDose(null, 10, loaded)).toEqual({ value: 10 })
+  })
+
+  it('without a loaded value, as before', () => {
+    expect(appliedDose('8,55', 10, null)).toEqual({ value: 8.55 })
+  })
+})
+
+describe('eatenAtToSave', () => {
+  const now = new Date('2026-11-16T16:00:30.500Z')
+  const loaded = {
+    text: '2026-11-15T08:30',
+    value: '2026-11-15T11:30:45.123+00:00',
+  }
+
+  it('"Ahora": the instant of saving', () => {
+    expect(eatenAtToSave(null, now)).toBe('2026-11-16T16:00:30.500Z')
+    expect(eatenAtToSave(null, now, loaded)).toBe('2026-11-16T16:00:30.500Z')
+  })
+
+  it('the field as it was loaded: the exact instant, with its seconds', () => {
+    expect(eatenAtToSave('2026-11-15T08:30', now, loaded)).toBe(loaded.value)
+  })
+
+  it('changed: the typed date and time, in Buenos Aires', () => {
+    expect(eatenAtToSave('2026-11-15T08:31', now, loaded)).toBe(
+      '2026-11-15T11:31:00.000Z',
+    )
+    expect(eatenAtToSave('2026-11-15T08:30', now)).toBe(
+      '2026-11-15T11:30:00.000Z',
+    )
+  })
+
+  it('not a real date: null', () => {
+    expect(eatenAtToSave('', now, loaded)).toBeNull()
+    expect(eatenAtToSave('2026-02-30T08:30', now)).toBeNull()
   })
 })

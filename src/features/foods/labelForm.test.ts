@@ -322,7 +322,7 @@ describe('validateLabelForm', () => {
   it('"¿Se cocina antes de comer?" y el nombre son obligatorios', () => {
     const texts = { ...initialLabelFormTexts(label()), name: '  ' }
     expect(validateLabelForm(texts, label()).errors).toEqual({
-      name: 'REQUIRED',
+      name: 'NAME_REQUIRED',
       state: 'STATE_REQUIRED',
     })
   })
@@ -331,7 +331,7 @@ describe('validateLabelForm', () => {
     const texts = filled(null)
     expect(validateLabelForm(texts, null).errors).toMatchObject({
       basis: 'BASIS_REQUIRED',
-      name: 'REQUIRED',
+      name: 'NAME_REQUIRED',
     })
     const typed: LabelFormTexts = {
       ...texts,

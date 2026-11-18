@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Food } from '../../lib/foods.ts'
+import { addToMealState, foodToAddToMeal } from '../../lib/mealHandoff.ts'
+import type { MealCopyRequest } from './mealCopy.ts'
 import {
+  copiedMealForm,
   initialMealForm,
   nextItemKey,
   parseStoredMealDraft,
@@ -68,6 +71,7 @@ const draft: StoredMealDraft = {
   ],
   appliedDoseText: '8',
   eatenAtText: '2026-11-16T13:30',
+  correcting: null,
 }
 
 /** What sessionStorage gives back: the draft as JSON, parsed. */
@@ -183,9 +187,11 @@ describe('initialMealForm', () => {
       items: [],
       appliedDoseText: null,
       eatenAtText: null,
+      correcting: null,
       nextKey: 0,
       focusKey: null,
       notUsableFood: null,
+      copyNotice: null,
     })
   })
 
@@ -195,6 +201,7 @@ describe('initialMealForm', () => {
       nextKey: 5,
       focusKey: null,
       notUsableFood: null,
+      copyNotice: null,
     })
   })
 
@@ -237,6 +244,153 @@ describe('initialMealForm', () => {
       nextKey: 5,
       focusKey: null,
       notUsableFood: { id: rice.id, name: rice.name },
+      copyNotice: null,
     })
+  })
+
+  // "Usar en una comida" in the food detail (UX-17) sends the food with the
+  // same navigation state as the photo, which survives a reload.
+  it('"Usar en una comida": the food at the end, with the focus on it', () => {
+    const state: unknown = JSON.parse(JSON.stringify(addToMealState(alfajor)))
+    const form = initialMealForm(draft, foodToAddToMeal(state))
+    expect(form.items).toHaveLength(4)
+    expect(form.items[3]).toEqual({
+      key: 5,
+      food: alfajor,
+      quantityMode: 'units',
+      quantityText: '',
+    })
+    expect(form.focusKey).toBe(5)
+    expect(form.correcting).toBe(draft.correcting)
+  })
+})
+
+// The meal being corrected (spec §6.7, "Corregir"), kept with the meal.
+describe('parseStoredMealDraft: the correction', () => {
+  const correcting = {
+    mealId: '00000000-0000-4000-8000-0000000000aa',
+    eatenAt: '2026-11-15T00:00:00.123+00:00',
+    eatenAtText: '2026-11-14T21:00',
+    appliedDose: { text: '8,55', value: 8.546666666666667 },
+    skipped: [{ foodName: 'Archivado de prueba', reason: 'NOT_IN_CATALOG' }],
+  }
+
+  it('reads it back as it was, also without dose or items not brought', () => {
+    const plain = {
+      ...draft,
+      correcting: { ...correcting, appliedDose: null, skipped: [] },
+    }
+    expect(parseStoredMealDraft(roundTrip(plain))).toEqual(plain)
+    const correction = { ...draft, correcting }
+    expect(parseStoredMealDraft(roundTrip(correction))).toEqual(correction)
+  })
+
+  it('a meal kept without it (before corrections existed) is not one', () => {
+    const old: Record<string, unknown> = { ...draft }
+    delete old.correcting
+    expect(parseStoredMealDraft(roundTrip(old))).toEqual(draft)
+  })
+
+  it.each([
+    { ...correcting, mealId: 'abc' },
+    { ...correcting, mealId: null },
+    { ...correcting, eatenAt: '2026-11-15' },
+    { ...correcting, eatenAt: 1 },
+    { mealId: correcting.mealId },
+    { ...correcting, eatenAtText: null },
+    { ...correcting, appliedDose: { text: '8,55' } },
+    { ...correcting, appliedDose: { text: '8,55', value: -1 } },
+    { ...correcting, skipped: [{ foodName: 'X', reason: 'GONE' }] },
+    { ...correcting, skipped: undefined },
+    'aa',
+  ])('gives null for a correction that is not valid: %j', (value) => {
+    expect(parseStoredMealDraft({ ...draft, correcting: value })).toBeNull()
+  })
+})
+
+describe('copiedMealForm', () => {
+  const request: MealCopyRequest = {
+    mode: 'repeat',
+    mealId: '00000000-0000-4000-8000-0000000000aa',
+    eatenAt: '2026-11-15T11:30:00+00:00',
+    appliedDoseUnits: 7,
+    items: [
+      {
+        position: 0,
+        food_id: rice.id,
+        food_name: rice.name,
+        quantity_mode: 'grams',
+        units: null,
+        grams: 250,
+      },
+      {
+        position: 1,
+        food_id: '00000000-0000-4000-8000-0000000000ff',
+        food_name: 'Archivado de prueba',
+        quantity_mode: 'grams',
+        units: null,
+        grams: 30,
+      },
+    ],
+  }
+
+  it('repeating replaces the meal in progress, with the notice of when it was eaten', () => {
+    expect(copiedMealForm(draft, request, [rice, banana])).toEqual({
+      items: [
+        { key: 0, food: rice, quantityMode: 'grams', quantityText: '250' },
+      ],
+      appliedDoseText: null,
+      eatenAtText: null,
+      correcting: null,
+      nextKey: 1,
+      focusKey: null,
+      notUsableFood: null,
+      copyNotice: {
+        repeatedFrom: request.eatenAt,
+        skipped: [
+          { foodName: 'Archivado de prueba', reason: 'NOT_IN_CATALOG' },
+        ],
+      },
+    })
+  })
+
+  it('correcting keeps which meal it replaces, without "Copiaste…"', () => {
+    const form = copiedMealForm(null, { ...request, mode: 'correct' }, [rice])
+    expect(form.correcting).toEqual({
+      mealId: request.mealId,
+      eatenAt: request.eatenAt,
+      eatenAtText: '2026-11-15T08:30',
+      appliedDose: { text: '7', value: 7 },
+      // Kept in the notice of the correction, not in the passing notices.
+      skipped: [{ foodName: 'Archivado de prueba', reason: 'NOT_IN_CATALOG' }],
+    })
+    expect(form.eatenAtText).toBe('2026-11-15T08:30')
+    expect(form.appliedDoseText).toBe('7')
+    expect(form.copyNotice).toBeNull()
+  })
+
+  it('if nothing could be brought, the meal in progress stays and only the notices show', () => {
+    for (const mode of ['repeat', 'correct'] as const) {
+      const form = copiedMealForm(draft, { ...request, mode }, [banana])
+      expect(form).toEqual({
+        ...draft,
+        nextKey: 5,
+        focusKey: null,
+        notUsableFood: null,
+        copyNotice: {
+          repeatedFrom: null,
+          skipped: [
+            { foodName: rice.name, reason: 'NOT_IN_CATALOG' },
+            { foodName: 'Archivado de prueba', reason: 'NOT_IN_CATALOG' },
+          ],
+        },
+      })
+    }
+  })
+
+  it('if nothing could be brought to an empty Inicio, it stays empty', () => {
+    const form = copiedMealForm(null, request, [])
+    expect(form.items).toEqual([])
+    expect(form.correcting).toBeNull()
   })
 })

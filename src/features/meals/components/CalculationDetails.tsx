@@ -1,4 +1,6 @@
 import { useId, useState } from 'react'
+import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { disclosure, enter } from '../../../components/styles.ts'
 
 type Props = {
   /** The lines of the calculation, already formatted (breakdown.ts). */
@@ -16,23 +18,68 @@ export function CalculationDetails({ lines }: Props) {
   if (lines.length === 0) return null
   return (
     <div className="flex flex-col">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={id}
-        className="flex min-h-11 items-center gap-2 self-start text-sm font-medium text-slate-700"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
-        {open ? 'Ocultar la cuenta' : 'Ver la cuenta'}
-      </button>
-      {open && (
-        <div id={id} className="flex flex-col gap-0.5 text-sm text-slate-700">
-          {lines.map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
-        </div>
-      )}
+      <CalculationToggle
+        open={open}
+        controls={id}
+        onToggle={() => setOpen((current) => !current)}
+        className="self-start"
+      />
+      {open && <CalculationLines id={id} lines={lines} />}
+    </div>
+  )
+}
+
+type ToggleProps = {
+  open: boolean
+  /** The id of the CalculationLines it unfolds. */
+  controls: string
+  onToggle: () => void
+  /** Where it goes in its container (self-start, self-end). */
+  className?: string
+}
+
+/**
+ * "Ver la cuenta" / "Ocultar la cuenta" alone, for a layout that puts the
+ * lines somewhere else (the meal item: the button under its carbs, the
+ * lines across the card).
+ */
+export function CalculationToggle({
+  open,
+  controls,
+  onToggle,
+  className,
+}: ToggleProps) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={controls}
+      className={`${disclosure} text-sm whitespace-nowrap${className === undefined ? '' : ` ${className}`}`}
+      onClick={onToggle}
+    >
+      <DisclosureIcon open={open} />
+      {open ? 'Ocultar la cuenta' : 'Ver la cuenta'}
+    </button>
+  )
+}
+
+export function CalculationLines({
+  id,
+  lines,
+  className,
+}: {
+  id: string
+  lines: readonly string[]
+  className?: string
+}) {
+  return (
+    <div
+      id={id}
+      className={`flex flex-col gap-0.5 text-sm tabular-nums ${enter}${className === undefined ? '' : ` ${className}`}`}
+    >
+      {lines.map((line, index) => (
+        <p key={index}>{line}</p>
+      ))}
     </div>
   )
 }

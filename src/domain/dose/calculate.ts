@@ -1,5 +1,6 @@
 import { MAX_CARBS_PER_100G, isValidCarbsPer100g } from './carbsPer100g.ts'
 import { isCookingFactorUnusual } from './cookingFactor.ts'
+import { doseForCarbs } from './doseForCarbs.ts'
 import type {
   DoseSettings,
   ItemErrorCode,
@@ -146,12 +147,13 @@ export function calculateMeal(
   }
 
   const totalCarbsG = successes.reduce((sum, item) => sum + item.carbsG, 0)
-  const doseUnits = totalCarbsG / ratio
+  const doseUnits = doseForCarbs(totalCarbsG, ratio)
 
   // Finite items can still add up to Infinity, and a tiny ratio can make the
-  // dose overflow. Both need absurd values, so they are reported as one
-  // meal-level INVALID_QUANTITY, without blaming an item (spec §8.4).
-  if (!Number.isFinite(totalCarbsG) || !Number.isFinite(doseUnits)) {
+  // dose overflow: doseForCarbs gives null for both. They need absurd
+  // values, so they are reported as one meal-level INVALID_QUANTITY, without
+  // blaming an item (spec §8.4).
+  if (doseUnits === null) {
     return { ok: false, items: results, errors: ['INVALID_QUANTITY'] }
   }
 

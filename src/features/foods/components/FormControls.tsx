@@ -1,7 +1,14 @@
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { InfoTip } from '../../../components/InfoTip.tsx'
+import {
+  field,
+  fieldLabel,
+  segmented as segmentedStyles,
+} from '../../../components/styles.ts'
 import {
   foodFieldErrorMessage,
   type FoodFieldError,
+  type RequiredFoodField,
 } from '../../../lib/errors.ts'
 
 // Small building blocks of the food form. No logic: they only lay out a
@@ -10,14 +17,14 @@ import {
 type FieldErrorProps = {
   id: string
   error: FoodFieldError | undefined
+  /** The field, so an empty one says what to write in it (UX-14). */
+  field?: RequiredFoodField
 }
 
-export function FieldError({ id, error }: FieldErrorProps) {
+export function FieldError({ id, error, field }: FieldErrorProps) {
   if (error === undefined) return null
   return (
-    <p id={id} className="text-sm text-red-700">
-      {foodFieldErrorMessage(error)}
-    </p>
+    <FieldMessage id={id}>{foodFieldErrorMessage(error, field)}</FieldMessage>
   )
 }
 
@@ -28,7 +35,11 @@ type TextFieldProps = {
   onChange: (value: string) => void
   onBlur?: () => void
   error?: FoodFieldError | undefined
-  placeholder?: string
+  /**
+   * An example, under the field ("Por ejemplo: alfajor"): written inside it,
+   * it would go away when typing and have little contrast (UX-26).
+   */
+  hint?: string
   multiline?: boolean
 }
 
@@ -39,25 +50,30 @@ export function TextField({
   onChange,
   onBlur,
   error,
-  placeholder,
+  hint,
   multiline = false,
 }: TextFieldProps) {
   const errorId = `${id}-error`
+  const hintId = `${id}-hint`
   const invalid = error !== undefined
+  const describedBy = [
+    hint !== undefined ? hintId : null,
+    invalid ? errorId : null,
+  ]
+    .filter((value) => value !== null)
+    .join(' ')
   const shared = {
     id,
     name: id,
     value,
-    placeholder,
     onBlur,
     'aria-invalid': invalid,
-    'aria-describedby': invalid ? errorId : undefined,
-    className:
-      'min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base focus:border-slate-500 focus:outline-none aria-invalid:border-red-600',
+    'aria-describedby': describedBy === '' ? undefined : describedBy,
+    className: field,
   }
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-slate-700">
+      <label htmlFor={id} className={fieldLabel}>
         {label}
       </label>
       {multiline ? (
@@ -75,6 +91,11 @@ export function TextField({
           onChange={(event) => onChange(event.target.value)}
         />
       )}
+      {hint !== undefined && (
+        <p id={hintId} className="text-sm text-ink-soft">
+          {hint}
+        </p>
+      )}
       <FieldError id={errorId} error={error} />
     </div>
   )
@@ -89,6 +110,11 @@ type RadioGroupProps<T extends string> = {
   value: T | null
   onChange: (value: T) => void
   error?: FoodFieldError | undefined
+  /**
+   * Two short options side by side (Sí/No), instead of one per line. Like
+   * the radios, none is chosen until the user picks one.
+   */
+  segmented?: boolean
 }
 
 export function RadioGroup<T extends string>({
@@ -99,6 +125,7 @@ export function RadioGroup<T extends string>({
   value,
   onChange,
   error,
+  segmented = false,
 }: RadioGroupProps<T>) {
   const errorId = `${name}-error`
   const legendId = `${name}-legend`
@@ -112,28 +139,36 @@ export function RadioGroup<T extends string>({
       aria-invalid={invalid}
       aria-describedby={invalid ? errorId : undefined}
     >
-      <div className="flex min-h-11 flex-wrap items-center gap-x-1">
-        <span id={legendId} className="text-sm font-medium text-slate-700">
+      <div className="flex flex-wrap items-center gap-x-1">
+        <span id={legendId} className={fieldLabel}>
           {legend}
         </span>
         {info !== undefined && <InfoTip text={info} />}
       </div>
-      {options.map((option) => (
-        <label
-          key={option.value}
-          className="flex min-h-11 items-center gap-3 text-base"
-        >
-          <input
-            type="radio"
-            name={name}
-            value={option.value}
-            checked={value === option.value}
-            onChange={() => onChange(option.value)}
-            className="size-5"
-          />
-          {option.label}
-        </label>
-      ))}
+      <div
+        className={segmented ? segmentedStyles.group : 'flex flex-col gap-1'}
+      >
+        {options.map((option) => (
+          <label
+            key={option.value}
+            className={
+              segmented
+                ? `${segmentedStyles.option} ${segmentedStyles.checked}`
+                : 'flex min-h-11 items-center gap-3 text-base'
+            }
+          >
+            <input
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={value === option.value}
+              onChange={() => onChange(option.value)}
+              className={segmented ? 'sr-only' : 'size-5 accent-accent'}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
       <FieldError id={errorId} error={error} />
     </fieldset>
   )

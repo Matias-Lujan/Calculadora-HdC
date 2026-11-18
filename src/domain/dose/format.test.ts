@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { formatCarbs, formatDose, formatGrams } from './format.ts'
+import {
+  formatCarbs,
+  formatDose,
+  formatDoseCompact,
+  formatGrams,
+  unitsWord,
+  withUnitsWord,
+} from './format.ts'
+
+const NBSP = '\u00a0'
 
 describe('formatDose (2 decimales)', () => {
   it.each([
@@ -23,6 +32,124 @@ describe('formatDose (2 decimales)', () => {
 
   it('redondea a 0 los restos de punto flotante', () => {
     expect(formatDose(0.1 + 0.2 - 0.3)).toBe('0,00') // 5.55e-17
+  })
+})
+
+describe('formatDoseCompact (hasta 2 decimales, sin ceros de más)', () => {
+  it.each([
+    [7, '7'],
+    [8.5, '8,5'],
+    [8.546666, '8,55'],
+    [8.546666666666667, '8,55'],
+    [1.005, '1,01'],
+    [2.675, '2,68'],
+    [8.999, '9'],
+    [8.995, '9'],
+    [0.995, '1'],
+    [9.995, '10'],
+    [0, '0'],
+    [0.004, '0'],
+    [0.005, '0,01'],
+    [0.05, '0,05'],
+    [0.1, '0,1'],
+    [0.1 + 0.2, '0,3'],
+    [0.5, '0,5'],
+    [1, '1'],
+    [10, '10'],
+    [10.5, '10,5'],
+    [100, '100'],
+    [100.05, '100,05'],
+    [10 / 3, '3,33'],
+    [2 / 3, '0,67'],
+    [1234.5, '1234,5'],
+    [1e-7, '0'],
+  ])('%s → %s', (value, expected) => {
+    expect(formatDoseCompact(value)).toBe(expected)
+  })
+
+  it('nunca muestra "-0"', () => {
+    expect(formatDoseCompact(-0)).toBe('0')
+    expect(formatDoseCompact(-0.001)).toBe('0')
+    expect(formatDoseCompact(-0.004)).toBe('0')
+  })
+
+  it('redondea a 0 los restos de punto flotante', () => {
+    expect(formatDoseCompact(0.1 + 0.2 - 0.3)).toBe('0') // 5.55e-17
+  })
+
+  it('does not trim the zeros of the whole part', () => {
+    expect(formatDoseCompact(10)).toBe('10')
+    expect(formatDoseCompact(20.001)).toBe('20')
+    expect(formatDoseCompact(100.004)).toBe('100')
+    expect(formatDoseCompact(1000)).toBe('1000')
+  })
+
+  it('a value toFixed writes with an exponent is left as it is', () => {
+    expect(formatDoseCompact(1e30)).toBe(formatDose(1e30))
+  })
+
+  it('never trims the zero of an exponent ("1,5e+30" is not "1,5e+3")', () => {
+    // Reachable with an absurd applied dose or ratio (60 ÷ 4e-29 in the
+    // example of Configuración): the number shown must not change.
+    for (const value of [1.5e30, 2.5e40, 1.25e100, 60 / 4e-29]) {
+      expect(formatDoseCompact(value)).toBe(formatDose(value))
+    }
+  })
+
+  it('is formatDose without the trailing zeros, for many values', () => {
+    for (let hundredths = 0; hundredths <= 5_000; hundredths += 7) {
+      const value = hundredths / 100
+      const compact = formatDoseCompact(value)
+      expect(compact).toMatch(/^\d+(,\d?[1-9])?$/)
+      expect(formatDose(value).startsWith(compact)).toBe(true)
+      expect(Number(compact.replace(',', '.'))).toBe(
+        Number(formatDose(value).replace(',', '.')),
+      )
+    }
+  })
+})
+
+describe('unitsWord y withUnitsWord', () => {
+  it('"1" exactly is one unit', () => {
+    expect(unitsWord('1')).toBe('unidad')
+    expect(withUnitsWord('1')).toBe(`1${NBSP}unidad`)
+  })
+
+  it.each([
+    '1,00',
+    '1,0',
+    '01',
+    '0,5',
+    '0',
+    '0,00',
+    '2',
+    '8,55',
+    '10',
+    '1.000',
+  ])('%j is "unidades"', (text) => {
+    expect(unitsWord(text)).toBe('unidades')
+    expect(withUnitsWord(text)).toBe(`${text}${NBSP}unidades`)
+  })
+
+  it('the space never breaks: U+00A0, not a plain space', () => {
+    const text = withUnitsWord(formatDose(8.546666))
+    expect(text).toBe('8,55\u00a0unidades')
+    expect(text).not.toContain(' ')
+  })
+
+  it('with the formats of a dose', () => {
+    expect(withUnitsWord(formatDose(1))).toBe(`1,00${NBSP}unidades`)
+    expect(withUnitsWord(formatDoseCompact(1))).toBe(`1${NBSP}unidad`)
+    expect(withUnitsWord(formatDoseCompact(1.004))).toBe(`1${NBSP}unidad`)
+    expect(withUnitsWord(formatDoseCompact(1.005))).toBe(`1,01${NBSP}unidades`)
+    expect(withUnitsWord(formatDoseCompact(0.5))).toBe(`0,5${NBSP}unidades`)
+    expect(withUnitsWord(formatDoseCompact(0))).toBe(`0${NBSP}unidades`)
+  })
+
+  it('never says "U"', () => {
+    for (const text of ['1', '0', '7', '8,55']) {
+      expect(withUnitsWord(text)).not.toMatch(/\bU\b/)
+    }
   })
 })
 

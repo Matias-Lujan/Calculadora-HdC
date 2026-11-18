@@ -1,6 +1,12 @@
-import type { FormEvent } from 'react'
+import { Plus } from 'lucide-react'
+import { useRef, type FormEvent } from 'react'
+import { flushSync } from 'react-dom'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import type { FoodFieldError } from '../../../lib/errors.ts'
+import { focusFirstInvalid } from '../../../components/focusProblem.ts'
+import { button, fieldLabel, pageTitle } from '../../../components/styles.ts'
+import type { FoodFieldError, RequiredFoodField } from '../../../lib/errors.ts'
 import { SAVE_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
 import {
@@ -35,6 +41,7 @@ import type { FoodFormValues } from '../types.ts'
 import { useFoodFormState } from '../useFoodFormState.ts'
 import { FoodFields } from './FoodFields.tsx'
 import { FieldError, RadioGroup } from './FormControls.tsx'
+import { StickyLabelPhoto } from './StickyLabelPhoto.tsx'
 import { UnusualYieldConfirmation } from './UnusualYieldConfirmation.tsx'
 
 type Props = {
@@ -76,6 +83,8 @@ export function LabelFoodForm({
   })
   const { texts, update, result, shownErrors, showErrorsOf, hideErrorsOf } =
     form
+  const saveButtonRef = useRef<HTMLButtonElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const columns = transcription?.columns ?? []
   const column = chosenColumn(texts, transcription)
@@ -94,15 +103,28 @@ export function LabelFoodForm({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    form.setShownErrors(result.errors)
-    if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
-    if (result.values === null) return
+    // Rendered right away, to take the user to the first error (UX-14).
+    flushSync(() => {
+      form.setShownErrors(result.errors)
+      if (hasMoreOptionsErrors(result.errors)) form.setMoreOptionsOpen(true)
+    })
+    if (result.values === null) {
+      focusFirstInvalid(formRef.current)
+      return
+    }
     // The calories warning and an unusual yield share one confirmation.
     if (energy !== null || needsFactorConfirmation(result.values)) {
       form.setConfirmingFactor(true)
       return
     }
     save(result.values)
+  }
+
+  // "Revisar" closes the confirmation and gives the focus back to "Guardar",
+  // which comes back in its place.
+  function review() {
+    flushSync(() => form.setConfirmingFactor(false))
+    saveButtonRef.current?.focus()
   }
 
   function numberField(
@@ -124,9 +146,9 @@ export function LabelFoodForm({
       .join(' ')
     return (
       <div
-        className={`flex flex-col gap-1 ${flagged ? 'rounded-lg bg-amber-50 p-2' : ''}`}
+        className={`flex flex-col gap-1 ${flagged ? 'rounded-control bg-warning-soft p-3' : ''}`}
       >
-        <label htmlFor={id} className="text-sm font-medium text-slate-700">
+        <label htmlFor={id} className={fieldLabel}>
           {label}
         </label>
         <NumberInput
@@ -138,17 +160,32 @@ export function LabelFoodForm({
           invalid={error !== undefined}
           describedBy={describedBy === '' ? undefined : describedBy}
         />
-        {origin !== null && (
-          <p
-            id={noteId}
-            className={`text-sm ${flagged ? 'text-amber-800' : 'text-slate-600'}`}
-          >
-            {fieldNote(origin)}
-          </p>
-        )}
-        <FieldError id={errorId} error={error} />
+        {origin !== null &&
+          (flagged ? (
+            <FieldMessage id={noteId} tone="warning">
+              {fieldNote(origin)}
+            </FieldMessage>
+          ) : (
+            <p id={noteId} className="text-sm text-ink-soft">
+              {fieldNote(origin)}
+            </p>
+          ))}
+        <FieldError id={errorId} error={error} field={requiredField(field)} />
       </div>
     )
+  }
+
+  // What an empty field says, in the words of its label (UX-14). The fiber
+  // is optional: it is never empty-and-required.
+  function requiredField(field: NumberField): RequiredFoodField | undefined {
+    switch (field) {
+      case 'portion':
+        return 'portion'
+      case 'labelCarbs':
+        return texts.basis === 'per_portion' ? 'portionCarbs' : 'carbsPer100g'
+      case 'fiber':
+        return undefined
+    }
   }
 
   // The texts of the confirmation on save: the calories warning and an
@@ -176,17 +213,20 @@ export function LabelFoodForm({
   ]
 
   return (
-    <form className="flex flex-col gap-5" onSubmit={handleSubmit} noValidate>
-      <h1 className="text-2xl font-semibold">Revisá los datos</h1>
+    // What gets the focus scrolls into view below the photo, which stays
+    // stuck to the top (a third of the screen, UX-16).
+    <form
+      ref={formRef}
+      className="flex flex-col gap-5 [&_:is(input,button,select,textarea)]:scroll-mt-[calc(22svh+2rem+env(safe-area-inset-top))]"
+      onSubmit={handleSubmit}
+      noValidate
+    >
+      <h1 className={pageTitle}>Revisá los datos</h1>
 
-      <img
-        src={photoUrl}
-        alt="Foto de la etiqueta"
-        className="max-h-[45vh] w-full rounded-lg object-contain"
-      />
+      <StickyLabelPhoto url={photoUrl} />
 
       {observations !== '' && (
-        <p className="text-sm text-slate-700">{`Al leer la foto: ${observations}`}</p>
+        <p className="text-sm text-ink">{`Al leer la foto: ${observations}`}</p>
       )}
 
       {asksColumn(transcription) && (
@@ -215,6 +255,7 @@ export function LabelFoodForm({
             name="label-basis"
             legend="¿Los HC de la etiqueta son de una porción o cada 100 g?"
             options={BASIS_OPTIONS}
+            segmented
             value={texts.basis}
             onChange={(basis) => {
               update({ basis })
@@ -228,8 +269,8 @@ export function LabelFoodForm({
         // The portion and the carbs, together and above the rest, to compare
         // them with the photo: the only real safeguard against a misread
         // (spec §6.1).
-        <section className="flex flex-col gap-3 rounded-lg border-2 border-slate-900 p-3">
-          <h2 className="text-base font-semibold">
+        <section className="flex flex-col gap-3 rounded-card border-2 border-ink bg-surface p-4 shadow-level-1">
+          <h2 className="font-display text-xl font-semibold">
             Compará con la foto de la etiqueta
           </h2>
           {texts.basis === 'per_portion' ? (
@@ -258,17 +299,17 @@ export function LabelFoodForm({
           {/* Always in the page, so the warning is announced when it shows. */}
           <div aria-live="polite">
             {energy !== null && (
-              <p className="rounded-lg bg-amber-50 p-2 text-amber-900">
-                {energy}
-              </p>
+              <Notice tone="warning">
+                <p>{energy}</p>
+              </Notice>
             )}
           </div>
         </section>
       )}
 
       {fiberShown && (
-        <div className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3">
-          <p className="text-amber-900">
+        <Notice tone="warning">
+          <p>
             {`La etiqueta dice "${carbsRowText(transcription)}". En ese formato los HC pueden incluir la fibra. Si la etiqueta trae la fibra, cargala y la app la resta.`}
           </p>
           {numberField(
@@ -278,19 +319,20 @@ export function LabelFoodForm({
               : 'Fibra cada 100 g (g) (opcional)',
             null,
           )}
-        </div>
+        </Notice>
       )}
 
       {offer !== null && (
         <button
           type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
+          className={button.soft}
           onClick={() => {
             update({ unitWeight: offer.weightText, unitLabel: offer.label })
             hideErrorsOf('unitWeight')
             form.setMoreOptionsOpen(true)
           }}
         >
+          <Plus aria-hidden="true" />
           {`Guardar también 1 ${offer.label} = ${offer.weightText} g`}
         </button>
       )}
@@ -308,40 +350,46 @@ export function LabelFoodForm({
         carbsField={null}
       />
 
-      {confirmationText !== null && (
+      {/* The confirmation takes the place of "Guardar" and "Cancelar" (spec
+          §6.1). Without a submit button, the form is not sent with Enter;
+          any change closes it and brings "Guardar" back. */}
+      {confirmationText !== null ? (
         <UnusualYieldConfirmation
           text={confirmationText}
           disabled={createFood.isPending}
           onConfirm={() => {
             if (result.values !== null) save(result.values)
           }}
-          onReview={() => form.setConfirmingFactor(false)}
+          onReview={review}
         />
-      )}
+      ) : (
+        <>
+          {createFood.isError && (
+            <Notice tone="error" role="alert">
+              <p>{SAVE_ERROR_MESSAGE}</p>
+            </Notice>
+          )}
 
-      {createFood.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {SAVE_ERROR_MESSAGE}
-        </p>
+          <div className="flex flex-col gap-3">
+            <button
+              ref={saveButtonRef}
+              type="submit"
+              className={button.primary}
+              disabled={createFood.isPending}
+            >
+              {createFood.isPending ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              type="button"
+              className={button.secondary}
+              disabled={createFood.isPending}
+              onClick={onCancel}
+            >
+              Cancelar
+            </button>
+          </div>
+        </>
       )}
-
-      <div className="flex flex-col gap-3">
-        <button
-          type="submit"
-          className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white disabled:opacity-60"
-          disabled={createFood.isPending}
-        >
-          {createFood.isPending ? 'Guardando…' : 'Guardar'}
-        </button>
-        <button
-          type="button"
-          className="min-h-11 rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
-          disabled={createFood.isPending}
-          onClick={onCancel}
-        >
-          Cancelar
-        </button>
-      </div>
     </form>
   )
 }

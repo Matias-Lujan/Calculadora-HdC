@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   MEALS_PAGE_SIZE,
+  RECENT_MEALS_LIMIT,
   createMeal,
   deleteMeal,
   fetchMeal,
   fetchMealsPage,
+  fetchRecentMeals,
   fetchReferenceFoods,
+  saveMeal,
 } from './api.ts'
 import type {
   CreateMealPayload,
@@ -442,6 +445,7 @@ const savedRow = {
   applied_dose_units: 6.5,
   meal_items: record.items.map((item) => ({
     position: item.position,
+    food_id: 'id' in item.food ? item.food.id : '',
     food_name: item.food_name,
     food_brand: item.food_brand,
     food_state: item.food_state,
@@ -474,10 +478,9 @@ describe('fetchMeal', () => {
     const columns = argsOf(0, 'select')?.[0] as string
     expect(columns).toContain('carb_ratio_g_per_unit')
     expect(columns).toContain(
-      'meal_items!inner(position, food_name, food_brand, food_state, quantity_mode, units, unit_weight_g, grams, carbs_per_100g, cooking_factor, effective_carbs_per_100g, carbs_g)',
+      'meal_items!inner(position, food_id, food_name, food_brand, food_state, quantity_mode, units, unit_weight_g, grams, carbs_per_100g, cooking_factor, effective_carbs_per_100g, carbs_g)',
     )
     expect(columns).not.toContain('calc_version')
-    expect(columns).not.toContain('food_id')
     expect(argsOf(0, 'eq')).toEqual(['id', MEAL_ID])
     expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
     expect(argsOf(0, 'order')).toEqual([
@@ -1007,4 +1010,132 @@ describe('createMeal with foods of the reference table', () => {
       'rpc:create_meal',
     ])
   })
+})
+
+// --- The shortcuts of Inicio and "Corregir" (spec §6.6, §6.7) ---
+
+describe('fetchRecentMeals', () => {
+  const recentRow = {
+    id: MEAL_ID,
+    eaten_at: '2026-11-14T16:05:00+00:00',
+    total_carbs_g: 99.24,
+    meal_items: [
+      {
+        position: 0,
+        food_id: '00000000-0000-4000-8000-000000000001',
+        food_name: 'Arroz de prueba',
+        quantity_mode: 'grams',
+        units: null,
+        grams: 250,
+      },
+    ],
+  }
+
+  it('reads the last 30 meals as the history lists them, with what repeating needs', async () => {
+    fake.state.results = [{ data: [recentRow], error: null }]
+    await expect(fetchRecentMeals()).resolves.toEqual([recentRow])
+
+    expect(RECENT_MEALS_LIMIT).toBe(30)
+    expect(fake.state.chains[0]?.table).toBe('meals')
+    expect(methods(0)).toEqual(['select', 'is', 'order', 'order', 'limit'])
+    expect(argsOf(0, 'select')).toEqual([
+      'id, eaten_at, total_carbs_g, meal_items!inner(position, food_id, food_name, quantity_mode, units, grams)',
+    ])
+    expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
+    expect(callsOf(0, 'order')).toEqual([
+      ['eaten_at', { ascending: false }],
+      ['created_at', { ascending: false }],
+    ])
+    expect(argsOf(0, 'limit')).toEqual([RECENT_MEALS_LIMIT])
+  })
+
+  it('an invalid row throws', async () => {
+    fake.state.results = [
+      { data: [{ ...recentRow, meal_items: [] }], error: null },
+    ]
+    await expect(fetchRecentMeals()).rejects.toThrow()
+  })
+
+  it('throws the Supabase error as is', async () => {
+    const error = { message: 'JWT expired', code: 'PGRST301' }
+    fake.state.results = [{ data: null, error }]
+    await expect(fetchRecentMeals()).rejects.toBe(error)
+  })
+})
+
+describe('saveMeal', () => {
+  const NEW_ID = '00000000-0000-4000-8000-0000000000bb'
+
+  it('a new meal: only createMeal', async () => {
+    fake.state.results = [{ data: NEW_ID, error: null }]
+    await expect(saveMeal({ record, replaces: null })).resolves.toEqual({
+      id: NEW_ID,
+      replacedDeleted: null,
+    })
+    expect(fake.state.chains.map((chain) => chain.table)).toEqual([
+      'rpc:create_meal',
+    ])
+  })
+
+  it('a correction: first creates the new meal, then deletes the corrected one, if it is not deleted yet', async () => {
+    fake.state.results = [
+      { data: NEW_ID, error: null },
+      { data: { id: MEAL_ID }, error: null },
+    ]
+    const before = Date.now()
+    await expect(saveMeal({ record, replaces: MEAL_ID })).resolves.toEqual({
+      id: NEW_ID,
+      replacedDeleted: true,
+    })
+    const after = Date.now()
+
+    expect(fake.state.chains.map((chain) => chain.table)).toEqual([
+      'rpc:create_meal',
+      'meals',
+    ])
+    expect(payloadOf(0).items).toEqual(catalogRows(record.items))
+    expect(methods(1)).toEqual(['update', 'eq', 'is', 'select', 'single'])
+    const payload = argsOf(1, 'update')?.[0] as Record<string, unknown>
+    expect(Object.keys(payload)).toEqual(['deleted_at'])
+    const sent = Date.parse(payload.deleted_at as string)
+    expect(sent).toBeGreaterThanOrEqual(before)
+    expect(sent).toBeLessThanOrEqual(after)
+    expect(argsOf(1, 'eq')).toEqual(['id', MEAL_ID])
+    expect(argsOf(1, 'is')).toEqual(['deleted_at', null])
+  })
+
+  it('if creating fails, its error is thrown and nothing is deleted', async () => {
+    const error = { message: 'x', code: '23514' }
+    fake.state.results = [{ data: null, error }]
+    await expect(saveMeal({ record, replaces: MEAL_ID })).rejects.toBe(error)
+    expect(fake.state.chains.map((chain) => chain.table)).toEqual([
+      'rpc:create_meal',
+    ])
+  })
+
+  it('if creating rejects (the network), nothing is deleted', async () => {
+    const network = new Error('network')
+    fake.state.results = [network]
+    await expect(saveMeal({ record, replaces: MEAL_ID })).rejects.toBe(network)
+    expect(fake.state.chains).toHaveLength(1)
+  })
+
+  it.each([
+    [
+      'no row updated (gone, or already deleted)',
+      { data: null, error: { message: 'x', code: 'PGRST116' } },
+    ],
+    ['a Supabase error', { data: null, error: { message: 'x', code: '500' } }],
+    ['the network', new Error('network')],
+  ])(
+    'if deleting the corrected meal fails (%s), the new meal stays saved',
+    async (_, deleteResult) => {
+      fake.state.results = [{ data: NEW_ID, error: null }, deleteResult]
+      await expect(saveMeal({ record, replaces: MEAL_ID })).resolves.toEqual({
+        id: NEW_ID,
+        replacedDeleted: false,
+      })
+      expect(fake.state.chains).toHaveLength(2)
+    },
+  )
 })

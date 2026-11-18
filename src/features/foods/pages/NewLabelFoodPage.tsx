@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { ChevronLeft } from 'lucide-react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
+import { Notice } from '../../../components/Notice.tsx'
+import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
+import { backLink, button, pageTitle } from '../../../components/styles.ts'
 import {
   NOT_A_LABEL_MESSAGE,
   PHOTO_OPEN_ERROR_MESSAGE,
@@ -9,10 +13,18 @@ import {
   visionErrorMessage,
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
-import { addToMealState, isFromMeal } from '../../../lib/mealHandoff.ts'
+import {
+  heldLabelPhoto,
+  releaseLabelPhoto,
+} from '../../../lib/labelPhotoHandoff.ts'
+import {
+  FROM_MEAL_STATE,
+  addToMealState,
+  isFromMeal,
+} from '../../../lib/mealHandoff.ts'
 import { LabelFoodForm } from '../components/LabelFoodForm.tsx'
+import { LabelProgress } from '../components/LabelProgress.tsx'
 import { LabelReadError } from '../components/LabelReadError.tsx'
-import { PhotoPickerButton } from '../components/PhotoPickerButton.tsx'
 import { toResizedJpeg } from '../photo.ts'
 import {
   useDeleteLabelPhoto,
@@ -45,6 +57,11 @@ function uploadedPath(step: Step): string | null {
  * photo, resize it, upload it, read it, and confirm. Reading errors offer
  * loading the data by hand, with the photo in sight.
  *
+ * The buttons that open it ("Con foto" in Inicio, "Agregar con una foto" in
+ * "Mis alimentos") open the camera or the gallery in the same tap, and the
+ * screen starts with that photo (UX-16, src/lib/labelPhotoHandoff.ts).
+ * Without one (a reload, a typed URL), it asks for the photo first.
+ *
  * Opened from Inicio (spec §6.6, §14 #61), going back and cancelling return
  * to Inicio, and saving returns there with the food, which Inicio adds to
  * the meal. Opened from the catalog, they return to the catalog and saving
@@ -52,12 +69,17 @@ function uploadedPath(step: Step): string | null {
  */
 export function NewLabelFoodPage() {
   const navigate = useNavigate()
-  const fromMeal = isFromMeal(useLocation().state)
+  const location = useLocation()
+  const fromMeal = isFromMeal(location.state)
   const backTo = fromMeal ? '/' : '/foods'
   const uploadPhoto = useUploadLabelPhoto()
   const transcribe = useTranscribeLabel()
   const deletePhoto = useDeleteLabelPhoto()
-  const [step, setStep] = useState<Step>({ kind: 'pick' })
+  // The photo picked with the button that opened the screen, if any.
+  const [pickedFile] = useState(() => heldLabelPhoto(location.state))
+  const [step, setStep] = useState<Step>(() =>
+    pickedFile === null ? { kind: 'pick' } : { kind: 'preparing' },
+  )
   const [photo, setPhoto] = useState<LocalPhoto | null>(null)
   // Each new photo (or leaving the screen) starts a new attempt: what an
   // older one finishes afterwards is ignored, and a photo it uploads late
@@ -119,9 +141,12 @@ export function NewLabelFoodPage() {
     const previous = uploadedPath(step)
     if (previous !== null) deletePhoto.mutate(previous)
     attemptRef.current += 1
-    const attempt = attemptRef.current
     setPhoto(null)
     setStep({ kind: 'preparing' })
+    await prepare(file, attemptRef.current)
+  }
+
+  async function prepare(file: File, attempt: number) {
     let blob: Blob
     try {
       blob = await toResizedJpeg(file)
@@ -133,6 +158,27 @@ export function NewLabelFoodPage() {
     setPhoto({ blob, url: URL.createObjectURL(blob) })
     await upload(blob, attempt)
   }
+
+  // The photo picked before opening the screen starts the first attempt,
+  // once. Its mark leaves the navigation state (without a new entry), so
+  // going back or forward to this entry does not upload it again. (In
+  // development, React runs effects twice: the first attempt ends with the
+  // effect above and the second one goes on with the same photo.)
+  const startPicked = useEffectEvent(() => {
+    if (pickedFile === null) return
+    releaseLabelPhoto()
+    void navigate('/foods/label', {
+      replace: true,
+      state: fromMeal ? FROM_MEAL_STATE : null,
+      preventScrollReset: true,
+    })
+    // The screen already starts in "Preparando", without a photo.
+    attemptRef.current += 1
+    void prepare(pickedFile, attemptRef.current)
+  })
+  useEffect(() => {
+    startPicked()
+  }, [])
 
   // Cancel deletes the uploaded photo without waiting (spec §6.1).
   function cancel() {
@@ -151,11 +197,9 @@ export function NewLabelFoodPage() {
   }
 
   const back = (
-    <Link
-      to={backTo}
-      className="flex min-h-11 items-center self-start text-slate-700"
-    >
-      {fromMeal ? '← Inicio' : '← Mis alimentos'}
+    <Link to={backTo} className={backLink}>
+      <ChevronLeft aria-hidden="true" className="shrink-0" />
+      {fromMeal ? 'Inicio' : 'Mis alimentos'}
     </Link>
   )
 
@@ -178,18 +222,18 @@ export function NewLabelFoodPage() {
     <img
       src={photo.url}
       alt="Foto de la etiqueta"
-      className="max-h-[45vh] w-full rounded-lg object-contain"
+      className="max-h-[45vh] w-full rounded-control object-contain"
     />
   )
 
   return (
     <section className="flex flex-col gap-4">
       {back}
-      <h1 className="text-2xl font-semibold">Agregar con una foto</h1>
+      <h1 className={pageTitle}>Agregar con una foto</h1>
 
       {step.kind === 'pick' && (
         <>
-          <p className="text-slate-700">
+          <p>
             Sacale una foto a la tabla nutricional del paquete; si entra,
             también al nombre.
           </p>
@@ -201,16 +245,17 @@ export function NewLabelFoodPage() {
       )}
 
       {step.kind === 'preparing' && (
-        <p aria-live="polite" className="text-slate-700">
-          Preparando la foto…
-        </p>
+        <>
+          <LabelProgress current="preparing" />
+          <CancelButton onClick={cancel} />
+        </>
       )}
 
       {step.kind === 'open-failed' && (
         <>
-          <p role="alert" className="text-red-700">
-            {PHOTO_OPEN_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{PHOTO_OPEN_ERROR_MESSAGE}</p>
+          </Notice>
           <PhotoPickerButton
             label="Sacar o elegir otra foto"
             onFile={(file) => void start(file)}
@@ -221,10 +266,8 @@ export function NewLabelFoodPage() {
 
       {step.kind === 'uploading' && (
         <>
+          <LabelProgress current="uploading" />
           {photoView}
-          <p aria-live="polite" className="text-slate-700">
-            Subiendo la foto…
-          </p>
           <CancelButton onClick={cancel} />
         </>
       )}
@@ -232,13 +275,13 @@ export function NewLabelFoodPage() {
       {step.kind === 'upload-failed' && (
         <>
           {photoView}
-          <p role="alert" className="text-red-700">
-            {PHOTO_UPLOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{PHOTO_UPLOAD_ERROR_MESSAGE}</p>
+          </Notice>
           {photo !== null && (
             <button
               type="button"
-              className="min-h-11 rounded-lg bg-slate-900 px-4 text-base font-medium text-white"
+              className={button.primary}
               onClick={() => void upload(photo.blob, attemptRef.current)}
             >
               Reintentar
@@ -250,10 +293,16 @@ export function NewLabelFoodPage() {
 
       {step.kind === 'reading' && (
         <>
-          {photoView}
-          <p aria-live="polite" className="text-slate-700">
-            Leyendo la etiqueta… Puede tardar unos segundos.
-          </p>
+          <LabelProgress current="reading" />
+          {/* A band of light goes over the photo while it is read (UX-22),
+              only without "Reducir movimiento". */}
+          <div className="relative overflow-hidden rounded-control">
+            {photoView}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 hidden h-1/4 bg-linear-to-b from-transparent via-on-display/45 to-transparent motion-safe:block motion-safe:animate-scan"
+            />
+          </div>
           <CancelButton onClick={cancel} />
         </>
       )}
@@ -331,11 +380,7 @@ function ReadFailure({
 
 function CancelButton({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      className="min-h-11 rounded-lg border border-slate-300 px-4 text-base"
-      onClick={onClick}
-    >
+    <button type="button" className={button.secondary} onClick={onClick}>
       Cancelar
     </button>
   )

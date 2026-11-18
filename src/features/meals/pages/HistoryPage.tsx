@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
+import { Notice } from '../../../components/Notice.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { MealDayGroup } from '../components/MealDayGroup.tsx'
+import { todayAndYesterday } from '../eatenAt.ts'
 import { groupMealsByDay, openDaysFromState, toggledDays } from '../history.ts'
 import { useMealList } from '../queries.ts'
 
 /**
  * The history (`/history`, spec §6.7): saved meals, most recent first,
- * grouped by day, every day folded at first.
+ * grouped by day, with "Hoy" and "Ayer" open at first.
  */
 export function HistoryPage() {
   const list = useMealList()
@@ -16,12 +20,13 @@ export function HistoryPage() {
     meals === undefined ? undefined : groupMealsByDay(meals, list.hasNextPage)
   const location = useLocation()
   const navigate = useNavigate()
-  // The open days live in the state of this entry of the browser history:
-  // going back from a meal finds them open, so the scroll restored by
-  // ScrollRestoration lands where it was. From the bar, none is open.
-  const openDays = openDaysFromState(location.state)
   // "Hoy" and "Ayer" are relative to when the list was opened.
   const [now] = useState(() => new Date())
+  // The open days live in the state of this entry of the browser history:
+  // going back from a meal finds them as they were, so the scroll restored
+  // by ScrollRestoration lands where it was. From the bar, "Hoy" and "Ayer"
+  // open (UX-11).
+  const openDays = openDaysFromState(location.state, todayAndYesterday(now))
 
   function toggle(day: string) {
     void navigate(location.pathname, {
@@ -34,15 +39,17 @@ export function HistoryPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Historial</h1>
+      <h1 className={pageTitle}>Historial</h1>
 
       {/* With data, the list stays even if a later refetch fails. */}
       {days !== undefined ? (
         days.length === 0 ? (
-          <p className="text-slate-700">Todavía no registraste comidas.</p>
+          <p>
+            Acá van a aparecer tus comidas. La primera se carga desde Inicio.
+          </p>
         ) : (
           <>
-            <ul className="flex flex-col divide-y divide-slate-200">
+            <ul className="flex flex-col divide-y divide-line">
               {days.map((day) => (
                 <li key={day.day}>
                   <MealDayGroup
@@ -60,7 +67,7 @@ export function HistoryPage() {
                     during a refetch would use an offset about to change. */}
                 <button
                   type="button"
-                  className="min-h-11 rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+                  className={button.secondary}
                   disabled={list.isFetching}
                   onClick={() => {
                     if (!list.isFetching) void list.fetchNextPage()
@@ -70,9 +77,9 @@ export function HistoryPage() {
                 </button>
                 {/* The retry is "Ver más" again. */}
                 {list.isFetchNextPageError && (
-                  <p role="alert" className="text-red-700">
-                    {LOAD_ERROR_MESSAGE}
-                  </p>
+                  <Notice tone="error" role="alert">
+                    <p>{LOAD_ERROR_MESSAGE}</p>
+                  </Notice>
                 )}
               </div>
             )}
@@ -80,12 +87,12 @@ export function HistoryPage() {
         )
       ) : list.isError ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={list.isFetching}
             onClick={() => void list.refetch()}
           >
@@ -93,7 +100,8 @@ export function HistoryPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        // The days of the list.
+        <LoadingShapes shapes={['h-14', 'h-14', 'h-14']} />
       )}
     </section>
   )

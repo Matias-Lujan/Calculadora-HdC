@@ -14,6 +14,7 @@ import {
   yieldLine,
 } from './features/foods/foodForm.ts'
 import {
+  displayCarbsText,
   doseLine,
   doseText,
   foodCarbsLine,
@@ -21,9 +22,17 @@ import {
   foodYieldLine,
   itemCalculationLines,
   itemCarbsText,
+  ratioText,
+  savedDoseNoteText,
+  savedMealText,
   savedItemLines,
+  savedItemQuantityText,
   totalCarbsText,
 } from './features/meals/breakdown.ts'
+import {
+  foodDetailSentences,
+  foodKeyFigure,
+} from './features/foods/foodDetail.ts'
 import {
   carbsLine,
   columnOptionText,
@@ -33,13 +42,24 @@ import {
   initialLabelFormTexts,
   nameNote,
 } from './features/foods/labelForm.ts'
-import { formatDayTitle } from './features/meals/eatenAt.ts'
+import { formatDayTitle, formatMealDateTime } from './features/meals/eatenAt.ts'
 import {
   appliedDoseText,
   daySummaryText,
-  mealSummaryText,
+  mealRowDetailText,
+  mealRowLabel,
 } from './features/meals/history.ts'
-import { SETTINGS_FIELDS } from './features/settings/fields.ts'
+import {
+  ALERT_FIELDS,
+  RATIO_LABEL_REST,
+  RATIO_PHRASE_END,
+  RATIO_PHRASE_START,
+} from './features/settings/fields.ts'
+import {
+  ratioChangeTexts,
+  ratioExampleText,
+  ratioSavedText,
+} from './features/settings/ratio.ts'
 import * as errors from './lib/errors.ts'
 import { TABLE_VALUE_INFO, cookedPer100gText } from './lib/foodText.ts'
 
@@ -102,6 +122,17 @@ const inputs: MealItemInput[] = [
   },
 ]
 
+const mealProblems: errors.MealProblem[] = [
+  { code: 'QUANTITY', foodName: 'Banana', error: 'REQUIRED' },
+  { code: 'QUANTITY', foodName: 'Banana', error: 'NOT_POSITIVE' },
+  { code: 'FOOD', foodName: 'Banana' },
+  { code: 'APPLIED_DOSE', error: 'REQUIRED' },
+  { code: 'APPLIED_DOSE', error: 'INVALID_NUMBER' },
+  { code: 'EATEN_AT', empty: true },
+  { code: 'EATEN_AT', empty: false },
+  { code: 'MEAL' },
+]
+
 describe('plain words on the screen', () => {
   it('error messages and notices', () => {
     const positive: PositiveNumberError[] = [
@@ -112,6 +143,7 @@ describe('plain words on the screen', () => {
     const foodFields: errors.FoodFieldError[] = [
       ...positive,
       'ABOVE_100',
+      'NAME_REQUIRED',
       'STATE_REQUIRED',
       'UNIT_WEIGHT_REQUIRED',
       'FACTOR_NOT_COMPUTABLE',
@@ -131,12 +163,29 @@ describe('plain words on the screen', () => {
     const notices: TypedNumberNotice[] = ['DECIMAL_DOT', 'REJECTED']
     expectPlain([
       ...positive.map(errors.positiveNumberErrorMessage),
-      ...foodFields.map(errors.foodFieldErrorMessage),
+      ...foodFields.map((code) => errors.foodFieldErrorMessage(code)),
       ...items.map(errors.mealItemErrorMessage),
       ...notices.map(errors.typedNumberNoticeMessage),
       ...errors.VISION_ERROR_CODES.map(errors.visionErrorMessage),
       errors.cookingFactorUnusualMessage('90'),
       errors.cookingFactorUnusualMessage('450'),
+      ...positive.flatMap((code) => [
+        errors.quantityErrorMessage(code, 'grams'),
+        errors.quantityErrorMessage(code, 'units'),
+        errors.ratioErrorMessage(code),
+      ]),
+      ...(
+        [
+          'carbsPer100g',
+          'rawWeight',
+          'cookedWeight',
+          'portion',
+          'portionCarbs',
+        ] as const
+      ).map((field) => errors.foodFieldErrorMessage('REQUIRED', field)),
+      errors.appliedDoseErrorMessage('REQUIRED'),
+      errors.appliedDoseErrorMessage('INVALID_NUMBER'),
+      ...mealProblems.map(errors.mealProblemMessage),
     ])
   })
 
@@ -153,7 +202,13 @@ describe('plain words on the screen', () => {
       { code: 'COOKING_FACTOR_UNUSUAL', foodName: 'Arroz', cookedGrams: null },
       { code: 'DOSE_ABOVE_THRESHOLD', dose: '8,55', threshold: '8' },
     ]
-    expectPlain(warnings.map(errors.mealSaveWarningMessage))
+    expectPlain(
+      warnings.map((warning) => {
+        const { before, strong, after } = errors.mealSaveWarningMessage(warning)
+        return `${before}${strong}${after}`
+      }),
+    )
+    expectPlain(warnings.map(errors.mealLiveWarningMessage))
   })
 
   it('the sign in messages', () => {
@@ -190,6 +245,24 @@ describe('plain words on the screen', () => {
       unitLine({ unitWeight: '45', unitLabel: '' }),
       unusualYieldText(4.5),
       unusualYieldText(0.9),
+      ...(['as_eaten', 'raw_cooked'] as const).flatMap((state) => {
+        const figure = foodKeyFigure({ state, carbs_per_100g: 78 })
+        return [figure.amount, figure.rest]
+      }),
+      ...[2.6, null, 1e307].flatMap((factor) =>
+        foodDetailSentences({
+          state: 'raw_cooked',
+          cooking_factor: factor,
+          unit_weight_g: null,
+          unit_label: null,
+        }),
+      ),
+      ...foodDetailSentences({
+        state: 'as_eaten',
+        cooking_factor: null,
+        unit_weight_g: 50,
+        unit_label: 'alfajor',
+      }),
     ])
   })
 
@@ -266,6 +339,7 @@ describe('plain words on the screen', () => {
         itemCarbsText(calc.carbsG),
         ...savedItemLines({
           position: index,
+          food_id: '00000000-0000-4000-8000-000000000001',
           food_name: 'Alimento',
           food_brand: null,
           food_state: input.foodState,
@@ -279,12 +353,22 @@ describe('plain words on the screen', () => {
           effective_carbs_per_100g: calc.effectiveCarbsPer100g,
           carbs_g: calc.carbsG,
         }),
+        savedItemQuantityText({
+          food_state: input.foodState,
+          quantity_mode: input.quantityMode,
+          units: input.quantityMode === 'units' ? input.quantity : null,
+          unit_weight_g:
+            input.quantityMode === 'units' ? input.unitWeightG : null,
+          grams: calc.grams,
+        }),
       )
     })
     texts.push(
       totalCarbsText(result.totalCarbsG),
+      displayCarbsText(result.totalCarbsG),
       doseText(result.doseUnits),
       doseLine(result.totalCarbsG, 12.5, result.doseUnits),
+      ratioText(12.5),
     )
     expectPlain(texts)
   })
@@ -302,7 +386,13 @@ describe('plain words on the screen', () => {
     expectPlain([
       appliedDoseText(null),
       appliedDoseText(8.5),
-      mealSummaryText(meal),
+      mealRowDetailText(meal),
+      mealRowLabel(meal),
+      mealRowLabel({ ...meal, applied_dose_units: 8.5 }),
+      formatMealDateTime(meal.eaten_at, now),
+      savedDoseNoteText(8.55, 15),
+      savedMealText(128.25, 8.5, false),
+      savedMealText(128.25, 8.5, true),
       daySummaryText({ day: '2026-11-14', meals: [meal], complete: true }),
       daySummaryText({
         day: '2026-11-14',
@@ -316,9 +406,24 @@ describe('plain words on the screen', () => {
   })
 
   it('the settings labels and their ⓘ', () => {
-    expectPlain(
-      SETTINGS_FIELDS.flatMap(({ label, info }) => [label, info ?? null]),
-    )
+    expectPlain([
+      RATIO_PHRASE_START,
+      RATIO_LABEL_REST,
+      RATIO_PHRASE_END,
+      ...ALERT_FIELDS.flatMap(({ label, info }) => [label, info]),
+    ])
+  })
+
+  it('the texts of the ratio', () => {
+    const change = ratioChangeTexts(15, 12)
+    expectPlain([
+      ratioExampleText(15),
+      ratioExampleText(60),
+      change.question,
+      change.detail,
+      ratioChangeTexts(15, 15.0001).detail,
+      ratioSavedText(12),
+    ])
   })
 
   it('the check itself catches the words it looks for', () => {
@@ -349,6 +454,7 @@ describe('plain words: every code, exhaustively', () => {
     INVALID_NUMBER: true,
     NOT_POSITIVE: true,
     ABOVE_100: true,
+    NAME_REQUIRED: true,
     STATE_REQUIRED: true,
     UNIT_WEIGHT_REQUIRED: true,
     FACTOR_NOT_COMPUTABLE: true,
@@ -384,7 +490,7 @@ describe('plain words: every code, exhaustively', () => {
 
   it('food field errors', () => {
     const codes = Object.keys(foodFieldCodes) as errors.FoodFieldError[]
-    expectPlain(codes.map(errors.foodFieldErrorMessage))
+    expectPlain(codes.map((code) => errors.foodFieldErrorMessage(code)))
   })
 
   it('meal item errors', () => {

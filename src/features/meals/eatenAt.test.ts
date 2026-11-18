@@ -6,6 +6,11 @@ import {
   formatDayTitle,
   formatEatenAt,
   formatEatenTime,
+  formatMealDateTime,
+  formatMealMoment,
+  ofMealMoment,
+  secondOfDayAt,
+  todayAndYesterday,
 } from './eatenAt.ts'
 
 // The time zone of the process when the file loads. vi.unstubAllEnvs()
@@ -542,5 +547,87 @@ describe('the time zone tests leave the zone of the process as it was', () => {
       zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       offset: probe.getTimezoneOffset(),
     }).toEqual(before)
+  })
+})
+
+// The shortcuts of Inicio (spec §6.6): the time of day and the moment of a
+// meal, in Buenos Aires (UTC−3).
+describe('secondOfDayAt', () => {
+  it.each([
+    ['2026-11-16T03:00:00Z', 0], // midnight in Buenos Aires
+    ['2026-11-16T02:59:59Z', 86399], // a second before
+    ['2026-11-16T16:05:30Z', 13 * 3600 + 5 * 60 + 30],
+    ['2026-11-16T00:00:00Z', 21 * 3600], // midnight UTC is 21:00
+  ])('%s is second %i', (iso, second) => {
+    expect(secondOfDayAt(Date.parse(iso))).toBe(second)
+  })
+
+  it('does not depend on the time zone of the device', () => {
+    try {
+      vi.stubEnv('TZ', 'Asia/Tokyo')
+      expect(secondOfDayAt(Date.parse('2026-11-16T03:00:00Z'))).toBe(0)
+    } finally {
+      restoreTimeZone()
+    }
+  })
+})
+
+describe('formatMealMoment and ofMealMoment', () => {
+  // Monday 16/11/2026, 13:00 in Buenos Aires.
+  const now = new Date('2026-11-16T16:00:00Z')
+
+  it.each([
+    ['2026-11-16T11:30:00+00:00', 'Hoy 08:30', 'de hoy 08:30'],
+    ['2026-11-15T11:30:00+00:00', 'Ayer 08:30', 'de ayer 08:30'],
+    // 23:30 of Saturday in Buenos Aires, already Sunday in UTC.
+    [
+      '2026-11-15T02:30:00+00:00',
+      'sábado 14/11 23:30',
+      'del sábado 14/11 23:30',
+    ],
+    [
+      '2025-12-31T15:00:00+00:00',
+      'miércoles 31/12/2025 12:00',
+      'del miércoles 31/12/2025 12:00',
+    ],
+  ])('%s: "%s", "%s"', (iso, row, notice) => {
+    expect(formatMealMoment(iso, now)).toBe(row)
+    expect(ofMealMoment(iso, now)).toBe(notice)
+  })
+})
+
+describe('todayAndYesterday', () => {
+  it.each([
+    // 13:00 UTC is 10:00 in Buenos Aires.
+    ['2026-11-16T13:00:00Z', '2026-11-16', '2026-11-15'],
+    // 02:59 UTC of the 16th is still 23:59 of the 15th in Buenos Aires.
+    ['2026-11-16T02:59:00Z', '2026-11-15', '2026-11-14'],
+    ['2026-11-16T03:00:00Z', '2026-11-16', '2026-11-15'],
+    // Across the change of month and year.
+    ['2026-12-01T12:00:00Z', '2026-12-01', '2026-11-30'],
+    ['2027-01-01T12:00:00Z', '2027-01-01', '2026-12-31'],
+    ['2028-03-01T12:00:00Z', '2028-03-01', '2028-02-29'],
+  ])('at %s: %s and %s', (now, today, yesterday) => {
+    expect(todayAndYesterday(new Date(now))).toEqual([today, yesterday])
+  })
+
+  it('the days formatDayTitle names "Hoy" and "Ayer"', () => {
+    const now = new Date('2027-01-01T02:30:00Z')
+    const [today, yesterday] = todayAndYesterday(now)
+    expect(formatDayTitle(today, now)).toBe('Hoy')
+    expect(formatDayTitle(yesterday, now)).toBe('Ayer')
+  })
+})
+
+describe('formatMealDateTime', () => {
+  const now = new Date('2026-11-16T13:00:00Z')
+
+  it.each([
+    ['2026-11-16T16:05:00Z', 'Hoy, 13:05'],
+    ['2026-11-16T00:00:00Z', 'Ayer, 21:00'],
+    ['2026-11-14T16:05:00Z', 'sábado 14/11, 13:05'],
+    ['2025-12-31T23:00:00Z', 'miércoles 31/12/2025, 20:00'],
+  ])('%s → %s', (iso, text) => {
+    expect(formatMealDateTime(iso, now)).toBe(text)
   })
 })

@@ -10,6 +10,7 @@ import {
   deletionEdit,
   pasteEdit,
 } from './numberInputEdit.ts'
+import { field } from './styles.ts'
 
 type NumberInputProps = {
   id: string
@@ -20,6 +21,19 @@ type NumberInputProps = {
   onBlur: () => void
   invalid: boolean
   describedBy?: string
+  /**
+   * Extra classes for the <input>, that do not change the ones of the field
+   * (size, border, colors): for example, the letter of a dose.
+   */
+  className?: string
+  /**
+   * The unit, written inside the field on its right ("g", "g cocidos",
+   * "unidades"). Only seen: the label of the field has to say it for
+   * screen readers.
+   */
+  suffix?: string
+  /** Classes for the box of the field and its suffix: its width. */
+  boxClassName?: string
 }
 
 /**
@@ -31,6 +45,9 @@ type NumberInputProps = {
  * (value and caret), and a controlled value would make React fight them and
  * move the caret. The listeners are native, because React's onBeforeInput is
  * not the native beforeinput and has no inputType (React issue #11211).
+ *
+ * When it gets the focus with a value, the whole text is selected, so the
+ * first key replaces it (UX-15); a second tap places the caret as usual.
  */
 export function NumberInput({
   id,
@@ -40,6 +57,9 @@ export function NumberInput({
   onBlur,
   invalid,
   describedBy,
+  className,
+  suffix,
+  boxClassName,
 }: NumberInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   // The last text this component accepted: what the field had before the
@@ -121,37 +141,101 @@ export function NumberInput({
       }
     }
 
+    // Select everything on focus (UX-15). Safari, also on iOS, places the
+    // caret where the finger landed after the focus event, so the selection
+    // is made again once the tap is done (setTimeout 0); and the mouseup of
+    // that same tap is cancelled, because desktop browsers collapse the
+    // selection there. Only the tap that gives the focus: a second tap
+    // places the caret.
+    let tapGivesFocus = false
+    let selectTimer: number | undefined
+    const selectAll = () => {
+      if (document.activeElement === input && input.value !== '') {
+        input.setSelectionRange(0, input.value.length)
+      }
+    }
+    const handlePointerDown = () => {
+      tapGivesFocus = document.activeElement !== input
+    }
+    const handleFocus = () => {
+      selectAll()
+      window.clearTimeout(selectTimer)
+      selectTimer = window.setTimeout(selectAll, 0)
+    }
+    const handleMouseUp = (event: MouseEvent) => {
+      if (!tapGivesFocus) return
+      tapGivesFocus = false
+      event.preventDefault()
+    }
+
     input.addEventListener('beforeinput', handleBeforeInput)
     input.addEventListener('paste', handlePaste)
     input.addEventListener('input', handleInput)
+    input.addEventListener('pointerdown', handlePointerDown)
+    input.addEventListener('focus', handleFocus)
+    input.addEventListener('mouseup', handleMouseUp)
     return () => {
+      window.clearTimeout(selectTimer)
       input.removeEventListener('beforeinput', handleBeforeInput)
       input.removeEventListener('paste', handlePaste)
       input.removeEventListener('input', handleInput)
+      input.removeEventListener('pointerdown', handlePointerDown)
+      input.removeEventListener('focus', handleFocus)
+      input.removeEventListener('mouseup', handleMouseUp)
     }
   }, [])
 
+  // Room on the right for the suffix: about half a letter of the field per
+  // letter of the suffix (it is smaller), plus its margin. In em, so it
+  // grows with the letter of the iPhone (UX-27).
+  const suffixRoom =
+    suffix === undefined
+      ? undefined
+      : { paddingRight: `calc(${suffix.length * 0.5}em + 1rem)` }
+  const input = (
+    <input
+      ref={inputRef}
+      id={id}
+      name={name}
+      style={suffixRoom}
+      className={`${field} tabular-nums${className === undefined ? '' : ` ${className}`}`}
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      autoCorrect="off"
+      spellCheck={false}
+      defaultValue={value}
+      aria-invalid={invalid}
+      aria-describedby={describedBy}
+      onBlur={() => {
+        setNotice(null)
+        onBlur()
+      }}
+    />
+  )
+
   return (
     <>
-      <input
-        ref={inputRef}
-        id={id}
-        name={name}
-        className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base focus:border-slate-500 focus:outline-none aria-invalid:border-red-600"
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        autoCorrect="off"
-        spellCheck={false}
-        defaultValue={value}
-        aria-invalid={invalid}
-        aria-describedby={describedBy}
-        onBlur={() => {
-          setNotice(null)
-          onBlur()
-        }}
-      />
-      <p aria-live="polite" className="text-sm text-slate-500">
+      {suffix === undefined && boxClassName === undefined ? (
+        input
+      ) : (
+        <div
+          // h-fit: as tall as the field, never stretched by a grid or flex
+          // row, so the suffix stays centered on the number.
+          className={`relative h-fit${boxClassName === undefined ? '' : ` ${boxClassName}`}`}
+        >
+          {input}
+          {suffix !== undefined && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-ink-soft"
+            >
+              {suffix}
+            </span>
+          )}
+        </div>
+      )}
+      <p aria-live="polite" className="text-sm text-ink-soft">
         {notice !== null && typedNumberNoticeMessage(notice)}
       </p>
     </>

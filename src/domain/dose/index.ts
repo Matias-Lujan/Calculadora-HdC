@@ -1,3 +1,5 @@
+export { appliedDoseShortcuts } from './appliedDoseShortcuts.ts'
+export type { AppliedDoseShortcuts } from './appliedDoseShortcuts.ts'
 export { applyTypedEdit } from './applyTypedEdit.ts'
 export type {
   TypedEdit,
@@ -17,7 +19,15 @@ export {
   isCookingFactorUnusual,
   needsCookingFactor,
 } from './cookingFactor.ts'
-export { formatCarbs, formatDose, formatGrams } from './format.ts'
+export { doseForCarbs } from './doseForCarbs.ts'
+export {
+  formatCarbs,
+  formatDose,
+  formatDoseCompact,
+  formatGrams,
+  unitsWord,
+  withUnitsWord,
+} from './format.ts'
 export { formatUserNumber } from './formatUserNumber.ts'
 export { normalizeForDisplay } from './normalizeForDisplay.ts'
 export { parseNonNegativeUserNumber } from './parseNonNegativeUserNumber.ts'

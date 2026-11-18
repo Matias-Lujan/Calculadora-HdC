@@ -1,14 +1,20 @@
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
+import { Notice } from '../../../components/Notice.tsx'
+import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods } from '../../../lib/foods.ts'
 import { useSettings } from '../../../lib/settings.ts'
-import { MealForm } from '../components/MealForm.tsx'
-import { useReferenceFoods } from '../queries.ts'
+import { EMPTY_MEAL_TITLE, MealForm } from '../components/MealForm.tsx'
+import { useRecentMeals, useReferenceFoods } from '../queries.ts'
 
 /** Home ("Inicio", `/`): a new meal (spec §6.6). */
 export function NewMealPage() {
   const foods = useFoods()
   const referenceFoods = useReferenceFoods()
   const settings = useSettings()
+  // Only for the shortcuts of an empty Inicio: Inicio does not wait for it,
+  // and without it (loading or failed) they are not shown.
+  const recentMeals = useRecentMeals()
   const queries = [foods, referenceFoods, settings]
 
   // A query fails "without data" only if it never loaded. With data, a later
@@ -20,8 +26,8 @@ export function NewMealPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Nueva comida</h1>
-
+      {/* With the meal loaded, MealForm writes the title ("Corregir comida"
+          while correcting). */}
       {foods.data !== undefined &&
       referenceFoods.data !== undefined &&
       settings.data !== undefined ? (
@@ -29,15 +35,17 @@ export function NewMealPage() {
           foods={foods.data}
           referenceFoods={referenceFoods.data}
           settings={settings.data}
+          recentMeals={recentMeals.data}
         />
       ) : failed.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={queries.some((query) => query.isFetching)}
             onClick={() => {
               for (const query of failed) void query.refetch()
@@ -47,7 +55,11 @@ export function NewMealPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        <>
+          <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
+          {/* The search field and the shortcuts of an empty Inicio. */}
+          <LoadingShapes shapes={['h-12', 'h-24', 'h-24']} />
+        </>
       )}
     </section>
   )

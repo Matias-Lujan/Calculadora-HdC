@@ -159,3 +159,6 @@ scripts/gemini-probe/output/
 .claude/settings.local.json
 # USDA FoodData Central download (scripts/usda-seed): public, but large
 scripts/usda-seed/data/
+
+# UX screenshots (scripts/ux-screens): local only
+scripts/ux-screens/out/

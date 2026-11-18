@@ -1,7 +1,10 @@
+import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { FieldMessage } from '../../../components/FieldMessage.tsx'
+import { button } from '../../../components/styles.ts'
 import { DELETE_ERROR_MESSAGE } from '../../../lib/errors.ts'
-import { formatEatenAt } from '../eatenAt.ts'
+import { ofMealMoment } from '../eatenAt.ts'
 import { useDeleteMeal } from '../queries.ts'
 import type { SavedMeal } from '../types.ts'
 
@@ -9,23 +12,26 @@ type Props = {
   meal: SavedMeal
 }
 
-// "Borrar" in the meal detail (spec §6.7, §14 #47): a soft delete, asked
-// for in an inline box (like ArchiveFoodSection). There is no way to
+// "Borrar comida" in the meal detail (spec §6.7, §14 #47): a soft delete,
+// asked for in an inline box (like ArchiveFoodSection). There is no way to
 // recover a deleted meal. No lock against a double tap: deleting again only
 // overwrites the date.
 export function DeleteMealSection({ meal }: Props) {
   const del = useDeleteMeal()
   const navigate = useNavigate()
   const [confirming, setConfirming] = useState(false)
+  // "Hoy" and "Ayer" are relative to when the detail was opened.
+  const [now] = useState(() => new Date())
 
   if (!confirming) {
     return (
       <button
         type="button"
         onClick={() => setConfirming(true)}
-        className="min-h-11 rounded-lg border border-red-300 px-4 text-base font-medium text-red-700"
+        className={`${button.dangerText} self-start`}
       >
-        Borrar
+        <Trash2 aria-hidden="true" />
+        Borrar comida
       </button>
     )
   }
@@ -48,34 +54,35 @@ export function DeleteMealSection({ meal }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900">
+    <div className="flex flex-col gap-3 rounded-card border border-danger bg-danger-soft p-4">
       <p>
-        ¿Borrar la comida del {formatEatenAt(meal.eaten_at)}? Deja de aparecer
+        ¿Borrar la comida {ofMealMoment(meal.eaten_at, now)}? Deja de aparecer
         en el historial y no se puede deshacer.
       </p>
       {del.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {DELETE_ERROR_MESSAGE}
-        </p>
+        <div role="alert">
+          <FieldMessage>{DELETE_ERROR_MESSAGE}</FieldMessage>
+        </div>
       )}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <button
           type="button"
           onClick={handleConfirm}
           disabled={del.isPending}
-          className="min-h-11 rounded-lg bg-red-700 px-4 text-base font-medium text-white disabled:opacity-60"
+          className={button.danger}
         >
-          {del.isPending ? 'Borrando…' : 'Borrar'}
+          <Trash2 aria-hidden="true" />
+          {del.isPending ? 'Borrando…' : 'Borrar comida'}
         </button>
         {/* Disabled while deleting: the request is already sent and can't be
-            undone, so "Cancelar" would only hide it before the navigation. */}
+            undone, so "No borrar" would only hide it before the navigation. */}
         <button
           type="button"
           onClick={handleCancel}
           disabled={del.isPending}
-          className="min-h-11 rounded-lg border border-red-300 px-4 text-base disabled:opacity-60"
+          className={button.secondary}
         >
-          Cancelar
+          No borrar
         </button>
       </div>
     </div>

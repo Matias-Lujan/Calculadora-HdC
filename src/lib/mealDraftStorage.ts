@@ -21,6 +21,19 @@ export function readMealDraft(): unknown {
   }
 }
 
+/**
+ * Whether there is a meal in progress, for the dot on Inicio in the bar
+ * (UX-20): a stored draft with at least one item. Only its shape is looked
+ * at; the meals feature validates the rest when Inicio reads it.
+ */
+export function hasMealDraft(): boolean {
+  const draft = readMealDraft()
+  if (typeof draft !== 'object' || draft === null || !('items' in draft)) {
+    return false
+  }
+  return Array.isArray(draft.items) && draft.items.length > 0
+}
+
 export function writeMealDraft(draft: unknown): void {
   try {
     sessionStorage.setItem(MEAL_DRAFT_KEY, JSON.stringify(draft))

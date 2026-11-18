@@ -1,5 +1,9 @@
+import { ChevronLeft } from 'lucide-react'
 import { useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
+import { Notice } from '../../../components/Notice.tsx'
+import { backLink, button } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { MealDetail } from '../components/MealDetail.tsx'
 import { isFromHistoryList, isPlainLeftClick } from '../history.ts'
@@ -34,18 +38,16 @@ export function MealDetailPage() {
           wentBack.current = true
           void navigate(-1)
         }}
-        className="flex min-h-11 items-center self-start text-slate-700"
+        className={backLink}
       >
-        ← Historial
+        <ChevronLeft aria-hidden="true" className="shrink-0" />
+        Historial
       </Link>
 
       {meal.data === null ? (
         <div className="flex flex-col gap-3">
           <p>No encontramos esta comida.</p>
-          <Link
-            to="/history"
-            className="flex min-h-11 items-center self-start rounded-lg border border-slate-300 px-4 text-base"
-          >
+          <Link to="/history" className={`${button.secondary} self-start`}>
             Ir al historial
           </Link>
         </div>
@@ -53,12 +55,12 @@ export function MealDetailPage() {
         <MealDetail meal={meal.data} />
       ) : meal.isError ? (
         <div className="flex flex-col gap-3">
-          <p role="alert" className="text-red-700">
-            {LOAD_ERROR_MESSAGE}
-          </p>
+          <Notice tone="error" role="alert">
+            <p>{LOAD_ERROR_MESSAGE}</p>
+          </Notice>
           <button
             type="button"
-            className="min-h-11 self-start rounded-lg border border-slate-300 px-4 text-base disabled:opacity-60"
+            className={`${button.secondary} self-start`}
             disabled={meal.isFetching}
             onClick={() => void meal.refetch()}
           >
@@ -66,7 +68,8 @@ export function MealDetailPage() {
           </button>
         </div>
       ) : (
-        <p className="text-slate-500">Cargando…</p>
+        // The summary and the foods of the meal.
+        <LoadingShapes shapes={['h-9 w-2/3', 'h-28', 'h-20', 'h-20']} />
       )}
     </section>
   )

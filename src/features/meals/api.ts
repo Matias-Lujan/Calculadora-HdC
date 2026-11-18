@@ -2,14 +2,18 @@ import { z } from 'zod'
 import { supabase } from '../../lib/supabase.ts'
 import {
   listedMealSchema,
+  recentMealSchema,
   referenceFoodSchema,
   savedMealSchema,
   type CreateMealPayload,
+  type MealToSave,
   type MealsPage,
   type NewMealRecord,
   type NewTableFood,
+  type RecentMeal,
   type ReferenceFood,
   type SavedMeal,
+  type SavedMealResult,
 } from './types.ts'
 
 // RLS lets each user insert and read only their own meals (spec §7.3).
@@ -148,7 +152,7 @@ export async function fetchMeal(id: string): Promise<SavedMeal | null> {
   const { data, error } = await supabase
     .from('meals')
     .select(
-      'id, eaten_at, carb_ratio_g_per_unit, total_carbs_g, calculated_dose_units, applied_dose_units, meal_items!inner(position, food_name, food_brand, food_state, quantity_mode, units, unit_weight_g, grams, carbs_per_100g, cooking_factor, effective_carbs_per_100g, carbs_g)',
+      'id, eaten_at, carb_ratio_g_per_unit, total_carbs_g, calculated_dose_units, applied_dose_units, meal_items!inner(position, food_id, food_name, food_brand, food_state, quantity_mode, units, unit_weight_g, grams, carbs_per_100g, cooking_factor, effective_carbs_per_100g, carbs_g)',
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -175,4 +179,57 @@ export async function deleteMeal(id: string): Promise<void> {
     .select('id')
     .single()
   if (error) throw error
+}
+
+/** How many of the last meals the shortcuts of an empty Inicio read. */
+export const RECENT_MEALS_LIMIT = 30
+
+/**
+ * The last meals, for the shortcuts of an empty Inicio (spec §6.6): the
+ * RECENT_MEALS_LIMIT most recent ones by eaten_at (like the history: not
+ * deleted, with at least one item), each with what "Recientes", "A esta
+ * hora comiste" and "Repetir" need. The items come in any order.
+ */
+export async function fetchRecentMeals(): Promise<RecentMeal[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select(
+      'id, eaten_at, total_carbs_g, meal_items!inner(position, food_id, food_name, quantity_mode, units, grams)',
+    )
+    .is('deleted_at', null)
+    .order('eaten_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(RECENT_MEALS_LIMIT)
+  if (error) throw error
+  return z.array(recentMealSchema).parse(data as unknown)
+}
+
+/**
+ * Saves a meal from Inicio (spec §6.6). A correction (spec §6.7, "Corregir")
+ * is two requests, without a function in the base: first the new meal is
+ * created, all or nothing, with createMeal (if it fails, its error is
+ * thrown and nothing is deleted); then the corrected one is soft-deleted.
+ * That second step only touches a meal not deleted yet: if it fails (the
+ * network, or the meal no longer exists or was already deleted), the new
+ * meal stays saved and `replacedDeleted` is false.
+ */
+export async function saveMeal({
+  record,
+  replaces,
+}: MealToSave): Promise<SavedMealResult> {
+  const id = await createMeal(record)
+  if (replaces === null) return { id, replacedDeleted: null }
+  try {
+    const { error } = await supabase
+      .from('meals')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', replaces)
+      .is('deleted_at', null)
+      .select('id')
+      .single()
+    if (error) throw error
+    return { id, replacedDeleted: true }
+  } catch {
+    return { id, replacedDeleted: false }
+  }
 }
