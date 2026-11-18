@@ -23,9 +23,15 @@ import {
   itemCalculationLines,
   itemCarbsText,
   ratioText,
+  savedDoseNoteText,
   savedItemLines,
+  savedItemQuantityText,
   totalCarbsText,
 } from './features/meals/breakdown.ts'
+import {
+  foodDetailSentences,
+  foodKeyFigure,
+} from './features/foods/foodDetail.ts'
 import {
   carbsLine,
   columnOptionText,
@@ -35,11 +41,12 @@ import {
   initialLabelFormTexts,
   nameNote,
 } from './features/foods/labelForm.ts'
-import { formatDayTitle } from './features/meals/eatenAt.ts'
+import { formatDayTitle, formatMealDateTime } from './features/meals/eatenAt.ts'
 import {
   appliedDoseText,
   daySummaryText,
-  mealSummaryText,
+  mealRowDetailText,
+  mealRowLabel,
 } from './features/meals/history.ts'
 import {
   ALERT_FIELDS,
@@ -237,6 +244,24 @@ describe('plain words on the screen', () => {
       unitLine({ unitWeight: '45', unitLabel: '' }),
       unusualYieldText(4.5),
       unusualYieldText(0.9),
+      ...(['as_eaten', 'raw_cooked'] as const).flatMap((state) => {
+        const figure = foodKeyFigure({ state, carbs_per_100g: 78 })
+        return [figure.amount, figure.rest]
+      }),
+      ...[2.6, null, 1e307].flatMap((factor) =>
+        foodDetailSentences({
+          state: 'raw_cooked',
+          cooking_factor: factor,
+          unit_weight_g: null,
+          unit_label: null,
+        }),
+      ),
+      ...foodDetailSentences({
+        state: 'as_eaten',
+        cooking_factor: null,
+        unit_weight_g: 50,
+        unit_label: 'alfajor',
+      }),
     ])
   })
 
@@ -327,6 +352,14 @@ describe('plain words on the screen', () => {
           effective_carbs_per_100g: calc.effectiveCarbsPer100g,
           carbs_g: calc.carbsG,
         }),
+        savedItemQuantityText({
+          food_state: input.foodState,
+          quantity_mode: input.quantityMode,
+          units: input.quantityMode === 'units' ? input.quantity : null,
+          unit_weight_g:
+            input.quantityMode === 'units' ? input.unitWeightG : null,
+          grams: calc.grams,
+        }),
       )
     })
     texts.push(
@@ -352,7 +385,11 @@ describe('plain words on the screen', () => {
     expectPlain([
       appliedDoseText(null),
       appliedDoseText(8.5),
-      mealSummaryText(meal),
+      mealRowDetailText(meal),
+      mealRowLabel(meal),
+      mealRowLabel({ ...meal, applied_dose_units: 8.5 }),
+      formatMealDateTime(meal.eaten_at, now),
+      savedDoseNoteText(8.55, 15),
       daySummaryText({ day: '2026-11-14', meals: [meal], complete: true }),
       daySummaryText({
         day: '2026-11-14',

@@ -1127,7 +1127,7 @@ function buildStates(
     {
       name: 'alimento-foto',
       description:
-        'Agregar con una foto, en su estado inicial (antes de elegir la foto).',
+        'Agregar con una foto sin una foto elegida: lo que queda de la pantalla intermedia, que solo se ve si se abre por URL o se recarga (desde «Con foto» y «Agregar con una foto» se abre directo la cámara o la galería, UX-16; el script no elige fotos).',
       run: async (page) => {
         await go(page, '/foods/label')
         await page.getByText('Sacar o elegir la foto').waitFor()
@@ -1137,7 +1137,8 @@ function buildStates(
     // --- Historial (spec §6.7) ---
     {
       name: 'historial',
-      description: 'Historial con todos los días plegados.',
+      description:
+        'Historial con todos los días plegados (al entrar, «Hoy» y «Ayer» arrancan abiertos: se pliegan a mano).',
       run: async (page) => {
         await go(page, '/history')
         await page.getByRole('button', { name: /^Hoy\b/ }).waitFor()
@@ -1150,7 +1151,8 @@ function buildStates(
     },
     {
       name: 'historial-hoy-ayer',
-      description: 'Historial con «Hoy» y «Ayer» abiertos.',
+      description:
+        'Historial con «Hoy» y «Ayer» abiertos, como al entrar desde la barra (UX-11).',
       run: async (page) => {
         await go(page, '/history')
         await openDay(page, /^Hoy\b/)
@@ -1165,7 +1167,7 @@ function buildStates(
     {
       name: 'comida-ver-la-cuenta',
       description:
-        'Detalle de una comida con «Ver la cuenta» abierto en cada alimento y en el total.',
+        'Detalle de una comida con «Ver la cuenta» abierto en cada alimento (el resumen de arriba no tiene «Ver la cuenta» desde UX-12).',
       run: async (page) => {
         await todayMeal(page)
         const closed = page.getByRole('button', { name: 'Ver la cuenta' })

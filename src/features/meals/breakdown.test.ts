@@ -22,7 +22,9 @@ import {
   itemCalculationLines,
   itemCarbsText,
   ratioText,
+  savedDoseNoteText,
   savedItemLines,
+  savedItemQuantityText,
   totalCarbsText,
 } from './breakdown.ts'
 import { toMealItemInput, toNewMealRecord } from './mealDraft.ts'
@@ -940,5 +942,55 @@ describe('foodYieldLine: bounds of the usual range', () => {
     expect(
       foodYieldLine({ state: 'as_eaten', cooking_factor: null }),
     ).toBeNull()
+  })
+})
+
+// --- The history detail (UX-12) ---
+
+describe('savedItemQuantityText', () => {
+  it('eaten cooked: the cooked grams', () => {
+    expect(savedItemQuantityText(savedRice)).toBe('250 g cocidos')
+  })
+
+  it('in grams: the grams', () => {
+    expect(savedItemQuantityText(savedBanana)).toBe('120 g')
+  })
+
+  it('in units: the units exact and the weight of the unit', () => {
+    expect(savedItemQuantityText(savedAlfajor)).toBe('1 × unidad de 50 g')
+    expect(
+      savedItemQuantityText({
+        ...savedAlfajor,
+        units: 0.25,
+        unit_weight_g: 9.5,
+        grams: 2.375,
+      }),
+    ).toBe('0,25 × unidad de 9,5 g')
+  })
+
+  it('the grams with up to 1 decimal, without a trailing ",0"', () => {
+    expect(savedItemQuantityText({ ...savedBanana, grams: 249.96 })).toBe(
+      '250 g',
+    )
+    expect(savedItemQuantityText({ ...savedRice, grams: 22.45 })).toBe(
+      '22,5 g cocidos',
+    )
+  })
+
+  it('in units without what it needs (the base does not allow it): the grams', () => {
+    expect(
+      savedItemQuantityText({ ...savedAlfajor, unit_weight_g: null }),
+    ).toBe('50 g')
+  })
+})
+
+describe('savedDoseNoteText', () => {
+  it('the calculated dose with 2 decimals and the ratio exact', () => {
+    expect(savedDoseNoteText(80.84 / 15, 15)).toBe(
+      'Calculada: 5,39 unidades · Ratio: 1 unidad cada 15 g de HC',
+    )
+    expect(savedDoseNoteText(1, 12.5)).toBe(
+      'Calculada: 1,00 unidades · Ratio: 1 unidad cada 12,5 g de HC',
+    )
   })
 })

@@ -1,4 +1,4 @@
-import { Camera, Plus, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router'
@@ -6,6 +6,7 @@ import { Confirmation } from '../../../components/Confirmation.tsx'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
+import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
 import { revealAndFocus } from '../../../components/focusProblem.ts'
 import { APP_NAV_ID } from '../../../components/AppLayout.tsx'
 import {
@@ -39,6 +40,7 @@ import {
   type MealProblem,
 } from '../../../lib/errors.ts'
 import type { Food } from '../../../lib/foods.ts'
+import { holdLabelPhoto } from '../../../lib/labelPhotoHandoff.ts'
 import {
   clearMealDraft,
   readMealDraft,
@@ -654,25 +656,23 @@ export function MealForm({
       </li>
     )
 
-  // The photo screen comes back here after saving, and the food is added to
-  // the meal (spec §6.1, §14 #61). A link is not disabled by the fieldset:
-  // while saving it is made inert by hand (also for the keyboard and
-  // VoiceOver, which skip pointer-events).
-  const photoLink = (
-    <Link
-      to="/foods/label"
-      state={FROM_MEAL_STATE}
-      aria-label="Agregar con foto"
-      aria-disabled={createMeal.isPending || undefined}
-      tabIndex={createMeal.isPending ? -1 : undefined}
-      onClick={(event) => {
-        if (savingRef.current || createMeal.isPending) event.preventDefault()
+  // "Con foto" opens the camera or the gallery in the same tap (UX-16); the
+  // photo screen starts with the photo picked, comes back here after saving
+  // and the food is added to the meal (spec §6.1, §14 #61). While saving,
+  // the fieldset disables its input.
+  const photoButton = (
+    <PhotoPickerButton
+      label="Con foto"
+      accessibleName="Agregar con foto"
+      variant="secondary"
+      className="shrink-0"
+      onFile={(file) => {
+        if (savingRef.current) return
+        void navigate('/foods/label', {
+          state: { ...FROM_MEAL_STATE, ...holdLabelPhoto(file) },
+        })
       }}
-      className={`${button.secondary} shrink-0 aria-disabled:pointer-events-none aria-disabled:opacity-60`}
-    >
-      <Camera aria-hidden="true" className="shrink-0" />
-      Con foto
-    </Link>
+    />
   )
 
   return (
@@ -859,7 +859,7 @@ export function MealForm({
               <Plus aria-hidden="true" className="shrink-0" />
               Agregar alimento
             </button>
-            {photoLink}
+            {photoButton}
           </div>
         ) : (
           <div className="flex flex-col gap-5">
@@ -881,7 +881,7 @@ export function MealForm({
                     Buscar alimento
                   </span>
                 </button>
-                {photoLink}
+                {photoButton}
               </div>
             </div>
             <RecentFoods foods={recents} onPick={handlePick} />

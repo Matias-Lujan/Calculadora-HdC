@@ -1,40 +1,35 @@
-import { Pencil } from 'lucide-react'
-import { Link } from 'react-router'
+import { Pencil, Plus } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import { button, pageTitle } from '../../../components/styles.ts'
-import {
-  formatCarbs,
-  formatUserNumber,
-  needsCookingFactor,
-} from '../../../domain/dose/index.ts'
+import { needsCookingFactor } from '../../../domain/dose/index.ts'
 import type { Food } from '../../../lib/foods.ts'
+import { TABLE_VALUE_INFO, isFromTable } from '../../../lib/foodText.ts'
+import { addToMealState } from '../../../lib/mealHandoff.ts'
 import {
-  TABLE_VALUE_INFO,
-  cookedPer100gText,
-  isFromTable,
-} from '../../../lib/foodText.ts'
-import { carbsLabel } from '../foodForm.ts'
+  foodDetailMainAction,
+  foodDetailSentences,
+  foodKeyFigure,
+} from '../foodDetail.ts'
 import { ArchiveFoodSection } from './ArchiveFoodSection.tsx'
 import { FoodPhoto } from './FoodPhoto.tsx'
-
-// The answer to "¿Se cocina antes de comer?", as in the form.
-const COOKED_ANSWERS: Record<Food['state'], string> = {
-  as_eaten: 'No',
-  raw_cooked: 'Sí',
-}
 
 type Props = {
   food: Food
 }
 
 /**
- * The detail of a food (spec §6.5), in plain words (§14 #52): it does not
- * show the source, the reference code or the original description. Only a
- * copy from the reference table says where it came from.
+ * The detail of a food (spec §6.5, UX-17), in plain words (§14 #52): the
+ * carbs every 100 g big, sentences about how it is eaten and its unit, and
+ * the buttons, "Usar en una comida" first. It does not show the source, the
+ * reference code or the original description. Only a copy from the
+ * reference table says where it came from.
  */
 export function FoodDetail({ food }: Props) {
-  const isRawCooked = food.state === 'raw_cooked'
+  const navigate = useNavigate()
+  const figure = foodKeyFigure(food)
+  const action = foodDetailMainAction(food)
 
   return (
     <article className="flex flex-col gap-4">
@@ -54,64 +49,57 @@ export function FoodDetail({ food }: Props) {
         )}
       </header>
 
-      {food.photo_path !== null && <FoodPhoto path={food.photo_path} />}
-
-      <dl className="flex flex-col gap-3">
-        <div>
-          <dt className="text-sm text-ink-soft">¿Se cocina antes de comer?</dt>
-          <dd>{COOKED_ANSWERS[food.state]}</dd>
-        </div>
-
-        <div>
-          <dt className="text-sm text-ink-soft">{carbsLabel(food.state)}</dt>
-          <dd className="font-display tabular-nums">
-            {formatCarbs(food.carbs_per_100g)} g
-          </dd>
-        </div>
-
-        {isRawCooked && (
-          <div>
-            <dt className="text-sm text-ink-soft">Cuánto rinde al cocinarlo</dt>
-            {needsCookingFactor(food.state, food.cooking_factor) ? (
-              <dd className="flex flex-col items-start gap-1">
-                <MissingFactorBadge />
-                <span className="text-sm text-ink">
-                  Cargalo con «Editar» para poder usarlo en una comida.
-                </span>
-              </dd>
-            ) : (
-              // Not missing here means not null: the check only narrows.
-              food.cooking_factor !== null && (
-                <dd>
-                  {cookedPer100gText(food.cooking_factor) ??
-                    'No se puede mostrar. Revisalo con «Editar».'}
-                </dd>
-              )
-            )}
+      <div className="flex flex-col gap-2">
+        <p>
+          <strong className="font-display text-title font-bold tabular-nums">
+            {figure.amount}
+          </strong>{' '}
+          {figure.rest}
+        </p>
+        {needsCookingFactor(food.state, food.cooking_factor) && (
+          <div className="flex flex-col items-start gap-1">
+            <MissingFactorBadge />
+            <p className="text-sm">
+              Cargá cuánto rinde al cocinarlo para poder usarlo en una comida.
+            </p>
           </div>
         )}
-
-        {food.unit_weight_g !== null && (
-          <div>
-            <dt className="text-sm text-ink-soft">Peso por unidad</dt>
-            <dd>
-              {`1 ${food.unit_label ?? 'unidad'} = ${formatUserNumber(food.unit_weight_g)} g`}
-            </dd>
-          </div>
-        )}
-
+        {foodDetailSentences(food).map((sentence) => (
+          <p key={sentence}>{sentence}</p>
+        ))}
         {food.notes !== null && (
           <div>
-            <dt className="text-sm text-ink-soft">Nota</dt>
-            <dd>{food.notes}</dd>
+            <p className="text-sm text-ink-soft">Nota</p>
+            <p>{food.notes}</p>
           </div>
         )}
-      </dl>
+      </div>
 
-      <Link to={`/foods/${food.id}/edit`} className={button.secondary}>
-        <Pencil aria-hidden="true" />
-        Editar
-      </Link>
+      <div className="flex flex-col gap-3">
+        {action === 'use' && (
+          // Inicio adds the food at the end of the meal in progress and
+          // puts the focus in its quantity (spec §6.6), as after the photo.
+          <button
+            type="button"
+            className={button.primary}
+            onClick={() => void navigate('/', { state: addToMealState(food) })}
+          >
+            <Plus aria-hidden="true" className="shrink-0" />
+            Usar en una comida
+          </button>
+        )}
+        {action === 'load-yield' && (
+          <Link to={`/foods/${food.id}/edit`} className={button.primary}>
+            Cargar cuánto rinde
+          </Link>
+        )}
+        <Link to={`/foods/${food.id}/edit`} className={button.secondary}>
+          <Pencil aria-hidden="true" />
+          Editar
+        </Link>
+      </div>
+
+      {food.photo_path !== null && <FoodPhoto path={food.photo_path} />}
 
       {food.archived_at === null && <ArchiveFoodSection food={food} />}
     </article>

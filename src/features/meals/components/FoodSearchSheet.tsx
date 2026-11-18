@@ -1,10 +1,12 @@
-import { Camera, PencilLine, Search, X } from 'lucide-react'
+import { PencilLine, Search, X } from 'lucide-react'
 import { useId, useMemo, useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
+import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
 import { button, field } from '../../../components/styles.ts'
 import { needsCookingFactor } from '../../../domain/dose/index.ts'
 import type { Food } from '../../../lib/foods.ts'
+import { holdLabelPhoto } from '../../../lib/labelPhotoHandoff.ts'
 import { fromMealState } from '../../../lib/mealHandoff.ts'
 import { pickerResults } from '../tableFoods.ts'
 import type { MealFood } from '../types.ts'
@@ -34,8 +36,9 @@ type Props = {
  * eaten cooked without how much it yields is listed but cannot be picked
  * (spec §6.4). Without matches, it offers adding the food with a photo or by
  * hand; both come back to Inicio with the food added (src/lib/mealHandoff.ts).
- * The two links replace the entry of the open search in the browser
- * history, so going back from them lands on Inicio.
+ * The photo one opens the camera or the gallery in the same tap (UX-16).
+ * Both replace the entry of the open search in the browser history, so
+ * going back from them lands on Inicio.
  */
 export function FoodSearchSheet({
   foods,
@@ -45,6 +48,7 @@ export function FoodSearchSheet({
   onClose,
 }: Props) {
   const titleId = useId()
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const trimmed = query.trim()
   const results = useMemo(
@@ -116,15 +120,16 @@ export function FoodSearchSheet({
           ) : noResults ? (
             <div className="flex flex-col gap-3">
               <p role="status">{`No hay alimentos que coincidan con «${trimmed}».`}</p>
-              <Link
-                to="/foods/label"
-                replace
-                state={fromMealState()}
-                className={button.secondary}
-              >
-                <Camera aria-hidden="true" className="shrink-0" />
-                Agregar con una foto
-              </Link>
+              <PhotoPickerButton
+                label="Agregar con una foto"
+                variant="secondary"
+                onFile={(file) =>
+                  void navigate('/foods/label', {
+                    replace: true,
+                    state: { ...fromMealState(), ...holdLabelPhoto(file) },
+                  })
+                }
+              />
               <Link
                 to="/foods/new"
                 replace

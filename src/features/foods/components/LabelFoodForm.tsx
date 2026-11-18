@@ -41,6 +41,7 @@ import type { FoodFormValues } from '../types.ts'
 import { useFoodFormState } from '../useFoodFormState.ts'
 import { FoodFields } from './FoodFields.tsx'
 import { FieldError, RadioGroup } from './FormControls.tsx'
+import { StickyLabelPhoto } from './StickyLabelPhoto.tsx'
 import { UnusualYieldConfirmation } from './UnusualYieldConfirmation.tsx'
 
 type Props = {
@@ -212,19 +213,17 @@ export function LabelFoodForm({
   ]
 
   return (
+    // What gets the focus scrolls into view below the photo, which stays
+    // stuck to the top (a third of the screen, UX-16).
     <form
       ref={formRef}
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-5 [&_:is(input,button,select,textarea)]:scroll-mt-[calc(22svh+2rem+env(safe-area-inset-top))]"
       onSubmit={handleSubmit}
       noValidate
     >
       <h1 className={pageTitle}>Revisá los datos</h1>
 
-      <img
-        src={photoUrl}
-        alt="Foto de la etiqueta"
-        className="max-h-[45vh] w-full rounded-control object-contain"
-      />
+      <StickyLabelPhoto url={photoUrl} />
 
       {observations !== '' && (
         <p className="text-sm text-ink">{`Al leer la foto: ${observations}`}</p>

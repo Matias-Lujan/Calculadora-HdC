@@ -162,6 +162,41 @@ export function savedItemLines(item: SavedMealItem): string[] {
 }
 
 /**
+ * How much of a saved item was eaten, in sight in the history detail
+ * (UX-12), from the saved values: "250 g cocidos" (a food eaten cooked),
+ * "1 × unidad de 50 g" (in units, with the units exact; the record does not
+ * keep the name of the unit) or "120 g".
+ */
+export function savedItemQuantityText(
+  item: Pick<
+    SavedMealItem,
+    'food_state' | 'quantity_mode' | 'units' | 'unit_weight_g' | 'grams'
+  >,
+): string {
+  if (
+    item.quantity_mode === 'units' &&
+    item.units !== null &&
+    item.unit_weight_g !== null
+  ) {
+    return `${formatUserNumber(item.units)} × unidad de ${formatGrams(item.unit_weight_g)} g`
+  }
+  const grams = `${formatGrams(item.grams)} g`
+  return item.food_state === 'raw_cooked' ? `${grams} cocidos` : grams
+}
+
+/**
+ * The small line of the summary of a saved meal (UX-12): "Calculada: 5,39
+ * unidades · Ratio: 1 unidad cada 15 g de HC", with the ratio saved in the
+ * record.
+ */
+export function savedDoseNoteText(
+  calculatedDoseUnits: number,
+  carbRatioGPerUnit: number,
+): string {
+  return `Calculada: ${withUnitsWord(formatDose(calculatedDoseUnits))} · ${ratioText(carbRatioGPerUnit)}`
+}
+
+/**
  * The calculation of the meal, under "Ver la cuenta" of the total. There is
  * no line with the sum of the items: each addend is rounded on its own and
  * the sum would not always add up to the rounded total (spec §14 #52).

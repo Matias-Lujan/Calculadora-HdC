@@ -1,8 +1,9 @@
-import { Camera, Plus, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useId, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
 import { Notice } from '../../../components/Notice.tsx'
+import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
 import {
   button,
   disclosure,
@@ -12,6 +13,7 @@ import {
 } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods, type Food } from '../../../lib/foods.ts'
+import { holdLabelPhoto } from '../../../lib/labelPhotoHandoff.ts'
 import { searchFoods } from '../../../lib/search.ts'
 import { FoodListItem } from '../components/FoodListItem.tsx'
 
@@ -21,6 +23,7 @@ import { FoodListItem } from '../components/FoodListItem.tsx'
  */
 export function FoodsPage() {
   const foods = useFoods()
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const allId = useId()
@@ -42,10 +45,20 @@ export function FoodsPage() {
       </header>
 
       <div className="flex flex-col gap-3">
-        <Link to="/foods/label" className={button.primary}>
-          <Camera aria-hidden="true" />
-          Agregar con una foto
-        </Link>
+        {/* Opens the camera or the gallery in the same tap (UX-16); the
+            photo screen starts with the photo picked. */}
+        <div className="flex flex-col gap-1">
+          <PhotoPickerButton
+            label="Agregar con una foto"
+            onFile={(file) =>
+              void navigate('/foods/label', { state: holdLabelPhoto(file) })
+            }
+          />
+          <p className="text-sm text-ink-soft">
+            Sacale una foto a la tabla nutricional del paquete; si entra,
+            también al nombre.
+          </p>
+        </div>
         <Link to="/foods/new" className={button.soft}>
           <Plus aria-hidden="true" />
           Agregar a mano

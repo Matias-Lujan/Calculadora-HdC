@@ -137,6 +137,18 @@ export function secondOfDayAt(time: number): number {
   return c.hour * 3600 + c.minute * 60 + c.second
 }
 
+/**
+ * The days of Buenos Aires that are "Hoy" and "Ayer" at `now`, as
+ * "YYYY-MM-DD" (eatenDay).
+ */
+export function todayAndYesterday(now: Date): [string, string] {
+  const today = dayAt(now.getTime())
+  const [year = NaN, month = NaN, day = NaN] = today.split('-').map(Number)
+  // Calendar arithmetic in UTC (no time zone): the day before today.
+  const yesterday = new Date(Date.UTC(year, month - 1, day - 1))
+  return [today, yesterday.toISOString().slice(0, 10)]
+}
+
 const WEEKDAYS = [
   'domingo',
   'lunes',
@@ -154,15 +166,11 @@ const WEEKDAYS = [
  * of Buenos Aires at `now`. A future day is shown with its date.
  */
 export function formatDayTitle(day: string, now: Date): string {
-  const today = dayAt(now.getTime())
+  const [today, yesterday] = todayAndYesterday(now)
   if (day === today) return 'Hoy'
+  if (day === yesterday) return 'Ayer'
   const [year = NaN, month = NaN, dayOfMonth = NaN] = day.split('-').map(Number)
-  const [todayYear = NaN, todayMonth = NaN, todayDay = NaN] = today
-    .split('-')
-    .map(Number)
-  // Calendar arithmetic in UTC (no time zone): the day before today.
-  const yesterday = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - 1))
-  if (day === yesterday.toISOString().slice(0, 10)) return 'Ayer'
+  const todayYear = Number(today.slice(0, 4))
 
   const weekday =
     WEEKDAYS[new Date(Date.UTC(year, month - 1, dayOfMonth)).getUTCDay()] ?? ''
@@ -179,6 +187,15 @@ export function formatDayTitle(day: string, now: Date): string {
  */
 export function formatMealMoment(iso: string, now: Date): string {
   return `${formatDayTitle(eatenDay(iso), now)} ${formatEatenTime(iso)}`
+}
+
+/**
+ * When a saved meal was eaten, for its detail: "Ayer, 21:00", "Hoy, 13:05",
+ * "sábado 14/11, 13:05" (the day as formatDayTitle names it, a comma and the
+ * time, Buenos Aires).
+ */
+export function formatMealDateTime(iso: string, now: Date): string {
+  return `${formatDayTitle(eatenDay(iso), now)}, ${formatEatenTime(iso)}`
 }
 
 /**

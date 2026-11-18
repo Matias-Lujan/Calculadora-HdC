@@ -5,9 +5,10 @@ import {
   formatDose,
   formatDoseCompact,
   sumCarbs,
+  unitsWord,
   withUnitsWord,
 } from '../../domain/dose/index.ts'
-import { eatenDay } from './eatenAt.ts'
+import { eatenDay, formatEatenTime } from './eatenAt.ts'
 import type { ListedMeal, MealSummary, MealsPage } from './types.ts'
 
 // Pure logic of the history (spec §6.7, §14 #47 and #62): the paging of the
@@ -94,13 +95,65 @@ export function appliedDoseText(units: number | null): string {
 }
 
 /**
- * "HC 128,2 g · Dosis 8,55 unidades · Aplicada 8,5 unidades". "Dosis" and
- * "Aplicada" are joined to their numbers with a space that does not break
- * (U+00A0), so the line only breaks at " · " and a word never ends up
- * apart from its dose.
+ * The applied dose of a row of the list, big at its right (UX-11): the
+ * number without trailing zeros ("5,5") and, under it, its word ("unidades",
+ * "unidad"). null if there is none: the row shows "—".
  */
-export function mealSummaryText(meal: MealSummary): string {
-  return `HC ${formatCarbs(meal.total_carbs_g)} g · Dosis\u00a0${withUnitsWord(formatDose(meal.calculated_dose_units))} · Aplicada\u00a0${appliedDoseText(meal.applied_dose_units)}`
+export function appliedDoseParts(
+  units: number | null,
+): { number: string; word: string } | null {
+  if (units === null) return null
+  const number = formatDoseCompact(units)
+  return { number, word: unitsWord(number) }
+}
+
+/**
+ * Whether the calculated dose would add nothing next to the applied one:
+ * both show the same with 2 decimals ("8,50" and "8,50"). Without an applied
+ * dose, it does add something.
+ */
+function appliedShowsCalculated(meal: MealSummary): boolean {
+  return (
+    meal.applied_dose_units !== null &&
+    formatDose(meal.applied_dose_units) ===
+      formatDose(meal.calculated_dose_units)
+  )
+}
+
+/**
+ * The line under the foods of a row: "80,8 g de HC · calculada 5,39", or
+ * only "80,8 g de HC" if the applied dose is the same as the calculated one.
+ * "calculada" is joined to its number with a space that does not break
+ * (U+00A0), so the line only breaks at " · ".
+ */
+export function mealRowDetailText(meal: MealSummary): string {
+  const carbs = `${formatCarbs(meal.total_carbs_g)} g de HC`
+  return appliedShowsCalculated(meal)
+    ? carbs
+    : `${carbs} · calculada ${formatDose(meal.calculated_dose_units)}`
+}
+
+/**
+ * Everything a row says, read at once by VoiceOver: "21:00. Arroz, Pan.
+ * 80,8 g de HC. Te aplicaste 5,5 unidades. Calculada: 5,39 unidades." (the
+ * calculated dose only if the row shows it), or "No anotaste cuánto te
+ * aplicaste." without an applied dose.
+ */
+export function mealRowLabel(meal: ListedMeal): string {
+  const parts = [
+    formatEatenTime(meal.eaten_at),
+    mealFoodsText(meal),
+    `${formatCarbs(meal.total_carbs_g)} g de HC`,
+    meal.applied_dose_units === null
+      ? 'No anotaste cuánto te aplicaste'
+      : `Te aplicaste ${appliedDoseText(meal.applied_dose_units)}`,
+  ]
+  if (!appliedShowsCalculated(meal)) {
+    parts.push(
+      `Calculada: ${withUnitsWord(formatDose(meal.calculated_dose_units))}`,
+    )
+  }
+  return `${parts.join('. ')}.`
 }
 
 /**
@@ -175,12 +228,16 @@ const openDaysStateSchema = z.object({ openDays: z.array(z.string()) })
 /**
  * The days open in the list, kept in the state of its entry of the browser
  * history (`{ openDays: [...] }`), so going back from a meal finds them open
- * and the scroll lands where it was. Anything else (the bar, a typed URL,
- * after deleting) gives none: every day folded.
+ * (or folded) as they were and the scroll lands where it was. Anything else
+ * (the bar, a typed URL, after deleting) gives `atStart`: "Hoy" and "Ayer"
+ * (UX-11, todayAndYesterday).
  */
-export function openDaysFromState(state: unknown): string[] {
+export function openDaysFromState(
+  state: unknown,
+  atStart: readonly string[],
+): string[] {
   const parsed = openDaysStateSchema.safeParse(state)
-  return parsed.success ? parsed.data.openDays : []
+  return parsed.success ? parsed.data.openDays : [...atStart]
 }
 
 /** The open days with `day` opened, or folded if it was open. */

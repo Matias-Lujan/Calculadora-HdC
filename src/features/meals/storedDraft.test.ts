@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Food } from '../../lib/foods.ts'
+import { addToMealState, foodToAddToMeal } from '../../lib/mealHandoff.ts'
 import type { MealCopyRequest } from './mealCopy.ts'
 import {
   copiedMealForm,
@@ -245,6 +246,22 @@ describe('initialMealForm', () => {
       notUsableFood: { id: rice.id, name: rice.name },
       copyNotice: null,
     })
+  })
+
+  // "Usar en una comida" in the food detail (UX-17) sends the food with the
+  // same navigation state as the photo, which survives a reload.
+  it('"Usar en una comida": the food at the end, with the focus on it', () => {
+    const state: unknown = JSON.parse(JSON.stringify(addToMealState(alfajor)))
+    const form = initialMealForm(draft, foodToAddToMeal(state))
+    expect(form.items).toHaveLength(4)
+    expect(form.items[3]).toEqual({
+      key: 5,
+      food: alfajor,
+      quantityMode: 'units',
+      quantityText: '',
+    })
+    expect(form.focusKey).toBe(5)
+    expect(form.correcting).toBe(draft.correcting)
   })
 })
 

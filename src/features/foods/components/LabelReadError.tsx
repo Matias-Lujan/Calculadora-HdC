@@ -1,6 +1,6 @@
 import { Notice } from '../../../components/Notice.tsx'
+import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
 import { button } from '../../../components/styles.ts'
-import { PhotoPickerButton } from './PhotoPickerButton.tsx'
 
 type Props = {
   message: string
