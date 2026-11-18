@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. Próxima: M2.** Última actualización: 2026-11-18.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. En curso: M7 (`mejora-aviso-uso`). Próxima: M2.** Última actualización: 2026-11-18.
 
 ---
 
@@ -396,7 +396,9 @@ Ciclo: toca la base, así que implementer, tester y reviewer. Antes de mergear, 
 
 **Terminada cuando**:
 - [ ] La migración está aplicada en `dev`, probada con `rls-check`, y la ventana aparece una sola vez por usuario.
-- [ ] Spec y `docs/decisiones.md` al día.
+- [x] Spec y `docs/decisiones.md` al día.
 - [ ] La migración está en `prod`, con `rls-check`, antes de mergear; y el usuario la probó en el iPhone.
 
-**Próximo paso**: empezar por el implementer (migración, lectura y escritura de la columna, la ventana).
+Hecho por el implementer (#82): la migración `20261118184810_user_settings_usage_notice` (columna y `grant update` de esa columna; el `select` ya era de toda la tabla), la ventana sobre toda la app con sesión, sus casos en `rls-check` y, en `ux-screens`, la aceptación automática del aviso del usuario de demo (sin estado nuevo de captura). La migración está aplicada en `dev`, `database.types.ts` regenerado y `rls-check` pasa en `dev`. El tester sumó que guardar Ajustes no manda la columna; el reviewer, sin hallazgos de lógica (el comentario de la migración cita §6.8 en vez de §10; no se edita porque ya está aplicada).
+
+**Próximo paso**: probar la ventana en la versión de prueba de la rama y en el iPhone (aparece una vez, no reaparece en otro teléfono, error y reintento sin conexión); después, la migración y `rls-check` en `prod` antes de mergear.

@@ -237,6 +237,50 @@ console.log('\nB no puede escribir datos de A')
   )
 }
 {
+  // The usage notice (plan M7): B can neither read nor accept it for A, and
+  // A can accept their own.
+  const readOther = await b.supabase
+    .from('user_settings')
+    .select('usage_notice_accepted_at')
+    .eq('user_id', a.id)
+  check(
+    'user_settings: B no ve si A aceptó el aviso de uso',
+    readOther.error === null && readOther.data?.length === 0,
+    readOther.error?.message ?? `${readOther.data?.length} filas`,
+  )
+  const readOwn = async () =>
+    a.supabase.from('user_settings').select('usage_notice_accepted_at').single()
+  const before = await readOwn()
+  const { data } = await b.supabase
+    .from('user_settings')
+    .update({ usage_notice_accepted_at: '2000-01-01T00:00:00Z' })
+    .eq('user_id', a.id)
+    .select()
+  const after = await readOwn()
+  check(
+    'user_settings: B no puede aceptar el aviso de uso por A',
+    (data?.length ?? 0) === 0 &&
+      before.error === null &&
+      after.error === null &&
+      after.data?.usage_notice_accepted_at ===
+        before.data?.usage_notice_accepted_at,
+  )
+  const acceptedAt = new Date().toISOString()
+  const own = await a.supabase
+    .from('user_settings')
+    .update({ usage_notice_accepted_at: acceptedAt })
+    .eq('user_id', a.id)
+    .select('usage_notice_accepted_at')
+  check(
+    'user_settings: A sí puede aceptar su aviso de uso',
+    own.error === null &&
+      own.data?.length === 1 &&
+      Date.parse(String(own.data[0]?.usage_notice_accepted_at)) ===
+        Date.parse(acceptedAt),
+    own.error?.message,
+  )
+}
+{
   const { data } = await b.supabase
     .from('meals')
     .update({ deleted_at: new Date().toISOString() })

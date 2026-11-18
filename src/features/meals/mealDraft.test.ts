@@ -245,6 +245,7 @@ describe('toDoseSettings', () => {
     carb_ratio_g_per_unit: 12.5,
     max_dose_warning_units: 10,
     max_item_grams_warning: 500,
+    usage_notice_accepted_at: null,
   }
 
   it('maps the three values', () => {
@@ -649,6 +650,7 @@ describe('a meal with one item still empty', () => {
         carb_ratio_g_per_unit: 0,
         max_dose_warning_units: null,
         max_item_grams_warning: 500,
+        usage_notice_accepted_at: null,
       }),
     )
     expect(result.ok).toBe(false)
@@ -665,6 +667,7 @@ const row: Settings = {
   carb_ratio_g_per_unit: 15,
   max_dose_warning_units: 10,
   max_item_grams_warning: 500,
+  usage_notice_accepted_at: null,
 }
 
 /** The same settings without the dose threshold, to look only at items. */

@@ -338,6 +338,7 @@ describe('savedMealSchema', () => {
       carb_ratio_g_per_unit: 15,
       max_dose_warning_units: null,
       max_item_grams_warning: 500,
+      usage_notice_accepted_at: null,
     }
     const drafts: MealItemDraft[] = [
       { key: 0, food: rice, quantityMode: 'grams', quantityText: '250' },

@@ -264,6 +264,7 @@ export type Database = {
           max_dose_warning_units: number | null
           max_item_grams_warning: number
           updated_at: string
+          usage_notice_accepted_at: string | null
           user_id: string
         }
         Insert: {
@@ -271,6 +272,7 @@ export type Database = {
           max_dose_warning_units?: number | null
           max_item_grams_warning?: number
           updated_at?: string
+          usage_notice_accepted_at?: string | null
           user_id: string
         }
         Update: {
@@ -278,6 +280,7 @@ export type Database = {
           max_dose_warning_units?: number | null
           max_item_grams_warning?: number
           updated_at?: string
+          usage_notice_accepted_at?: string | null
           user_id?: string
         }
         Relationships: []
