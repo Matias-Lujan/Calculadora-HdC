@@ -753,6 +753,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
     carb_ratio_g_per_unit: 15,
     max_dose_warning_units: null,
     max_item_grams_warning: 500,
+    usage_notice_accepted_at: null,
   }
 
   function draftOf(input: MealItemInput, key: number): MealItemDraft {

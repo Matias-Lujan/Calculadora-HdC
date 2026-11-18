@@ -3,6 +3,7 @@
 > [!WARNING]
 > **Proyecto personal. No es un dispositivo médico y no reemplaza la indicación médica.**
 > Los valores que muestra esta app son una ayuda para hacer una cuenta que el usuario igual revisa y decide. No usar para tomar decisiones de tratamiento sin el criterio de un profesional de la salud.
+> Si otra persona la usa, la dosis depende de su propio ratio y de que los datos que cargue (alimentos, cantidades, alertas) estén bien: los tiene que revisar con su médico, y el uso es bajo su responsabilidad. El software se entrega sin garantía (ver [LICENSE](LICENSE)).
 
 App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de insulina rápida por hidratos, pensada para el uso personal de una persona con diabetes tipo 1. Se usa desde Safari en iPhone, agregada a la pantalla de inicio.
 

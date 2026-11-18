@@ -321,9 +321,10 @@ Convenciones:
 | `carb_ratio_g_per_unit` | numeric not null default 15 | check > 0 |
 | `max_dose_warning_units` | numeric null | check > 0 |
 | `max_item_grams_warning` | numeric not null default 500 | check > 0 |
+| `usage_notice_accepted_at` | timestamptz null | Cuándo aceptó el aviso de uso (§10, M7). `null` hasta que lo acepta |
 | `updated_at` | timestamptz | |
 
-La fila se crea con un trigger sobre `auth.users` al dar de alta el usuario.
+La fila se crea con un trigger sobre `auth.users` al dar de alta el usuario. El usuario puede actualizar solo las columnas de configuración y `usage_notice_accepted_at` (privilegio por columna); nunca `user_id` ni `updated_at`.
 
 **`foods`**: el catálogo del usuario.
 
@@ -436,7 +437,7 @@ En las políticas se usa `(select auth.uid())`, que Postgres evalúa una vez por
 
 | Tabla | select | insert | update | delete |
 |---|---|---|---|---|
-| `user_settings` | propias | — (lo hace el trigger) | propias | — |
+| `user_settings` | propias | — (lo hace el trigger) | propias (solo las columnas de configuración y `usage_notice_accepted_at`, por privilegio de columna) | — |
 | `foods` | propias | `with check` propias | propias | — (se archiva) |
 | `reference_foods` | autenticados | — | — | — |
 | `meals` | propias | `with check` propias | propias (solo `deleted_at`, por privilegio de columna) | — |
@@ -881,6 +882,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
   - El límite de 7 días de WebKit (que borra el almacenamiento de un sitio que no se visitó en 7 días de uso del navegador) no afecta a la app instalada mientras se use: las apps agregadas a la pantalla de inicio tienen su propio contador de días de uso, separado del de Safari ([WebKit, "Full Third-Party Cookie Blocking and More"](https://webkit.org/blog/10218/full-third-party-cookie-blocking-and-more/)).
 - El login se hace **dentro de la app instalada**, no en Safari, porque no comparten sesión.
 - **La pantalla de entrada** (M1, UX-23, #81): sobre el fondo crema, el ícono de la app, "Calculadora de HdC" en la letra redondeada y debajo "Pesás, cargás y listo."; después, "Email", "Contraseña" y "Entrar", y al pie la aclaración de que no es un dispositivo médico. El ícono de la app es la gota crema sobre berenjena.
+- **Aviso de uso** (M7, #82): la primera vez que una persona entra, apenas se lee su configuración y si nunca lo aceptó, una ventana tapa toda la app (la barra incluida) con el título "Antes de empezar", el texto "Proyecto personal. No es un dispositivo médico y no reemplaza la indicación médica. La dosis sale de tu ratio y de los datos que cargues: revisalos con tu médico. El uso es bajo tu responsabilidad." y el botón "Entendido". Al tocarlo se guarda la fecha y hora del teléfono en `user_settings.usage_notice_accepted_at` ("Guardando…" mientras tanto); la ventana se cierra recién cuando el servidor confirma. Si falla, muestra "No se pudo guardar. Revisá la conexión y reintentá." y se reintenta tocando otra vez "Entendido". No se cierra de otra forma (tampoco con Escape). Como queda en la base, no vuelve a aparecer para esa persona en ningún teléfono. Mientras se lee la configuración, o si esa lectura falla, no aparece. La entrada no cambia.
 - **Sesión revocada o vencida**: si el servidor responde 401 (por ejemplo, un JWT rechazado por PostgREST) o rechaza el *refresh token*, la app cierra la sesión local y vuelve al login, sin mensaje (§14, decisión 33). **Ante una falla de red**, en cambio, supabase-js conserva la sesión: un `AuthRetryableFetchError` no la borra, y la renovación se reintenta sola.
 - **"Cerrar sesión"** está en Configuración (§6.8) y llama a `signOut({ scope: 'local' })`, que cierra solo la sesión de este dispositivo. El valor por defecto, `'global'`, revocaría todas las sesiones del usuario, incluida la de la app instalada en el iPhone. supabase-js borra la sesión local antes de avisar al servidor, así que cerrar sesión no depende de la red.
 - **La cache de react-query y la comida en curso se borran en cada `SIGNED_OUT`** (`queryClient.clear()` y el borrado de la comida conservada en `sessionStorage`, §6.6, en `src/lib/queryClient.ts`). Cubre el botón, el 401 y el *refresh token* rechazado: otra cuenta en el mismo dispositivo nunca ve, ni por un instante, datos de la anterior, ni la comida que estaba cargando. Un 401 al guardar la comida también la borra: después del login, Inicio arranca vacía.

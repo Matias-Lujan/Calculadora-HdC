@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. Próxima: M2.** Última actualización: 2026-11-18.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. En curso: M7 (`mejora-aviso-uso`). Próxima: M2.** Última actualización: 2026-11-18.
 
 ---
 
@@ -345,6 +345,7 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Pendiente |
+| M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | En curso (`mejora-aviso-uso`) |
 
 ### M1 — Revisión de UI/UX
 
@@ -381,3 +382,25 @@ Incluye (alcance acordado con el usuario, 2026-11-17, spec §14 #64):
 - Tanda 6 (detalle en #81): el punto de Inicio no se ve estando en Inicio, y para lectores de pantalla la pestaña suma ", con una comida sin guardar"; la barra no crece con la letra del iPhone (como las de iOS). Al tocar, el oscurecido es instantáneo y está siempre (no es movimiento); el achicarse, las entradas y los giros, solo sin "Reducir movimiento". Al quitar un alimento no se pliega la tarjeta: "Quitaste…" entra con el mismo fundido (plegar pedía demorar el borrado, que maneja el foco y "Deshacer"); plegar y desplegar es un fundido del contenido, no una animación de altura. Los campos de Configuración siguen a todo el ancho. Los atajos (chips) pasan a fondo blanco con el borde de los campos (3,8:1 sobre `paper` en claro, 4,9:1 en oscuro), porque el fondo hundido no se distinguía. "¿Borrar la comida…?" nombra el día como el resto con la forma que va dentro de una frase ("de hoy 13:05", la de "Copiaste la comida…"): "Hoy, 13:05" no entra en la oración. Con la letra al máximo, "unidades" baja debajo de la dosis en el visor. En oscuro, `warning-line` es `#C99A3A` (5,4:1 sobre `warning-soft`; la tabla no lo daba), `on-accent` y `on-danger` pasan a `#221B1F`, las sombras son negras más marcadas y el resto de la tabla 2.3 pasa sin ajustes (todo medido; lo más bajo, `line-strong` sobre `surface`, 4,45:1). La raíz mide 17 px (`106.25 %`) en todos lados y, en Safari de iOS (`@supports` con `-webkit-touch-callout`, porque en la Mac `-apple-system-body` es de 13 px), la letra del sistema; los tamaños de texto pasan a rem sobre 17, y los espacios, las esquinas y el ancho de página a px (`--spacing: 4px`), para que con la letra más grande no se coman la pantalla; el visor limita sus números a 1,5 veces; el lugar del sufijo de un campo va en `em`. "Borrar comida" también es el botón que abre la confirmación. La entrada usa `public/icon.svg`. El formulario de la foto no cambió (sus campos siguen con "(g)" en el rótulo). Capturas: `--oscuro`, y la espera también aguarda que no queden formas grises. A probar en el iPhone: "Tamaño del texto" al máximo (con y sin tamaños de accesibilidad) en el visor, las tarjetas de alimento, el rinde en una fila, Configuración y la barra; que al tocar un botón se note (`:active` en iOS); "Reducir movimiento"; el modo oscuro de noche y la barra de estado de la app instalada en oscuro; y el ícono nuevo, que seguramente pide quitar la app de la pantalla de inicio y volver a agregarla.
 
 **Cerrada** el 2026-11-18 (PR #17). Detalle conocido del script de capturas: si corta temprano por un error (por ejemplo, credenciales mal puestas), en Windows Node termina con "Assertion failed … UV_HANDLE_CLOSING" y el código 127 en lugar de 1; cuando todo sale bien, termina limpio. El permiso para correrlo está en `.claude/settings.json`.
+
+### M7 — Aviso de uso aceptado por usuario
+
+**Objetivo**: que cada persona que use la app lea y acepte una vez que no es un dispositivo médico y que la dosis depende de sus propios datos, y que quede registrado que lo aceptó. Hoy la usa solo el usuario, pero quiere estar cubierto si algún día se la pasa a alguien.
+
+Incluye (alcance acordado con el usuario, 2026-11-18):
+1. **Migración**: una columna nueva en `user_settings`, la fecha en que el usuario aceptó el aviso (`timestamptz`, acepta `null`, así es compatible con la versión publicada). El usuario la puede escribir solo para sí mismo: revisar los `grant` por columna y las políticas de RLS, y sumar el caso a `scripts/rls-check/`. Spec §7 y §8 de RLS, y la tabla de permisos.
+2. **La ventana**: después de entrar, si la columna está vacía, una ventana que tapa la app con el aviso completo: "Proyecto personal. No es un dispositivo médico y no reemplaza la indicación médica. La dosis sale de tu ratio y de los datos que cargues: revisalos con tu médico. El uso es bajo tu responsabilidad." y el botón "Entendido". Al tocarlo se guarda la fecha (sin optimistic update: la ventana se cierra cuando el servidor confirma; si falla, el error de siempre y se puede reintentar). No vuelve a aparecer para ese usuario, en ningún teléfono.
+3. **La entrada** sigue con su línea corta ("Proyecto personal. No es un dispositivo médico y no reemplaza la indicación médica."). El README ya tiene el aviso para otra persona que la use (commit de esta rama).
+
+Ciclo: toca la base, así que implementer, tester y reviewer. Antes de mergear, la migración se aplica en `prod` y se corre `rls-check` contra `prod` ("Cambios que llegan a prod" en `CLAUDE.md`), con el OK del usuario.
+
+**Terminada cuando**:
+- [ ] La migración está aplicada en `dev`, probada con `rls-check`, y la ventana aparece una sola vez por usuario.
+- [x] Spec y `docs/decisiones.md` al día.
+- [ ] La migración está en `prod`, con `rls-check`, antes de mergear; y el usuario la probó en el iPhone.
+
+Hecho por el implementer (#82): la migración `20261118184810_user_settings_usage_notice` (columna y `grant update` de esa columna; el `select` ya era de toda la tabla), la ventana sobre toda la app con sesión, sus casos en `rls-check` y, en `ux-screens`, la aceptación automática del aviso del usuario de demo (sin estado nuevo de captura). La migración está aplicada en `dev`, `database.types.ts` regenerado y `rls-check` pasa en `dev`. El tester sumó que guardar Ajustes no manda la columna; el reviewer, sin hallazgos de lógica (el comentario de la migración cita §6.8 en vez de §10; no se edita porque ya está aplicada).
+
+La migración está aplicada en `prod` y `rls-check` pasa contra `prod` (2026-11-18). La prueba en la versión de prueba se salteó (el usuario no tenía a mano su usuario de `dev`).
+
+**Próximo paso**: mergear el PR y, después del merge, que el usuario confirme en el iPhone que la ventana aparece una vez y no vuelve.

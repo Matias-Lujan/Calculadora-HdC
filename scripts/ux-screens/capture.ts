@@ -420,6 +420,24 @@ async function ensureDoseAlert(
   return setDoseAlert(supabase, userId, DOSE_ALERT_UNITS)
 }
 
+/**
+ * Accepts the usage notice of the demo user (plan M7) if it has not been
+ * accepted yet: otherwise its window would cover every screen.
+ */
+async function ensureUsageNoticeAccepted(
+  supabase: Supabase,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_settings')
+    .update({ usage_notice_accepted_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('usage_notice_accepted_at', null)
+  if (error) {
+    throw new Error(`No se pudo aceptar el aviso de uso: ${error.message}`)
+  }
+}
+
 async function setDoseAlert(
   supabase: Supabase,
   userId: string,
@@ -1467,6 +1485,7 @@ try {
     )
   }
   const userId = signIn.data.user.id
+  await ensureUsageNoticeAccepted(supabase, userId)
   const loadedFoods = await ensureFoods(supabase)
   const foods = demoFoods(await activeFoods(supabase))
   const settings = await ensureDoseAlert(supabase, userId)
