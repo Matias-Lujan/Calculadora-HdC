@@ -7,6 +7,9 @@ const sections = [
   { to: '/settings', label: 'Configuración' },
 ]
 
+/** The bar at the bottom: a screen over everything makes it inert. */
+export const APP_NAV_ID = 'app-nav'
+
 export function AppLayout() {
   return (
     <>
@@ -17,7 +20,10 @@ export function AppLayout() {
       <main className="mx-auto min-h-dvh max-w-md px-4 pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))]">
         <Outlet />
       </main>
-      <nav className="fixed inset-x-0 bottom-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
+      <nav
+        id={APP_NAV_ID}
+        className="fixed inset-x-0 bottom-0 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]"
+      >
         <ul className="mx-auto flex max-w-md">
           {sections.map(({ to, label }) => (
             <li key={to} className="flex-1">

@@ -10,14 +10,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextMealsOffset } from './history.ts'
 import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
-import { createMeal, fetchReferenceFoods } from './api.ts'
+import {
+  deleteMeal,
+  fetchRecentMeals,
+  fetchReferenceFoods,
+  saveMeal,
+} from './api.ts'
 import {
   mealListOptions,
   mealsKeys,
   referenceFoodsKey,
   referenceFoodsOptions,
   useCreateMeal,
+  useDeleteMeal,
   useMealList,
+  useRecentMeals,
   useReferenceFoods,
 } from './queries.ts'
 import type { MealsPage } from './types.ts'
@@ -122,7 +129,7 @@ describe('useCreateMeal', () => {
 
     useCreateMeal()
     const options = vi.mocked(useMutation).mock.calls[0]?.[0]
-    expect(options?.mutationFn).toBe(createMeal)
+    expect(options?.mutationFn).toBe(saveMeal)
     await options?.onSuccess?.(
       'id' as never,
       undefined as never,
@@ -143,5 +150,42 @@ describe('useCreateMeal', () => {
     const options = vi.mocked(useMutation).mock.calls[0]?.[0]
     expect(options?.onError).toBeUndefined()
     expect(options?.onSettled).toBeUndefined()
+  })
+})
+
+describe('useRecentMeals', () => {
+  it('reads the last meals under the meals prefix, so saving reads them again', () => {
+    expect(mealsKeys.recent[0]).toBe(mealsKeys.all[0])
+    vi.mocked(useQuery).mockClear()
+    useRecentMeals()
+    expect(vi.mocked(useQuery).mock.calls[0]?.[0]).toEqual({
+      queryKey: mealsKeys.recent,
+      queryFn: fetchRecentMeals,
+    })
+  })
+})
+
+describe('useDeleteMeal', () => {
+  it('after deleting, reads again the list and the shortcuts of Inicio, not the detail', async () => {
+    const client = new QueryClient()
+    const invalidate = vi
+      .spyOn(client, 'invalidateQueries')
+      .mockResolvedValue(undefined)
+    vi.mocked(useQueryClient).mockReturnValue(client)
+    vi.mocked(useMutation).mockClear()
+
+    useDeleteMeal()
+    const options = vi.mocked(useMutation).mock.calls[0]?.[0]
+    expect(options?.mutationFn).toBe(deleteMeal)
+    await options?.onSuccess?.(
+      undefined as never,
+      'id' as never,
+      undefined as never,
+      undefined as never,
+    )
+    expect(invalidate.mock.calls.map((call) => call[0])).toEqual([
+      { queryKey: mealsKeys.list },
+      { queryKey: mealsKeys.recent },
+    ])
   })
 })

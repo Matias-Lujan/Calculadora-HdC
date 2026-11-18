@@ -30,6 +30,7 @@ import {
   savedMealItemSchema,
   savedMealSchema,
   type MealItemDraft,
+  type NewMealItem,
   type SavedMealItem,
 } from './types.ts'
 
@@ -569,8 +570,18 @@ describe('doseLine: bordes', () => {
 // --- The lines of a saved item (history detail, spec §6.7) ---
 
 // Saved items with the values of spec §8.3, as the history reads them.
+// The row the base keeps for an item: food_id instead of the food it
+// points to (a table food not copied yet gets an invented id).
+function asStoredItem({ food, ...row }: NewMealItem) {
+  return {
+    ...row,
+    food_id: 'id' in food ? food.id : '00000000-0000-4000-8000-0000000000ff',
+  }
+}
+
 const savedRice: SavedMealItem = {
   position: 0,
+  food_id: '00000000-0000-4000-8000-000000000001',
   food_name: 'Arroz de prueba',
   food_brand: null,
   food_state: 'raw_cooked',
@@ -586,6 +597,7 @@ const savedRice: SavedMealItem = {
 
 const savedBanana: SavedMealItem = {
   position: 1,
+  food_id: '00000000-0000-4000-8000-000000000002',
   food_name: 'Banana de prueba',
   food_brand: null,
   food_state: 'as_eaten',
@@ -601,6 +613,7 @@ const savedBanana: SavedMealItem = {
 
 const savedAlfajor: SavedMealItem = {
   position: 2,
+  food_id: '00000000-0000-4000-8000-000000000003',
   food_name: 'Alfajor de prueba',
   food_brand: 'Marca Inventada',
   food_state: 'as_eaten',
@@ -800,7 +813,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
       const calc = result.items[index]
       if (draft === undefined || calc === undefined) throw new Error('missing')
       const saved = savedMealItemSchema.parse(
-        JSON.parse(JSON.stringify(item)) as unknown,
+        JSON.parse(JSON.stringify(asStoredItem(item))) as unknown,
       )
       expect(savedItemLines(saved)).toEqual([
         ...foodLines(draft.food),
@@ -860,7 +873,7 @@ describe('savedItemLines: the same lines the meal screen showed', () => {
           JSON.stringify({
             id: '00000000-0000-4000-8000-0000000000aa',
             ...record.meal,
-            meal_items: record.items,
+            meal_items: record.items.map(asStoredItem),
           }),
         ) as unknown,
       )

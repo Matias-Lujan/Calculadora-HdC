@@ -1,9 +1,15 @@
-import { CircleAlert, CircleCheck, TriangleAlert } from 'lucide-react'
+import { CircleAlert, CircleCheck, Info, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-type Tone = 'success' | 'warning' | 'error'
+type Tone = 'info' | 'success' | 'warning' | 'error'
 
 const TONES = {
+  /** Neutral: something to know, not a problem. */
+  info: {
+    Icon: Info,
+    box: 'border border-line bg-sunken text-ink',
+    icon: 'text-accent',
+  },
   success: {
     Icon: CircleCheck,
     box: 'bg-success-soft text-success',
@@ -29,8 +35,8 @@ type Props = {
 }
 
 /**
- * A notice of success, warning or error (docs/ux/revision-1.md §2.10):
- * always an icon and text, never only a color.
+ * A notice, neutral or of success, warning or error (docs/ux/revision-1.md
+ * §2.10): always an icon and text, never only a color.
  */
 export function Notice({ tone, role, children }: Props) {
   const { Icon, box, icon } = TONES[tone]

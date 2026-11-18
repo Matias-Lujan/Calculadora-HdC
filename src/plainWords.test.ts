@@ -313,6 +313,7 @@ describe('plain words on the screen', () => {
         itemCarbsText(calc.carbsG),
         ...savedItemLines({
           position: index,
+          food_id: '00000000-0000-4000-8000-000000000001',
           food_name: 'Alimento',
           food_brand: null,
           food_state: input.foodState,

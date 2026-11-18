@@ -762,7 +762,19 @@ function buildStates(
     await go(page, '/')
     await page.evaluate(`sessionStorage.removeItem('${MEAL_DRAFT_KEY}')`)
     await page.reload()
-    await page.locator('#meal-food-search').waitFor()
+    await page.locator('#meal-food-search-open').waitFor()
+  }
+
+  // Opens the search over the whole screen (UX-08): the field of an empty
+  // Inicio, or "+ Agregar alimento".
+  const openSearch = async (page: Page) => {
+    const field = page.locator('#meal-food-search-open')
+    if (await field.isVisible()) {
+      await field.click()
+    } else {
+      await page.getByRole('button', { name: 'Agregar alimento' }).click()
+    }
+    await page.getByRole('dialog').waitFor()
   }
 
   const itemCard = (page: Page, food: Food) =>
@@ -773,16 +785,18 @@ function buildStates(
 
   // Picks a food in the search of Inicio and types its quantity, as a user.
   const addItem = async (page: Page, food: Food, quantity: string) => {
-    const search = page.locator('#meal-food-search')
-    if (!(await search.isVisible())) {
-      await page.getByRole('button', { name: 'Agregar alimento' }).click()
-    }
-    await search.fill(food.name)
+    await openSearch(page)
+    await page.locator('#meal-food-search').fill(food.name)
     await page
-      .locator('#meal-food-picker')
+      .getByRole('dialog')
       .getByRole('button', { name: food.name })
       .first()
       .click()
+    // Picking closes the search and leaves its entry of the browser history.
+    await page.getByRole('dialog').waitFor({ state: 'detached' })
+    await page.waitForFunction(
+      '!(history.state && history.state.usr && history.state.usr.foodSearch)',
+    )
     const field = itemCard(page, food).locator('input[id$="-quantity"]')
     await field.pressSequentially(quantity)
     await field.blur()
@@ -871,14 +885,15 @@ function buildStates(
     {
       name: 'inicio-vacio',
       description:
-        'Inicio sin alimentos en la comida: el buscador abierto y «Con foto» debajo.',
+        'Inicio sin alimentos en la comida: el campo de búsqueda con «Con foto» a su derecha y, debajo, «Recientes» y «A esta hora comiste» (o «Tus últimas comidas»).',
       run: emptyMeal,
     },
     {
       name: 'inicio-buscador',
-      description: `Inicio escribiendo «${breadQuery}» en el buscador: resultados de «Tus alimentos» y de la «Tabla de alimentos».`,
+      description: `Inicio con el buscador a pantalla completa, escribiendo «${breadQuery}»: resultados de «Tus alimentos» y de la «Tabla de alimentos».`,
       run: async (page) => {
         await emptyMeal(page)
+        await openSearch(page)
         await page.locator('#meal-food-search').fill(breadQuery)
         await page
           .getByRole('heading', { name: 'Tus alimentos' })
@@ -890,10 +905,11 @@ function buildStates(
     {
       name: 'inicio-falta-rinde',
       description:
-        'Inicio buscando un alimento que se cocina y no tiene cargado cuánto rinde: no se puede elegir, con «Falta cuánto rinde» y «Cargar cuánto rinde».',
+        'Inicio con el buscador a pantalla completa, buscando un alimento que se cocina y no tiene cargado cuánto rinde: no se puede elegir, con «Falta cuánto rinde» y «Cargar cuánto rinde».',
       run: async (page) => {
         const food = need(foods.missingYield, 'que se cocina sin cuánto rinde')
         await emptyMeal(page)
+        await openSearch(page)
         await page
           .locator('#meal-food-search')
           .fill(firstWord(food.name).toLowerCase())
@@ -1322,6 +1338,69 @@ function buildStates(
           "(() => { const input = document.activeElement; if (input && 'setSelectionRange' in input) input.setSelectionRange(input.value.length, input.value.length) })()",
         )
         await center(field)
+      },
+    },
+
+    // --- Added in tanda 4 of M1 (UX-08 to UX-10), at the end so the
+    // numbers above do not move. None of them saves anything. ---
+    {
+      name: 'inicio-recientes',
+      description:
+        'Inicio vacía con «Recientes» (los últimos alimentos usados, a un toque) y «A esta hora comiste» (o «Tus últimas comidas»), cada comida con «Repetir».',
+      run: async (page) => {
+        await emptyMeal(page)
+        await page.getByRole('heading', { name: 'Recientes' }).waitFor()
+        await page
+          .getByRole('heading', {
+            name: /^(A esta hora comiste|Tus últimas comidas)$/,
+          })
+          .waitFor()
+      },
+    },
+    {
+      name: 'inicio-buscador-pantalla-completa',
+      description:
+        'Inicio después de tocar el campo de búsqueda: el buscador a pantalla completa, sin nada escrito, con la ayuda y «Recientes».',
+      run: async (page) => {
+        await emptyMeal(page)
+        await openSearch(page)
+      },
+    },
+    {
+      name: 'inicio-repetir',
+      description:
+        'Inicio después de tocar «Repetir» en la primera comida de «A esta hora comiste» (o «Tus últimas comidas»): los mismos alimentos y cantidades, con los valores de hoy, el aviso «Copiaste la comida de…» y, si alguno no se pudo traer, el aviso de cada uno (no se guarda).',
+      run: async (page) => {
+        await emptyMeal(page)
+        await page
+          .getByRole('button', { name: /^Repetir la comida / })
+          .first()
+          .click()
+        await page
+          .getByText(/^(Copiaste la comida |No se pudo traer )/)
+          .first()
+          .waitFor()
+        await page.evaluate('window.scrollTo(0, 0)')
+      },
+    },
+    {
+      name: 'inicio-corrigiendo',
+      description:
+        'Inicio después de tocar «Corregir» en el detalle de la comida más reciente de hoy (reemplazando la comida a medio cargar, si había): arriba, «Estás corrigiendo la comida de…» con «Cancelar la corrección», y la comida con su fecha y hora y su dosis aplicada (no se guarda).',
+      run: async (page) => {
+        await todayMeal(page)
+        await page
+          .getByRole('button', { name: 'Corregir', exact: true })
+          .click()
+        const replace = page.getByRole('button', {
+          name: 'Reemplazar',
+          exact: true,
+        })
+        const correcting = page.getByText(/^Estás corrigiendo la comida /)
+        await replace.or(correcting).first().waitFor()
+        if (await replace.isVisible()) await replace.click()
+        await correcting.waitFor()
+        await page.evaluate('window.scrollTo(0, 0)')
       },
     },
   ]

@@ -414,6 +414,35 @@ export function mealProblemMessage(problem: MealProblem): string {
   }
 }
 
+/**
+ * Why an item of a saved meal is not brought back by "Repetir" or
+ * "Corregir" (spec §6.6; src/features/meals/mealCopy.ts). Declared here, and
+ * not in the feature, because lib does not import features.
+ */
+export type MealCopySkipReason =
+  'NOT_IN_CATALOG' | 'MISSING_COOKING_FACTOR' | 'NO_UNIT_WEIGHT'
+
+/** The notice of an item that "Repetir" or "Corregir" could not bring. */
+export function mealCopySkipMessage(
+  foodName: string,
+  reason: MealCopySkipReason,
+): string {
+  const start = `No se pudo traer «${foodName}»: `
+  switch (reason) {
+    case 'NOT_IN_CATALOG':
+      return `${start}ya no está en Mis alimentos.`
+    case 'MISSING_COOKING_FACTOR':
+      return `${start}falta cuánto rinde al cocinarlo.`
+    case 'NO_UNIT_WEIGHT':
+      return `${start}ya no tiene peso por unidad.`
+  }
+}
+
+// A correction saved, but the corrected meal could not be deleted (spec
+// §6.7, "Corregir").
+export const CORRECTION_DELETE_ERROR_MESSAGE =
+  'Se guardó la corrección, pero no se pudo borrar la comida anterior. Borrala desde el historial.'
+
 // The meal total when the ratio is not valid (INVALID_RATIO, spec §8.4).
 export const INVALID_RATIO_MESSAGE =
   'El ratio de Configuración no es válido. Revisalo en Configuración.'

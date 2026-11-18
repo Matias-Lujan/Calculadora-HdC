@@ -12,6 +12,7 @@ import type { Food } from '../../lib/foods.ts'
 import type { Settings } from '../../lib/settings.ts'
 import {
   appliedDose,
+  eatenAtToSave,
   appliedDoseFieldText,
   canUseUnits,
   doseWarning,
@@ -2204,5 +2205,62 @@ describe('a food of the reference table (spec §6.2, §14 #51)', () => {
     const record = toNewMealRecord(items, calcOk(items), row, 1, EATEN_AT)
     expect(itemAt(record, 0).food).toEqual({ id: copy.id })
     expect(itemAt(record, 0).food_source).toBe('reference')
+  })
+})
+
+// "Corregir" (spec §6.7): while a field keeps the text it was loaded with,
+// the exact loaded value is saved.
+describe('appliedDose with a loaded value', () => {
+  const loaded = { text: '8,55', value: 8.546666666666667 }
+
+  it('the field as it was loaded: the exact value', () => {
+    expect(appliedDose('8,55', 10, loaded)).toEqual({
+      value: 8.546666666666667,
+    })
+  })
+
+  it('edited: what was typed, even if it is the same number', () => {
+    expect(appliedDose('8,5', 10, loaded)).toEqual({ value: 8.5 })
+    expect(appliedDose('8,550', 10, loaded)).toEqual({ value: 8.55 })
+    expect(appliedDose('', 10, loaded)).toEqual({ error: 'REQUIRED' })
+  })
+
+  it('following the calculated dose (null) wins over the loaded value', () => {
+    expect(appliedDose(null, 10, loaded)).toEqual({ value: 10 })
+  })
+
+  it('without a loaded value, as before', () => {
+    expect(appliedDose('8,55', 10, null)).toEqual({ value: 8.55 })
+  })
+})
+
+describe('eatenAtToSave', () => {
+  const now = new Date('2026-11-16T16:00:30.500Z')
+  const loaded = {
+    text: '2026-11-15T08:30',
+    value: '2026-11-15T11:30:45.123+00:00',
+  }
+
+  it('"Ahora": the instant of saving', () => {
+    expect(eatenAtToSave(null, now)).toBe('2026-11-16T16:00:30.500Z')
+    expect(eatenAtToSave(null, now, loaded)).toBe('2026-11-16T16:00:30.500Z')
+  })
+
+  it('the field as it was loaded: the exact instant, with its seconds', () => {
+    expect(eatenAtToSave('2026-11-15T08:30', now, loaded)).toBe(loaded.value)
+  })
+
+  it('changed: the typed date and time, in Buenos Aires', () => {
+    expect(eatenAtToSave('2026-11-15T08:31', now, loaded)).toBe(
+      '2026-11-15T11:31:00.000Z',
+    )
+    expect(eatenAtToSave('2026-11-15T08:30', now)).toBe(
+      '2026-11-15T11:30:00.000Z',
+    )
+  })
+
+  it('not a real date: null', () => {
+    expect(eatenAtToSave('', now, loaded)).toBeNull()
+    expect(eatenAtToSave('2026-02-30T08:30', now)).toBeNull()
   })
 })

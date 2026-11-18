@@ -119,17 +119,43 @@ export function foodErrors(result: ItemResult): MealItemFoodError[] {
 }
 
 /**
+ * A saved value loaded in a field, rounded to be shown (`text`), and the
+ * exact value it stands for: while the field keeps that text, the exact one
+ * is saved ("Corregir", spec §6.7).
+ */
+export type LoadedValue<T> = { text: string; value: T }
+
+/**
  * The applied dose that is saved (spec §6.6). While the user has not edited
  * the field (`text` is null), it follows the calculated dose, exactly (not
- * the rounded value the field shows). Once edited, it is the typed text,
- * which has to be a number >= 0.
+ * the rounded value the field shows). If the field still holds the text it
+ * was loaded with (`loaded`, a correction), the exact loaded value. Once
+ * edited, it is the typed text, which has to be a number >= 0.
  */
 export function appliedDose(
   text: string | null,
   calculatedDose: number,
+  loaded: LoadedValue<number> | null = null,
 ): NonNegativeNumberResult {
   if (text === null) return { value: calculatedDose }
+  if (loaded !== null && text === loaded.text) return { value: loaded.value }
   return parseNonNegativeUserNumber(text)
+}
+
+/**
+ * The `eaten_at` that is saved (spec §6.6): `now` with "Ahora" (`text`
+ * null); the exact loaded instant if the field still holds the text it was
+ * loaded with (`loaded`, a correction: the field has no seconds); otherwise
+ * the typed date and time (null if it is not a real one).
+ */
+export function eatenAtToSave(
+  text: string | null,
+  now: Date,
+  loaded: LoadedValue<string> | null = null,
+): string | null {
+  if (text === null) return now.toISOString()
+  if (loaded !== null && text === loaded.text) return loaded.value
+  return eatenAtFromInput(text)
 }
 
 /**

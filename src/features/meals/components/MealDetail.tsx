@@ -10,6 +10,7 @@ import { formatEatenAt } from '../eatenAt.ts'
 import { appliedDoseText } from '../history.ts'
 import type { SavedMeal } from '../types.ts'
 import { CalculationDetails } from './CalculationDetails.tsx'
+import { CopyMealSection } from './CopyMealSection.tsx'
 import { DeleteMealSection } from './DeleteMealSection.tsx'
 
 type Props = {
@@ -69,6 +70,8 @@ export function MealDetail({ meal }: Props) {
           ]}
         />
       </div>
+
+      <CopyMealSection meal={meal} />
 
       <DeleteMealSection meal={meal} />
     </article>

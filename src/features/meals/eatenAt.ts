@@ -128,6 +128,15 @@ export function formatEatenTime(iso: string): string {
   return `${pad(c.hour, 2)}:${pad(c.minute, 2)}`
 }
 
+/**
+ * The second of the day a Buenos Aires clock shows at an instant, from 0
+ * (00:00:00) to 86399 (23:59:59).
+ */
+export function secondOfDayAt(time: number): number {
+  const c = wallClockAt(time)
+  return c.hour * 3600 + c.minute * 60 + c.second
+}
+
 const WEEKDAYS = [
   'domingo',
   'lunes',
@@ -161,4 +170,26 @@ export function formatDayTitle(day: string, now: Date): string {
   return year === todayYear
     ? `${weekday} ${date}`
     : `${weekday} ${date}/${pad(year, 4)}`
+}
+
+/**
+ * When a saved meal was eaten, for a row of Inicio: "Ayer 08:30", "Hoy
+ * 13:05", "lunes 09/11 08:30" (the day as formatDayTitle names it and the
+ * time, Buenos Aires).
+ */
+export function formatMealMoment(iso: string, now: Date): string {
+  return `${formatDayTitle(eatenDay(iso), now)} ${formatEatenTime(iso)}`
+}
+
+/**
+ * The same, after "la comida": "de ayer 08:30", "de hoy 13:05", "del lunes
+ * 09/11 08:30".
+ */
+export function ofMealMoment(iso: string, now: Date): string {
+  const title = formatDayTitle(eatenDay(iso), now)
+  const time = formatEatenTime(iso)
+  if (title === 'Hoy' || title === 'Ayer') {
+    return `de ${title.toLowerCase()} ${time}`
+  }
+  return `del ${title} ${time}`
 }

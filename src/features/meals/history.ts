@@ -107,7 +107,12 @@ export function mealSummaryText(meal: MealSummary): string {
  * The names of the foods of a meal, in the order they were entered
  * (`position`), as they were saved: "Arroz, Pollo, Manzana".
  */
-export function mealFoodsText(meal: ListedMeal): string {
+export function mealFoodsText(meal: {
+  meal_items: readonly Pick<
+    ListedMeal['meal_items'][number],
+    'position' | 'food_name'
+  >[]
+}): string {
   return meal.meal_items
     .toSorted((a, b) => a.position - b.position)
     .map((item) => item.food_name)

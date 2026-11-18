@@ -27,6 +27,7 @@ const summaryRow = {
 
 const itemRow = {
   position: 0,
+  food_id: '00000000-0000-4000-8000-000000000001',
   food_name: 'Arroz de prueba',
   food_brand: null,
   food_state: 'raw_cooked',
@@ -227,6 +228,7 @@ describe('the schemas read the JSON that PostgREST sends', () => {
     "applied_dose_units": 8.50,
     "meal_items": [{
       "position": 0,
+      "food_id": "00000000-0000-4000-8000-000000000001",
       "food_name": "Arroz de prueba",
       "food_brand": null,
       "food_state": "raw_cooked",
@@ -359,7 +361,11 @@ describe('savedMealSchema', () => {
       JSON.stringify({
         id: '00000000-0000-4000-8000-0000000000aa',
         ...record.meal,
-        meal_items: record.items,
+        meal_items: record.items.map(({ food, ...item }) => ({
+          ...item,
+          food_id:
+            'id' in food ? food.id : '00000000-0000-4000-8000-0000000000ff',
+        })),
       }),
     ) as unknown
     const parsed = savedMealSchema.parse(row)

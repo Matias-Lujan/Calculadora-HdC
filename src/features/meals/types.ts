@@ -116,6 +116,18 @@ export type NewMealRecord = {
 }
 
 /**
+ * What saving a meal from Inicio sends: the meal, and the id of the saved
+ * meal it corrects ("Corregir", spec §6.7), or null for a new one.
+ */
+export type MealToSave = { record: NewMealRecord; replaces: string | null }
+
+/**
+ * The id of the saved meal and, when it corrects another one, whether that
+ * one was deleted (null for a new meal).
+ */
+export type SavedMealResult = { id: string; replacedDeleted: boolean | null }
+
+/**
  * The payload of the create_meal function (spec §7.2): the record, with
  * each item's food already resolved to its food_id. The function reads only
  * these keys; user_id, meal_id and id come from the column defaults.
@@ -182,6 +194,7 @@ export type MealsPage = {
 type SavedMealItemRow = Pick<
   Tables<'meal_items'>,
   | 'position'
+  | 'food_id'
   | 'food_name'
   | 'food_brand'
   | 'food_state'
@@ -197,11 +210,13 @@ type SavedMealItemRow = Pick<
 
 /**
  * An item of a saved meal: the copy of the food values and the result of
- * its calculation, as they were saved (spec §6.7). The enums narrow the
- * `text` columns to the values their CHECKs allow.
+ * its calculation, as they were saved (spec §6.7), and the food it points
+ * to (to repeat or correct the meal with today's values of that food). The
+ * enums narrow the `text` columns to the values their CHECKs allow.
  */
 export const savedMealItemSchema = z.object({
   position: z.number(),
+  food_id: z.string(),
   food_name: z.string(),
   food_brand: z.string().nullable(),
   food_state: z.enum(['as_eaten', 'raw_cooked']),
@@ -232,3 +247,37 @@ export const savedMealSchema = mealSummarySchema.extend({
 >
 
 export type SavedMeal = z.infer<typeof savedMealSchema>
+
+/**
+ * What repeating or correcting a meal reads of each item (spec §6.6): the
+ * food it points to, its name as saved (for the notices) and the quantity
+ * as it was entered.
+ */
+export const copyableMealItemSchema = savedMealItemSchema.pick({
+  position: true,
+  food_id: true,
+  food_name: true,
+  quantity_mode: true,
+  units: true,
+  grams: true,
+})
+
+export type CopyableMealItem = z.infer<typeof copyableMealItemSchema>
+
+/**
+ * A recent meal, for the shortcuts of an empty Inicio (spec §6.6): its
+ * foods for "Recientes", and its time, names and carbs for "A esta hora
+ * comiste", with what "Repetir" needs.
+ */
+export const recentMealSchema = z.object({
+  id: z.string(),
+  eaten_at: z.iso.datetime({ offset: true }),
+  total_carbs_g: z.number(),
+  meal_items: z.array(copyableMealItemSchema).min(1),
+}) satisfies z.ZodType<
+  Pick<Tables<'meals'>, 'id' | 'eaten_at' | 'total_carbs_g'> & {
+    meal_items: CopyableMealItem[]
+  }
+>
+
+export type RecentMeal = z.infer<typeof recentMealSchema>

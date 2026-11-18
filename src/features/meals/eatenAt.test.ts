@@ -6,6 +6,9 @@ import {
   formatDayTitle,
   formatEatenAt,
   formatEatenTime,
+  formatMealMoment,
+  ofMealMoment,
+  secondOfDayAt,
 } from './eatenAt.ts'
 
 // The time zone of the process when the file loads. vi.unstubAllEnvs()
@@ -542,5 +545,51 @@ describe('the time zone tests leave the zone of the process as it was', () => {
       zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       offset: probe.getTimezoneOffset(),
     }).toEqual(before)
+  })
+})
+
+// The shortcuts of Inicio (spec §6.6): the time of day and the moment of a
+// meal, in Buenos Aires (UTC−3).
+describe('secondOfDayAt', () => {
+  it.each([
+    ['2026-11-16T03:00:00Z', 0], // midnight in Buenos Aires
+    ['2026-11-16T02:59:59Z', 86399], // a second before
+    ['2026-11-16T16:05:30Z', 13 * 3600 + 5 * 60 + 30],
+    ['2026-11-16T00:00:00Z', 21 * 3600], // midnight UTC is 21:00
+  ])('%s is second %i', (iso, second) => {
+    expect(secondOfDayAt(Date.parse(iso))).toBe(second)
+  })
+
+  it('does not depend on the time zone of the device', () => {
+    try {
+      vi.stubEnv('TZ', 'Asia/Tokyo')
+      expect(secondOfDayAt(Date.parse('2026-11-16T03:00:00Z'))).toBe(0)
+    } finally {
+      restoreTimeZone()
+    }
+  })
+})
+
+describe('formatMealMoment and ofMealMoment', () => {
+  // Monday 16/11/2026, 13:00 in Buenos Aires.
+  const now = new Date('2026-11-16T16:00:00Z')
+
+  it.each([
+    ['2026-11-16T11:30:00+00:00', 'Hoy 08:30', 'de hoy 08:30'],
+    ['2026-11-15T11:30:00+00:00', 'Ayer 08:30', 'de ayer 08:30'],
+    // 23:30 of Saturday in Buenos Aires, already Sunday in UTC.
+    [
+      '2026-11-15T02:30:00+00:00',
+      'sábado 14/11 23:30',
+      'del sábado 14/11 23:30',
+    ],
+    [
+      '2025-12-31T15:00:00+00:00',
+      'miércoles 31/12/2025 12:00',
+      'del miércoles 31/12/2025 12:00',
+    ],
+  ])('%s: "%s", "%s"', (iso, row, notice) => {
+    expect(formatMealMoment(iso, now)).toBe(row)
+    expect(ofMealMoment(iso, now)).toBe(notice)
   })
 })

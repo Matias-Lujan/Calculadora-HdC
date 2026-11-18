@@ -1,13 +1,20 @@
 import { z } from 'zod'
 import { needsCookingFactor } from '../../domain/dose/index.ts'
 import { foodSchema, type Food } from '../../lib/foods.ts'
+import {
+  copiedMeal,
+  type CorrectedMeal,
+  type MealCopyRequest,
+  type SkippedItem,
+} from './mealCopy.ts'
 import { canUseUnits, newItemDraft } from './mealDraft.ts'
 import type { MealFood, MealItemDraft } from './types.ts'
 
 // The meal being entered, kept while the app is open (spec §6.6, §14 #61):
-// what is stored, how it is read back, and the food that comes back from
-// "Con foto". Only what the user entered is stored; the
-// calculation and the breakdown are derived again in the render.
+// what is stored, how it is read back, the food that comes back from
+// "Con foto" (or "Agregar a mano") and a saved meal loaded with "Repetir"
+// or "Corregir". Only what the user entered is stored; the calculation and
+// the breakdown are derived again in the render.
 
 /** What is stored: the items (with their copy of the food), as typed. */
 export type StoredMealDraft = {
@@ -16,6 +23,8 @@ export type StoredMealDraft = {
   appliedDoseText: string | null
   /** null: "Ahora". */
   eatenAtText: string | null
+  /** The saved meal this one corrects ("Corregir", spec §6.7), or null. */
+  correcting: CorrectedMeal | null
 }
 
 const mealFoodSchema = foodSchema.extend({
@@ -42,11 +51,34 @@ const storedItemSchema = z
         food.state === 'as_eaten'),
   ) satisfies z.ZodType<MealItemDraft>
 
+const correctedMealSchema = z.object({
+  mealId: z.guid(),
+  eatenAt: z.iso.datetime({ offset: true }),
+  eatenAtText: z.string(),
+  appliedDose: z
+    .object({ text: z.string(), value: z.number().nonnegative() })
+    .nullable(),
+  skipped: z.array(
+    z.object({
+      foodName: z.string(),
+      reason: z.enum([
+        'NOT_IN_CATALOG',
+        'MISSING_COOKING_FACTOR',
+        'NO_UNIT_WEIGHT',
+      ]),
+    }),
+  ),
+}) satisfies z.ZodType<CorrectedMeal>
+
 const storedMealDraftSchema = z
   .object({
     items: z.array(storedItemSchema).min(1),
     appliedDoseText: z.string().nullable(),
     eatenAtText: z.string().nullable(),
+    // Missing in a meal kept before corrections existed: not one.
+    correcting: correctedMealSchema
+      .nullish()
+      .transform((value) => value ?? null),
   })
   .refine(
     ({ items }) => new Set(items.map((item) => item.key)).size === items.length,
@@ -67,6 +99,16 @@ export function nextItemKey(items: readonly MealItemDraft[]): number {
   return items.reduce((next, item) => Math.max(next, item.key + 1), 0)
 }
 
+/**
+ * The notices of a saved meal loaded in Inicio: when it was eaten, if it was
+ * repeated ("Copiaste la comida de…"; null when correcting or if nothing
+ * was loaded), and the items that could not be brought.
+ */
+export type CopyNotice = {
+  repeatedFrom: string | null
+  skipped: SkippedItem[]
+}
+
 /** How the meal form starts. */
 export type InitialMealForm = StoredMealDraft & {
   /** The key the next picked item gets. */
@@ -78,6 +120,14 @@ export type InitialMealForm = StoredMealDraft & {
    * much it yields): it is not added and Inicio says why.
    */
   notUsableFood: Pick<Food, 'id' | 'name'> | null
+  copyNotice: CopyNotice | null
+}
+
+const EMPTY_DRAFT: StoredMealDraft = {
+  items: [],
+  appliedDoseText: null,
+  eatenAtText: null,
+  correcting: null,
 }
 
 /**
@@ -90,28 +140,62 @@ export function initialMealForm(
   stored: StoredMealDraft | null,
   addedFood: Food | null,
 ): InitialMealForm {
-  const draft = stored ?? {
-    items: [],
-    appliedDoseText: null,
-    eatenAtText: null,
-  }
+  const draft = stored ?? EMPTY_DRAFT
   const nextKey = nextItemKey(draft.items)
-  if (addedFood === null) {
-    return { ...draft, nextKey, focusKey: null, notUsableFood: null }
+  const base = {
+    ...draft,
+    nextKey,
+    focusKey: null,
+    notUsableFood: null,
+    copyNotice: null,
   }
+  if (addedFood === null) return base
   if (needsCookingFactor(addedFood.state, addedFood.cooking_factor)) {
     return {
-      ...draft,
-      nextKey,
-      focusKey: null,
+      ...base,
       notUsableFood: { id: addedFood.id, name: addedFood.name },
     }
   }
   return {
-    ...draft,
+    ...base,
     items: [...draft.items, newItemDraft(nextKey, addedFood)],
     nextKey: nextKey + 1,
     focusKey: nextKey,
+  }
+}
+
+/**
+ * The meal form with a saved meal loaded ("Repetir" or "Corregir", spec
+ * §6.6), with today's foods (`foods`, the active ones). It replaces the
+ * meal in progress (the detail asked first). If no item could be brought,
+ * nothing is loaded: the meal in progress (`stored`) stays as it was, and
+ * only the notices of the items show.
+ */
+export function copiedMealForm(
+  stored: StoredMealDraft | null,
+  request: MealCopyRequest,
+  foods: readonly Food[],
+): InitialMealForm {
+  const copy = copiedMeal(request, foods)
+  if (copy.items.length === 0) {
+    return {
+      ...initialMealForm(stored, null),
+      copyNotice: { repeatedFrom: null, skipped: copy.skipped },
+    }
+  }
+  return {
+    items: copy.items,
+    appliedDoseText: copy.appliedDoseText,
+    eatenAtText: copy.eatenAtText,
+    correcting: copy.correcting,
+    nextKey: nextItemKey(copy.items),
+    focusKey: null,
     notUsableFood: null,
+    // Correcting, the items not brought stay in the notice of the
+    // correction (correcting.skipped) until saving or cancelling.
+    copyNotice:
+      request.mode === 'repeat'
+        ? { repeatedFrom: request.eatenAt, skipped: copy.skipped }
+        : null,
   }
 }

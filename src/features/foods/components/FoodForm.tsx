@@ -25,7 +25,17 @@ import { FoodFields } from './FoodFields.tsx'
 import { FieldError } from './FormControls.tsx'
 import { UnusualYieldConfirmation } from './UnusualYieldConfirmation.tsx'
 
-type Props = { mode: 'create' } | { mode: 'edit'; food: Food }
+type Props =
+  | {
+      mode: 'create'
+      /** The name the form starts with (what was searched in Inicio). */
+      initialName?: string
+      /** Where "Cancelar" goes; by default, Mis alimentos. */
+      cancelTo?: string
+      /** What happens after saving; by default, the food's detail. */
+      onSaved?: (food: Food) => void
+    }
+  | { mode: 'edit'; food: Food }
 
 const CARBS_INFO =
   'Gramos de hidratos de carbono cada 100 g, sin contar la fibra. En las etiquetas argentinas ya vienen sin fibra.'
@@ -41,9 +51,14 @@ export function FoodForm(props: Props) {
   const mutation = props.mode === 'create' ? createFood : updateFood
   const food = props.mode === 'edit' ? props.food : null
   const savedCookingFactor = food?.cooking_factor ?? null
+  const createOptions = props.mode === 'create' ? props : null
 
   const form = useFoodFormState({
-    initialTexts: () => initialFoodFormTexts(food ?? undefined),
+    initialTexts: () => {
+      const texts = initialFoodFormTexts(food ?? undefined)
+      const name = createOptions?.initialName
+      return name === undefined ? texts : { ...texts, name }
+    },
     initialMoreOptionsOpen: startsWithMoreOptionsOpen(food ?? undefined),
     validate: (texts) =>
       validateFoodForm(texts, savedCookingFactor, food ?? undefined),
@@ -54,8 +69,13 @@ export function FoodForm(props: Props) {
 
   function save(values: FoodFormValues) {
     form.setConfirmingFactor(false)
-    const onSuccess = (saved: Food) =>
-      void navigate(`/foods/${saved.id}`, { replace: true })
+    const onSuccess = (saved: Food) => {
+      if (createOptions?.onSaved !== undefined) {
+        createOptions.onSaved(saved)
+      } else {
+        void navigate(`/foods/${saved.id}`, { replace: true })
+      }
+    }
     if (food === null) {
       createFood.mutate(toNewFood(values), { onSuccess })
     } else {
@@ -175,7 +195,11 @@ export function FoodForm(props: Props) {
               {mutation.isPending ? 'Guardando…' : 'Guardar'}
             </button>
             <Link
-              to={food === null ? '/foods' : `/foods/${food.id}`}
+              to={
+                food === null
+                  ? (createOptions?.cancelTo ?? '/foods')
+                  : `/foods/${food.id}`
+              }
               className={button.secondary}
             >
               Cancelar

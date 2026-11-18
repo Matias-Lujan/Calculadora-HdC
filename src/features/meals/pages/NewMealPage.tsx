@@ -4,13 +4,16 @@ import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods } from '../../../lib/foods.ts'
 import { useSettings } from '../../../lib/settings.ts'
 import { MealForm } from '../components/MealForm.tsx'
-import { useReferenceFoods } from '../queries.ts'
+import { useRecentMeals, useReferenceFoods } from '../queries.ts'
 
 /** Home ("Inicio", `/`): a new meal (spec §6.6). */
 export function NewMealPage() {
   const foods = useFoods()
   const referenceFoods = useReferenceFoods()
   const settings = useSettings()
+  // Only for the shortcuts of an empty Inicio: Inicio does not wait for it,
+  // and without it (loading or failed) they are not shown.
+  const recentMeals = useRecentMeals()
   const queries = [foods, referenceFoods, settings]
 
   // A query fails "without data" only if it never loaded. With data, a later
@@ -22,8 +25,8 @@ export function NewMealPage() {
 
   return (
     <section className="flex flex-col gap-4">
-      <h1 className={pageTitle}>Nueva comida</h1>
-
+      {/* With the meal loaded, MealForm writes the title ("Corregir comida"
+          while correcting). */}
       {foods.data !== undefined &&
       referenceFoods.data !== undefined &&
       settings.data !== undefined ? (
@@ -31,9 +34,11 @@ export function NewMealPage() {
           foods={foods.data}
           referenceFoods={referenceFoods.data}
           settings={settings.data}
+          recentMeals={recentMeals.data}
         />
       ) : failed.length > 0 ? (
         <div className="flex flex-col gap-3">
+          <h1 className={pageTitle}>Nueva comida</h1>
           <Notice tone="error" role="alert">
             <p>{LOAD_ERROR_MESSAGE}</p>
           </Notice>
@@ -49,7 +54,10 @@ export function NewMealPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        <>
+          <h1 className={pageTitle}>Nueva comida</h1>
+          <p className="text-ink-soft">Cargando…</p>
+        </>
       )}
     </section>
   )
