@@ -1,5 +1,6 @@
 import { useId } from 'react'
 import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { enter } from '../../../components/styles.ts'
 import { formatDayTitle } from '../eatenAt.ts'
 import { daySummaryText, type MealDay } from '../history.ts'
 import { MealListItem } from './MealListItem.tsx'
@@ -43,7 +44,10 @@ export function MealDayGroup({ day, open, onToggle, now }: Props) {
         </span>
       </button>
       {open && (
-        <ul id={id} className="flex flex-col divide-y divide-line pl-7">
+        <ul
+          id={id}
+          className={`flex flex-col divide-y divide-line pl-7 ${enter}`}
+        >
           {day.meals.map((meal) => (
             <li key={meal.id}>
               <MealListItem meal={meal} />

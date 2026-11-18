@@ -23,6 +23,7 @@ import {
   itemCarbsText,
   ratioText,
   savedDoseNoteText,
+  savedMealText,
   savedItemLines,
   savedItemQuantityText,
   totalCarbsText,
@@ -991,6 +992,20 @@ describe('savedDoseNoteText', () => {
     )
     expect(savedDoseNoteText(1, 12.5)).toBe(
       'Calculada: 1,00 unidades · Ratio: 1 unidad cada 12,5 g de HC',
+    )
+  })
+})
+
+describe('savedMealText', () => {
+  it('says the total and the applied dose without trailing zeros (UX-23)', () => {
+    expect(savedMealText(128.25, 8.5, false)).toBe(
+      'Listo, guardada. 128,3 g de HC · te aplicaste 8,5 unidades.',
+    )
+    expect(savedMealText(15, 1, true)).toBe(
+      'Listo, corregida. 15,0 g de HC · te aplicaste 1 unidad.',
+    )
+    expect(savedMealText(0, 0, false)).toBe(
+      'Listo, guardada. 0,0 g de HC · te aplicaste 0 unidades.',
     )
   })
 })

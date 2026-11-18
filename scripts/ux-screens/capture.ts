@@ -11,7 +11,7 @@
 // service_role).
 //
 // Run: node --env-file=.env.local scripts/ux-screens/capture.ts
-//        [--device "iPhone 15"] [--url <url>] [--out <folder>] [--sin-alerta]
+//        [--device "iPhone 15"] [--url <url>] [--out <folder>] [--sin-alerta] [--oscuro]
 // See README.md in this folder.
 
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -56,7 +56,7 @@ const MEAL_DRAFT_KEY = 'meal-draft'
 const DOSE_ALERT_UNITS = 15
 
 const USAGE =
-  'Uso: node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta]'
+  'Uso: node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [--url <url>] [--out <carpeta>] [--sin-alerta] [--oscuro]'
 
 function fail(message: string): never {
   console.error(message)
@@ -73,6 +73,7 @@ function readArgs() {
         url: { type: 'string' },
         out: { type: 'string' },
         'sin-alerta': { type: 'boolean', default: false },
+        oscuro: { type: 'boolean', default: false },
         help: { type: 'boolean', short: 'h', default: false },
       },
     }).values
@@ -700,10 +701,13 @@ const index = {
   error: null as string | null,
 }
 
-/** Waits until the screen is drawn: no "Cargando…", requests done, fonts. */
+/**
+ * Waits until the screen is drawn: no "Cargando…" nor gray loading shapes
+ * ([data-loading]), requests done, fonts.
+ */
 async function settle(page: Page) {
   await page.waitForFunction(
-    "!document.body.innerText.includes('Cargando…')",
+    "!document.body.innerText.includes('Cargando…') && document.querySelector('[data-loading]') === null",
     undefined,
     { timeout: 20_000 },
   )
@@ -1008,11 +1012,11 @@ function buildStates(
     {
       name: 'inicio-comida-guardada',
       description:
-        'Inicio después de guardar una comida (se guarda de verdad): «Comida guardada.» y «Ver en el historial», con la comida vacía.',
+        'Inicio después de guardar una comida (se guarda de verdad): «Listo, guardada.» con los hidratos y la dosis, y «Ver en el historial», con la comida vacía.',
       run: async (page) => {
         await buildMeal(page)
         await saveButton(page).click()
-        const saved = page.getByText('Comida guardada.')
+        const saved = page.getByText('Listo, guardada.')
         const anyway = page.getByRole('button', { name: 'Guardar igual' })
         await saved.or(anyway).first().waitFor()
         if (await anyway.isVisible()) await anyway.click()
@@ -1096,7 +1100,7 @@ function buildStates(
         await foodDetail(page, need(foods.bread ?? foods.yogurt, 'manual'))
         // Only the first "Archivar": the one in the box would archive it.
         await page
-          .getByRole('button', { name: 'Archivar', exact: true })
+          .getByRole('button', { name: 'Archivar alimento', exact: true })
           .click()
         await center(page.getByText('¿Archivar'))
       },
@@ -1179,10 +1183,12 @@ function buildStates(
     {
       name: 'comida-borrar',
       description:
-        'Detalle de una comida con la confirmación de «Borrar» abierta (sin confirmar).',
+        'Detalle de una comida con la confirmación de «Borrar comida» abierta (sin confirmar).',
       run: async (page) => {
         await todayMeal(page)
-        await page.getByRole('button', { name: 'Borrar', exact: true }).click()
+        await page
+          .getByRole('button', { name: 'Borrar comida', exact: true })
+          .click()
         await center(page.getByText('¿Borrar la comida'))
       },
     },
@@ -1413,7 +1419,10 @@ async function signInThroughUi(page: Page, baseUrl: string) {
   await page.getByLabel('Email').fill(demoEmail)
   await page.getByLabel('Contraseña').fill(demoPassword)
   await page.getByRole('button', { name: 'Entrar' }).click()
-  await page.getByRole('heading', { name: 'Nueva comida' }).waitFor()
+  // Inicio: «¿Qué vas a comer?» empty, «Nueva comida» with a meal kept.
+  await page
+    .getByRole('heading', { level: 1, name: /¿Qué vas a comer\?|Nueva comida/ })
+    .waitFor()
 }
 
 async function startVite(): Promise<ViteDevServer> {
@@ -1492,7 +1501,8 @@ try {
     ...device,
     locale: 'es-AR',
     timezoneId: TIME_ZONE,
-    colorScheme: 'light' as const,
+    // --oscuro: the dark mode of the iPhone (UX-21).
+    colorScheme: args.oscuro ? ('dark' as const) : ('light' as const),
   }
   // Nothing in the browser may reach prod (for example, a --url whose app
   // uses the prod project).

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
@@ -43,7 +44,9 @@ export function HistoryPage() {
       {/* With data, the list stays even if a later refetch fails. */}
       {days !== undefined ? (
         days.length === 0 ? (
-          <p>Todavía no registraste comidas.</p>
+          <p>
+            Acá van a aparecer tus comidas. La primera se carga desde Inicio.
+          </p>
         ) : (
           <>
             <ul className="flex flex-col divide-y divide-line">
@@ -97,7 +100,8 @@ export function HistoryPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        // The days of the list.
+        <LoadingShapes shapes={['h-14', 'h-14', 'h-14']} />
       )}
     </section>
   )

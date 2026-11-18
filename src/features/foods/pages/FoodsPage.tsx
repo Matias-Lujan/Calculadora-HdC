@@ -2,6 +2,7 @@ import { Plus, Search } from 'lucide-react'
 import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { PhotoPickerButton } from '../../../components/PhotoPickerButton.tsx'
 import {
@@ -68,7 +69,10 @@ export function FoodsPage() {
       {/* With data, the list stays even if a later refetch fails. */}
       {foods.data !== undefined ? (
         foods.data.length === 0 ? (
-          <p>Todavía no cargaste alimentos.</p>
+          <p>
+            Todavía no guardaste alimentos. Sacale una foto a una etiqueta para
+            empezar.
+          </p>
         ) : (
           <>
             <div className="flex flex-col gap-1">
@@ -98,7 +102,7 @@ export function FoodsPage() {
                 (open or folded, as it was) when the search is emptied. */}
             {searching ? (
               results.length === 0 ? (
-                <p>{`No hay alimentos que coincidan con "${query.trim()}".`}</p>
+                <p>{`No hay alimentos que coincidan con «${query.trim()}».`}</p>
               ) : (
                 <FoodList foods={results} />
               )
@@ -138,7 +142,8 @@ export function FoodsPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        // The search and «Ver todos los alimentos».
+        <LoadingShapes shapes={['h-16', 'h-11 w-64']} />
       )}
     </section>
   )

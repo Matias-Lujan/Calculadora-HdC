@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
-import { disclosure } from '../../../components/styles.ts'
+import { disclosure, enter } from '../../../components/styles.ts'
 
 type Props = {
   /** The lines of the calculation, already formatted (breakdown.ts). */
@@ -54,7 +54,7 @@ export function CalculationToggle({
       type="button"
       aria-expanded={open}
       aria-controls={controls}
-      className={`${disclosure} text-sm${className === undefined ? '' : ` ${className}`}`}
+      className={`${disclosure} text-sm whitespace-nowrap${className === undefined ? '' : ` ${className}`}`}
       onClick={onToggle}
     >
       <DisclosureIcon open={open} />
@@ -75,7 +75,7 @@ export function CalculationLines({
   return (
     <div
       id={id}
-      className={`flex flex-col gap-0.5 text-sm tabular-nums${className === undefined ? '' : ` ${className}`}`}
+      className={`flex flex-col gap-0.5 text-sm tabular-nums ${enter}${className === undefined ? '' : ` ${className}`}`}
     >
       {lines.map((line, index) => (
         <p key={index}>{line}</p>

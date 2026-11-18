@@ -11,7 +11,7 @@ type Props = {
   food: Food
 }
 
-// "Archivar" in the food detail (spec §6.5, §14 #40). Asks for confirmation
+// "Archivar alimento" in the food detail (spec §6.5, §14 #40). Asks for confirmation
 // in an inline box; there is no way to unarchive.
 export function ArchiveFoodSection({ food }: Props) {
   const archive = useArchiveFood()
@@ -26,7 +26,7 @@ export function ArchiveFoodSection({ food }: Props) {
         className={`${button.dangerText} self-start`}
       >
         <Archive aria-hidden="true" />
-        Archivar
+        Archivar alimento
       </button>
     )
   }
@@ -66,17 +66,17 @@ export function ArchiveFoodSection({ food }: Props) {
           className={button.danger}
         >
           <Archive aria-hidden="true" />
-          {archive.isPending ? 'Archivando…' : 'Archivar'}
+          {archive.isPending ? 'Archivando…' : 'Archivar alimento'}
         </button>
         {/* Disabled while archiving: the request is already sent and can't be
-            undone, so "Cancelar" would only hide it before the navigation. */}
+            undone, so "No archivar" would only hide it before the navigation. */}
         <button
           type="button"
           onClick={handleCancel}
           disabled={archive.isPending}
           className={button.secondary}
         >
-          Cancelar
+          No archivar
         </button>
       </div>
     </div>

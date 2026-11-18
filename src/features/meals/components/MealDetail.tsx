@@ -37,7 +37,7 @@ export function MealDetail({ meal }: Props) {
         </p>
       </header>
 
-      <div className="flex flex-col gap-2 rounded-display bg-display p-4 text-on-display shadow-level-2">
+      <div className="flex flex-col gap-2 rounded-display border border-transparent bg-display p-4 text-on-display shadow-level-2 dark:border-accent">
         <p className="font-display text-2xl font-semibold tabular-nums">
           {itemCarbsText(meal.total_carbs_g)}
         </p>

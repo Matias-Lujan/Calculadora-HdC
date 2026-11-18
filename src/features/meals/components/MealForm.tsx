@@ -12,6 +12,7 @@ import { APP_NAV_ID } from '../../../components/AppLayout.tsx'
 import {
   button,
   chip,
+  enter,
   field,
   fieldLabel,
   pageTitle,
@@ -74,6 +75,7 @@ import {
   toNewMealRecord,
   type RemovedItem,
 } from '../mealDraft.ts'
+import { savedMealText } from '../breakdown.ts'
 import { useCreateMeal } from '../queries.ts'
 import {
   copiedMealForm,
@@ -108,6 +110,9 @@ type Props = {
   recentMeals: RecentMeal[] | undefined
 }
 
+/** The title of Inicio without foods (UX-23); with them, "Nueva comida". */
+export const EMPTY_MEAL_TITLE = '¿Qué vas a comer?'
+
 const APPLIED_DOSE_ID = 'meal-applied-dose'
 const EATEN_AT_ID = 'meal-eaten-at'
 // How long "Quitaste {nombre}." and its "Deshacer" stay (spec §6.6).
@@ -126,6 +131,9 @@ const CORRECTION_NOTICE_ID = 'meal-correction-notice'
 type SavedNotice = SavedMealResult & {
   /** The meal it corrected, or null. */
   replaced: string | null
+  /** What was saved, for "Listo, guardada…" (UX-23). */
+  totalCarbsG: number
+  appliedDoseUnits: number
 }
 
 /** The element to take the user to for a problem (UX-14), or null. */
@@ -557,7 +565,13 @@ export function MealForm({
     createMeal.mutate(
       { record, replaces },
       {
-        onSuccess: (savedMeal) => reset({ ...savedMeal, replaced: replaces }),
+        onSuccess: (savedMeal) =>
+          reset({
+            ...savedMeal,
+            replaced: replaces,
+            totalCarbsG: record.meal.total_carbs_g,
+            appliedDoseUnits: applied.value,
+          }),
         onSettled: () => {
           savingRef.current = false
         },
@@ -642,7 +656,7 @@ export function MealForm({
       <li
         key={`removed-${removed.item.key}`}
         role="status"
-        className="flex items-center justify-between gap-3 rounded-card border border-dashed border-line-strong bg-sunken py-1 pr-2 pl-4"
+        className={`flex items-center justify-between gap-3 rounded-card border border-dashed border-line-strong bg-sunken py-1 pr-2 pl-4 ${enter}`}
       >
         <p className="min-w-0">{`Quitaste ${removed.item.food.name}.`}</p>
         <button
@@ -682,7 +696,11 @@ export function MealForm({
     // "1 alfajor = 50 g" hint of one in units) in sight.
     <>
       <h1 className={pageTitle}>
-        {correcting === null ? 'Nueva comida' : 'Corregir comida'}
+        {correcting !== null
+          ? 'Corregir comida'
+          : items.length === 0
+            ? EMPTY_MEAL_TITLE
+            : 'Nueva comida'}
       </h1>
       {/* While the search is open over the whole screen, the rest of the
           page is inert (the bar too, in an effect). */}
@@ -740,9 +758,11 @@ export function MealForm({
           ) : (
             <Notice tone="success">
               <p role="status">
-                {saved.replaced === null
-                  ? 'Comida guardada.'
-                  : 'Comida corregida.'}
+                {savedMealText(
+                  saved.totalCarbsG,
+                  saved.appliedDoseUnits,
+                  saved.replaced !== null,
+                )}
               </p>
               <Link
                 to={`/history/${saved.id}`}
@@ -993,7 +1013,7 @@ export function MealForm({
             <div className="flex flex-col gap-1">
               {eatenAtText === null ? (
                 <>
-                  <span className={fieldLabel}>Fecha y hora</span>
+                  <span className={fieldLabel}>¿Cuándo?</span>
                   <div className="flex items-center justify-between gap-2">
                     <span>Ahora</span>
                     <button
@@ -1012,7 +1032,7 @@ export function MealForm({
               ) : (
                 <>
                   <label htmlFor={EATEN_AT_ID} className={fieldLabel}>
-                    Fecha y hora
+                    ¿Cuándo?
                   </label>
                   <input
                     id={EATEN_AT_ID}

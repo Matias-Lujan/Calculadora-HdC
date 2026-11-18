@@ -140,6 +140,7 @@ export function FoodForm(props: Props) {
             <div className="flex flex-wrap items-center gap-x-1">
               <label htmlFor="food-carbs" className={fieldLabel}>
                 {carbsLabel(texts.state)}
+                <span className="sr-only">, en gramos</span>
               </label>
               <InfoTip text={CARBS_INFO} />
             </div>
@@ -155,6 +156,8 @@ export function FoodForm(props: Props) {
                   ? 'food-carbs-error'
                   : undefined
               }
+              suffix="g"
+              boxClassName="w-[9.5rem] max-w-full"
             />
             <FieldError
               id={'food-carbs-error'}

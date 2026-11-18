@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { DisclosureIcon } from '../../../components/DisclosureIcon.tsx'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import { disclosure, fieldLabel } from '../../../components/styles.ts'
+import { disclosure, enter, fieldLabel } from '../../../components/styles.ts'
 import type { Food } from '../../../lib/foods.ts'
 import {
   unitLine,
@@ -110,7 +110,7 @@ export function FoodFields({
         </button>
 
         {moreOptionsOpen && (
-          <div id={MORE_OPTIONS_ID} className="flex flex-col gap-5">
+          <div id={MORE_OPTIONS_ID} className={`flex flex-col gap-5 ${enter}`}>
             {texts.state === 'raw_cooked' && (
               <CookingFactorFields
                 texts={texts}
@@ -125,7 +125,9 @@ export function FoodFields({
               <div className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1">
                   <label htmlFor="food-unit-weight" className={fieldLabel}>
-                    Peso por unidad (g) (opcional)
+                    Peso por unidad (opcional)
+                    {/* "g" is written inside the field, only seen. */}
+                    <span className="sr-only">, en gramos</span>
                   </label>
                   <NumberInput
                     id="food-unit-weight"
@@ -139,6 +141,8 @@ export function FoodFields({
                         ? 'food-unit-weight-error'
                         : undefined
                     }
+                    suffix="g"
+                    boxClassName="w-[9.5rem] max-w-full"
                   />
                   <FieldError
                     id={'food-unit-weight-error'}
@@ -148,7 +152,7 @@ export function FoodFields({
                 <TextField
                   id="food-unit-label"
                   label="Nombre de la unidad (opcional)"
-                  placeholder="alfajor"
+                  hint="Por ejemplo: alfajor"
                   value={texts.unitLabel}
                   onChange={(unitLabel) => update({ unitLabel })}
                   // A name without a weight is an error of the weight field.

@@ -5,7 +5,12 @@ import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import { button, card, fieldLabel } from '../../../components/styles.ts'
+import {
+  button,
+  card,
+  cardTitle,
+  fieldLabel,
+} from '../../../components/styles.ts'
 import {
   formatUserNumber,
   parsePositiveUserNumber,
@@ -194,7 +199,8 @@ export function SettingsForm({ saved }: Props) {
       )}
 
       {/* The ratio, in its own card and written as a phrase (spec §6.8). */}
-      <div className={`flex flex-col gap-2 ${card}`}>
+      <section className={`flex flex-col gap-2 ${card}`}>
+        <h2 className={cardTitle}>Tu ratio</h2>
         <label htmlFor={RATIO_ID}>
           {RATIO_PHRASE_START}
           <span className="sr-only"> {RATIO_LABEL_REST}</span>
@@ -232,43 +238,49 @@ export function SettingsForm({ saved }: Props) {
             {example}
           </p>
         )}
-      </div>
+      </section>
 
-      {ALERT_FIELDS.map(({ name, label, info }) => {
-        const shownError = shownErrors[name]
-        const showError = shownError !== null
-        const inputId = `settings-${name}`
-        const errorId = `${inputId}-error`
-        return (
-          <div key={name} className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center">
-              <label htmlFor={inputId} className={fieldLabel}>
-                {label}
-              </label>
-              <InfoTip text={info} />
+      {/* The alerts only warn: apart from the ratio, which changes the dose
+          (UX-25). */}
+      <section className={`flex flex-col gap-4 ${card}`}>
+        <h2 className={cardTitle}>Alertas</h2>
+
+        {ALERT_FIELDS.map(({ name, label, info }) => {
+          const shownError = shownErrors[name]
+          const showError = shownError !== null
+          const inputId = `settings-${name}`
+          const errorId = `${inputId}-error`
+          return (
+            <div key={name} className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center">
+                <label htmlFor={inputId} className={fieldLabel}>
+                  {label}
+                </label>
+                <InfoTip text={info} />
+              </div>
+              <NumberInput
+                id={inputId}
+                name={name}
+                value={texts[name]}
+                onValueChange={(value) => edit(name, value)}
+                onBlur={() =>
+                  setShownErrors((current) => ({
+                    ...current,
+                    [name]: errorOf(results[name]),
+                  }))
+                }
+                invalid={showError}
+                describedBy={showError ? errorId : undefined}
+              />
+              {shownError !== null && (
+                <FieldMessage id={errorId}>
+                  {positiveNumberErrorMessage(shownError)}
+                </FieldMessage>
+              )}
             </div>
-            <NumberInput
-              id={inputId}
-              name={name}
-              value={texts[name]}
-              onValueChange={(value) => edit(name, value)}
-              onBlur={() =>
-                setShownErrors((current) => ({
-                  ...current,
-                  [name]: errorOf(results[name]),
-                }))
-              }
-              invalid={showError}
-              describedBy={showError ? errorId : undefined}
-            />
-            {shownError !== null && (
-              <FieldMessage id={errorId}>
-                {positiveNumberErrorMessage(shownError)}
-              </FieldMessage>
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
+      </section>
 
       {change !== null && values !== null ? (
         <Confirmation focusRef={keepRatioButtonRef}>

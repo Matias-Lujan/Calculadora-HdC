@@ -3,7 +3,7 @@
 - **Fecha**: 2026-11-17. **Rama**: `mejora-ux`. **Mejora**: M1 (`docs/plan.md`, "M1 — Revisión de UI/UX").
 - **Capturas**: `scripts/ux-screens/out/revision-1/` (31 estados, 48 capturas, ninguno falló). iPhone 15 emulado con WebKit, 393 × 659 px, con datos inventados de `dev`.
 - **Spec leído**: §6.1 y §6.5 a §6.8. **Código leído**: los componentes de `src/components/` y `src/features/` que arman cada pantalla.
-- **Estado**: decidido el 2026-11-17. El usuario eligió las 27 propuestas, en una página con las capturas; cada una termina con su "Decisión del usuario". El color de la app (UX-18) es berenjena. Los cambios al spec y a decisiones ya tomadas (#46, #53 y #62) se registran en `docs/spec.md` y `docs/decisiones.md` en la tanda que implementa cada propuesta, no antes, para que el spec siga diciendo lo que hace la app.
+- **Estado**: decidido el 2026-11-17 e implementado en seis tandas (2026-11-17 y 18; ver "M1" en `docs/plan.md`). El usuario eligió las 27 propuestas, en una página con las capturas; cada una termina con su "Decisión del usuario". El color de la app (UX-18) es berenjena. Los cambios al spec y a decisiones ya tomadas (#46, #53 y #62) se registran en `docs/spec.md` y `docs/decisiones.md` en la tanda que implementa cada propuesta, no antes, para que el spec siga diciendo lo que hace la app.
 
 ## Cómo leer este informe
 

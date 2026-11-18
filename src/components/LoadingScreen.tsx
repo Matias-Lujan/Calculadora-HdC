@@ -1,7 +1,11 @@
+/**
+ * While the session is read (an instant): the paper background, without a
+ * text that would flash, and "Cargando" for screen readers (UX-26).
+ */
 export function LoadingScreen() {
   return (
-    <p className="flex min-h-dvh items-center justify-center text-ink-soft">
-      Cargando…
-    </p>
+    <div role="status" data-loading="" className="min-h-dvh">
+      <span className="sr-only">Cargando</span>
+    </div>
   )
 }

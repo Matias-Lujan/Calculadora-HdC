@@ -9,6 +9,7 @@ import {
   INVALID_RATIO_MESSAGE,
   MEAL_OUT_OF_RANGE_MESSAGE,
 } from '../../../lib/errors.ts'
+import { enter } from '../../../components/styles.ts'
 import { displayCarbsText, doseLine, ratioText } from '../breakdown.ts'
 
 type Props = {
@@ -46,7 +47,9 @@ function problemOf(
  * screen scrolls, with the ratio always in sight and the calculation folded
  * under a "Ver la cuenta" arrow. With an item to complete or an error, "—"
  * instead of the numbers: never a partial dose. The message takes the place
- * of the ratio line, so the display keeps its height while typing.
+ * of the ratio line, so the display keeps its height while typing. With the
+ * biggest letters of the iPhone (UX-27), the numbers grow up to one and a
+ * half times, so the dose and its word still fit on one line.
  */
 export function DoseDisplay({ result, carbRatioGPerUnit, warning }: Props) {
   const [open, setOpen] = useState(false)
@@ -54,29 +57,37 @@ export function DoseDisplay({ result, carbRatioGPerUnit, warning }: Props) {
   const problem = problemOf(result)
 
   return (
-    <div className="sticky top-[env(safe-area-inset-top)] z-10 flex flex-col gap-2 rounded-display bg-display p-4 text-on-display shadow-level-2">
+    // In dark mode, an accent line keeps it apart from the background
+    // (UX-21), which is almost as dark.
+    <div className="sticky top-[env(safe-area-inset-top)] z-10 flex flex-col gap-2 rounded-display border border-transparent bg-display p-4 text-on-display shadow-level-2 dark:border-accent">
       <dl className="flex flex-wrap gap-x-6 gap-y-2">
         {/* A minimum width, so "Dosis calculada" does not jump when the
             carbs turn into "—". */}
         <div className="flex min-w-[5.5rem] flex-col justify-between">
           <dt className="text-xs text-on-display-soft">Hidratos</dt>
-          <dd className="font-display text-2xl font-semibold whitespace-nowrap tabular-nums">
+          <dd className="font-display text-[length:min(var(--text-2xl),36px)] leading-[1.33] font-semibold whitespace-nowrap tabular-nums">
             {result.ok ? displayCarbsText(result.totalCarbsG) : '—'}
           </dd>
         </div>
         <div className="flex flex-col justify-between">
           <dt className="text-xs text-on-display-soft">Dosis calculada</dt>
-          {/* The number and its word on the same baseline, never on two
-              lines. */}
-          <dd className="whitespace-nowrap">
-            <span className="font-display text-5xl font-bold tabular-nums">
+          {/* The number and its word on the same baseline; with the biggest
+              letters, the word goes under the number, never the number
+              cut. */}
+          <dd className="flex flex-wrap items-baseline gap-x-1.5">
+            {/* When the dose changes, the background of the number lights up
+                for an instant (UX-22): a new span each time. The digits
+                themselves never move. */}
+            <span
+              key={dose ?? '—'}
+              className="-mx-1 rounded-lg px-1 font-display text-[length:min(var(--text-5xl),72px)] leading-none font-bold tabular-nums motion-safe:animate-dose-flash"
+            >
               {dose ?? '—'}
             </span>
             {dose !== null && (
-              <>
-                {' '}
-                <span className="text-base">{unitsWord(dose)}</span>
-              </>
+              <span className="text-[length:min(1rem,26px)]">
+                {unitsWord(dose)}
+              </span>
             )}
           </dd>
         </div>
@@ -99,7 +110,7 @@ export function DoseDisplay({ result, carbRatioGPerUnit, warning }: Props) {
           >
             <ChevronDown
               aria-hidden="true"
-              className={`shrink-0 ${open ? 'rotate-180' : ''}`}
+              className={`shrink-0 motion-safe:transition-transform motion-safe:duration-200 ${open ? 'rotate-180' : ''}`}
             />
           </button>
         </div>
@@ -117,7 +128,7 @@ export function DoseDisplay({ result, carbRatioGPerUnit, warning }: Props) {
       {result.ok && open && (
         <p
           id={CALCULATION_ID}
-          className="font-display text-sm font-semibold tabular-nums"
+          className={`font-display text-sm font-semibold tabular-nums ${enter}`}
         >
           {doseLine(result.totalCarbsG, carbRatioGPerUnit, result.doseUnits)}
         </p>

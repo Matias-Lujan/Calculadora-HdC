@@ -1,9 +1,10 @@
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods } from '../../../lib/foods.ts'
 import { useSettings } from '../../../lib/settings.ts'
-import { MealForm } from '../components/MealForm.tsx'
+import { EMPTY_MEAL_TITLE, MealForm } from '../components/MealForm.tsx'
 import { useRecentMeals, useReferenceFoods } from '../queries.ts'
 
 /** Home ("Inicio", `/`): a new meal (spec §6.6). */
@@ -38,7 +39,7 @@ export function NewMealPage() {
         />
       ) : failed.length > 0 ? (
         <div className="flex flex-col gap-3">
-          <h1 className={pageTitle}>Nueva comida</h1>
+          <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
           <Notice tone="error" role="alert">
             <p>{LOAD_ERROR_MESSAGE}</p>
           </Notice>
@@ -55,8 +56,9 @@ export function NewMealPage() {
         </div>
       ) : (
         <>
-          <h1 className={pageTitle}>Nueva comida</h1>
-          <p className="text-ink-soft">Cargando…</p>
+          <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
+          {/* The search field and the shortcuts of an empty Inicio. */}
+          <LoadingShapes shapes={['h-12', 'h-24', 'h-24']} />
         </>
       )}
     </section>

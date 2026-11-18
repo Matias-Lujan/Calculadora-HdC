@@ -3,12 +3,18 @@ import { Link } from 'react-router'
 import { MissingFactorBadge } from '../../../components/MissingFactorBadge.tsx'
 import { needsCookingFactor } from '../../../domain/dose/index.ts'
 import type { Food } from '../../../lib/foods.ts'
+import { foodKeyFigure } from '../foodDetail.ts'
 
 type Props = {
   food: Food
 }
 
+/**
+ * A row of Mis alimentos: the name, the brand, the carbs in small (to check
+ * a value without opening it, UX-26) and the arrow to its detail.
+ */
 export function FoodListItem({ food }: Props) {
+  const { amount, rest } = foodKeyFigure(food)
   return (
     <Link
       to={`/foods/${food.id}`}
@@ -19,6 +25,9 @@ export function FoodListItem({ food }: Props) {
         {food.brand !== null && (
           <span className="text-sm text-ink-soft">{food.brand}</span>
         )}
+        <span className="text-sm text-ink-soft tabular-nums">
+          {`${amount} ${rest}`}
+        </span>
         {needsCookingFactor(food.state, food.cooking_factor) && (
           <span>
             <MissingFactorBadge />

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearMealDraft,
+  hasMealDraft,
   readMealDraft,
   writeMealDraft,
 } from './mealDraftStorage.ts'
@@ -55,5 +56,25 @@ describe('mealDraftStorage', () => {
     expect(readMealDraft()).toBeNull()
     expect(() => writeMealDraft({ items: [] })).not.toThrow()
     expect(() => clearMealDraft()).not.toThrow()
+  })
+
+  it('has a meal in progress only with a stored draft with items (UX-20)', () => {
+    const storage = stubSessionStorage()
+    expect(hasMealDraft()).toBe(false)
+    writeMealDraft({ items: [{ key: 0 }] })
+    expect(hasMealDraft()).toBe(true)
+    for (const draft of [{ items: [] }, { items: 'x' }, {}, [], 3, null]) {
+      writeMealDraft(draft)
+      expect(hasMealDraft(), JSON.stringify(draft)).toBe(false)
+    }
+    storage.setItem('meal-draft', '{not json')
+    expect(hasMealDraft()).toBe(false)
+    clearMealDraft()
+    expect(hasMealDraft()).toBe(false)
+  })
+
+  it('has no meal in progress if sessionStorage fails', () => {
+    vi.stubGlobal('sessionStorage', { getItem: failing })
+    expect(hasMealDraft()).toBe(false)
   })
 })

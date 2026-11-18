@@ -10,10 +10,11 @@ const TONES = {
     box: 'border border-line bg-sunken text-ink',
     icon: 'text-accent',
   },
+  /** It comes in with its check drawn (UX-22). */
   success: {
     Icon: CircleCheck,
-    box: 'bg-success-soft text-success',
-    icon: 'text-success',
+    box: 'bg-success-soft text-success motion-safe:animate-enter',
+    icon: 'text-success motion-safe:[&_path]:animate-draw-check',
   },
   warning: {
     Icon: TriangleAlert,

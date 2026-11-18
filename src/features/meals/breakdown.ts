@@ -2,6 +2,7 @@ import {
   cookedGramsPer100gRaw,
   formatCarbs,
   formatDose,
+  formatDoseCompact,
   formatGrams,
   formatUserNumber,
   withUnitsWord,
@@ -25,6 +26,21 @@ import type { SavedMealItem } from './types.ts'
 /** The carbs of a valid item, in sight: "75,0 g de HC". */
 export function itemCarbsText(carbsG: number): string {
   return `${formatCarbs(carbsG)} g de HC`
+}
+
+/**
+ * The notice after saving a meal (UX-23): "Listo, guardada. 128,3 g de HC ·
+ * te aplicaste 8,5 unidades." ("corregida" for a correction). The applied
+ * dose without trailing zeros, as it is marked on the pen.
+ */
+export function savedMealText(
+  totalCarbsG: number,
+  appliedDoseUnits: number,
+  corrected: boolean,
+): string {
+  const word = corrected ? 'corregida' : 'guardada'
+  const applied = withUnitsWord(formatDoseCompact(appliedDoseUnits))
+  return `Listo, ${word}. ${itemCarbsText(totalCarbsG)} · te aplicaste ${applied}.`
 }
 
 /** The meal total, in sight: "HC total 128,2 g". */

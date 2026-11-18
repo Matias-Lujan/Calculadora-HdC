@@ -112,7 +112,7 @@ export function FoodSearchSheet({
             id={`${FOOD_SEARCH_INPUT_ID}-help`}
             className={trimmed === '' ? 'text-sm text-ink-soft' : 'sr-only'}
           >
-            Buscá por nombre o marca, por ejemplo «banana» o «arroz».
+            Buscá por nombre o marca
           </p>
 
           {trimmed === '' ? (

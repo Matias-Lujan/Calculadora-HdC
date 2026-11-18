@@ -37,7 +37,20 @@ export function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-4 pt-[calc(2rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))]">
-      <h1 className={pageTitle}>Calculadora de HdC</h1>
+      {/* The icon of the app, its name and its phrase (UX-23). */}
+      <header className="flex flex-col items-start gap-3">
+        <img
+          src="/icon.svg"
+          alt=""
+          width={64}
+          height={64}
+          className="size-16 rounded-card shadow-level-1"
+        />
+        <div className="flex flex-col gap-1">
+          <h1 className={pageTitle}>Calculadora de HdC</h1>
+          <p className="text-ink-soft">Pesás, cargás y listo.</p>
+        </div>
+      </header>
 
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-1">

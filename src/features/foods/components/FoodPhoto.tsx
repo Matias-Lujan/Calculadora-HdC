@@ -24,7 +24,7 @@ export function FoodPhoto({ path }: Props) {
   return (
     <div
       aria-hidden="true"
-      className="h-48 w-full animate-pulse rounded-control bg-sunken"
+      className="h-48 w-full motion-safe:animate-pulse rounded-control bg-sunken"
     />
   )
 }

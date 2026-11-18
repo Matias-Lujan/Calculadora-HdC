@@ -1,5 +1,6 @@
+import { ArrowRight } from 'lucide-react'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import { card, fieldLabel } from '../../../components/styles.ts'
+import { card } from '../../../components/styles.ts'
 import { cookedPer100gText } from '../../../lib/foodText.ts'
 import {
   yieldLine,
@@ -35,18 +36,22 @@ export function CookingFactorFields({
     savedCookingFactor === null ? null : cookedPer100gText(savedCookingFactor)
   const measuredErrorId = 'food-measured-factor-error'
 
-  function weightField(field: WeightField, label: string) {
-    const id = `food-${field}`
-    const error = errors[field]
-    const describedBy = [
-      error !== undefined ? `${id}-error` : null,
+  function describedByOf(field: WeightField): string | undefined {
+    const ids = [
+      errors[field] !== undefined ? `food-${field}-error` : null,
       errors.measuredFactor !== undefined ? measuredErrorId : null,
-    ]
-      .filter((value) => value !== null)
-      .join(' ')
+    ].filter((value) => value !== null)
+    return ids.length === 0 ? undefined : ids.join(' ')
+  }
+
+  // One field of the row; the unit is written inside it, so its label is
+  // only for screen readers (UX-24).
+  function weightInput(field: WeightField, label: string, suffix: string) {
+    const id = `food-${field}`
+    const describedBy = describedByOf(field)
     return (
-      <div className="flex flex-col gap-1">
-        <label htmlFor={id} className={fieldLabel}>
+      <div className="flex flex-col">
+        <label htmlFor={id} className="sr-only">
           {label}
         </label>
         <NumberInput
@@ -55,10 +60,11 @@ export function CookingFactorFields({
           value={texts[field]}
           onValueChange={(value) => onChange({ [field]: value })}
           onBlur={() => onBlur(field)}
-          invalid={describedBy !== ''}
-          describedBy={describedBy === '' ? undefined : describedBy}
+          invalid={describedBy !== undefined}
+          describedBy={describedBy}
+          suffix={suffix}
+          boxClassName="w-[8.5rem] max-w-full"
         />
-        <FieldError id={`${id}-error`} error={error} field={field} />
       </div>
     )
   }
@@ -77,8 +83,26 @@ export function CookingFactorFields({
           Ahora: {savedText}. Para cambiarlo, completá los dos pesos.
         </p>
       )}
-      {weightField('rawWeight', 'Peso crudo (g)')}
-      {weightField('cookedWeight', 'Peso cocido (g)')}
+      {/* The two weights in one row, as a phrase (UX-24):
+          [ 100 ] g crudo → [ 260 ] g cocido. */}
+      <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+        {weightInput('rawWeight', 'Peso crudo, en gramos', 'g crudo')}
+        <ArrowRight
+          aria-hidden="true"
+          className="mt-3 shrink-0 text-ink-soft"
+        />
+        {weightInput('cookedWeight', 'Peso cocido, en gramos', 'g cocido')}
+      </div>
+      <FieldError
+        id="food-rawWeight-error"
+        error={errors.rawWeight}
+        field="rawWeight"
+      />
+      <FieldError
+        id="food-cookedWeight-error"
+        error={errors.cookedWeight}
+        field="cookedWeight"
+      />
       <FieldError id={measuredErrorId} error={errors.measuredFactor} />
       <p aria-live="polite" className="text-base">
         {liveText}

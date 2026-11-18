@@ -294,7 +294,15 @@ export function NewLabelFoodPage() {
       {step.kind === 'reading' && (
         <>
           <LabelProgress current="reading" />
-          {photoView}
+          {/* A band of light goes over the photo while it is read (UX-22),
+              only without "Reducir movimiento". */}
+          <div className="relative overflow-hidden rounded-control">
+            {photoView}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 top-0 hidden h-1/4 bg-linear-to-b from-transparent via-on-display/45 to-transparent motion-safe:block motion-safe:animate-scan"
+            />
+          </div>
           <CancelButton onClick={cancel} />
         </>
       )}

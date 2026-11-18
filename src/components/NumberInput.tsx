@@ -185,16 +185,20 @@ export function NumberInput({
     }
   }, [])
 
-  // Room on the right for the suffix, just enough: one letter ("g") or a
-  // word ("g cocidos", "unidades", about 4rem at 15 px, plus its margin).
+  // Room on the right for the suffix: about half a letter of the field per
+  // letter of the suffix (it is smaller), plus its margin. In em, so it
+  // grows with the letter of the iPhone (UX-27).
   const suffixRoom =
-    suffix === undefined ? '' : suffix.length <= 2 ? ' pr-8' : ' pr-[4.75rem]'
+    suffix === undefined
+      ? undefined
+      : { paddingRight: `calc(${suffix.length * 0.5}em + 1rem)` }
   const input = (
     <input
       ref={inputRef}
       id={id}
       name={name}
-      className={`${field} tabular-nums${suffixRoom}${className === undefined ? '' : ` ${className}`}`}
+      style={suffixRoom}
+      className={`${field} tabular-nums${className === undefined ? '' : ` ${className}`}`}
       type="text"
       inputMode="decimal"
       autoComplete="off"

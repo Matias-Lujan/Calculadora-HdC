@@ -4,9 +4,15 @@
  * The visual identity of the app (docs/ux/revision-1.md §2): colors, letters,
  * corners and shadows. Components use these tokens (bg-paper, text-ink,
  * rounded-card), never Tailwind's own palette, which is removed below so a
- * stray `slate-500` does nothing. Every value is a CSS variable: dark mode can
- * redefine them inside `@media (prefers-color-scheme: dark)` without touching
- * the components.
+ * stray `slate-500` does nothing. Every color is a CSS variable: dark mode
+ * redefines them below, inside `@media (prefers-color-scheme: dark)`,
+ * without touching the components.
+ *
+ * Sizes of text (UX-27): the root letter is the iPhone's text size (see
+ * `html` below), 17 px by default, and every text token is in rem relative
+ * to it, so the whole app follows "Tamaño del texto". Spacing, corners and
+ * the bar stay in px: a margin three times wider with the biggest letter
+ * would leave no room for the text.
  */
 @theme {
   --color-*: initial;
@@ -38,33 +44,139 @@
   /* Titles and numbers: the rounded variant of the system font (§2.4). */
   --font-display: ui-rounded, system-ui, sans-serif;
 
-  /* §2.4: 17, 15 and 13 px, and the 28 px screen title. */
-  --text-xs: 0.8125rem;
+  /* §2.4, relative to the root letter (17 px by default): 13, 15, 17, 18,
+     20, 24 and 48 px, and the 28 px screen title. */
+  --text-xs: calc(13rem / 17);
   --text-xs--line-height: calc(18 / 13);
-  --text-sm: 0.9375rem;
+  --text-sm: calc(15rem / 17);
   --text-sm--line-height: calc(20 / 15);
-  --text-base: 1.0625rem;
+  --text-base: 1rem;
   --text-base--line-height: calc(24 / 17);
-  --text-title: 1.75rem;
+  --text-lg: calc(18rem / 17);
+  --text-lg--line-height: calc(26 / 18);
+  --text-xl: calc(20rem / 17);
+  --text-xl--line-height: calc(28 / 20);
+  --text-2xl: calc(24rem / 17);
+  --text-2xl--line-height: calc(32 / 24);
+  --text-5xl: calc(48rem / 17);
+  --text-5xl--line-height: 1;
+  --text-title: calc(28rem / 17);
   --text-title--line-height: calc(34 / 28);
 
+  /* Spacing and the width of the page do not grow with the letter. */
+  --spacing: 4px;
+  --container-md: 448px;
+
   /* §2.5: fields and buttons, cards, the dose display. */
-  --radius-control: 0.75rem;
-  --radius-card: 1rem;
-  --radius-display: 1.25rem;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-display: 20px;
 
   /* §2.7: level 1 (cards and fields) and level 2 (what floats). */
   --shadow-level-1: 0 1px 2px rgb(34 27 31 / 0.06);
   --shadow-level-2: 0 8px 24px rgb(34 27 31 / 0.16);
+
+  /* §2.8 (UX-22), used only inside `motion-safe:`. A new card comes in;
+     the background of the dose flashes when it changes (never its digits);
+     the check of "guardado" is drawn; a band of light goes over the photo
+     while the label is read. */
+  --animate-enter: enter 200ms ease-out;
+  --animate-dose-flash: dose-flash 200ms ease-out;
+  --animate-draw-check: draw-check 320ms ease-out both;
+  --animate-scan: scan 1.6s ease-in-out infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+  @keyframes dose-flash {
+    from {
+      background-color: color-mix(
+        in srgb,
+        var(--color-on-display) 22%,
+        transparent
+      );
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+  /* The check of lucide's CircleCheck is about 8.5 units long. */
+  @keyframes draw-check {
+    from {
+      stroke-dasharray: 12;
+      stroke-dashoffset: 12;
+    }
+    to {
+      stroke-dasharray: 12;
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes scan {
+    from {
+      transform: translateY(-100%);
+    }
+    to {
+      transform: translateY(400%);
+    }
+  }
 }
 
 @layer base {
   html {
+    /* 17 px when the browser's letter is 16 (§2.4). */
+    font-size: 106.25%;
     background-color: var(--color-paper);
     color: var(--color-ink);
+    /* The browser's own controls (date, search, scroll bars) follow the
+       scheme of the app. */
+    color-scheme: light dark;
     /* What scrolls into view (a focused button or field) stays above the
-       fixed bar at the bottom: 3.5rem and its line, plus 1rem of air. */
-    scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+       fixed bar at the bottom (UX-26): its 64 px (which do not grow with
+       the letter) and its line, plus 15 px of air. */
+    scroll-padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* UX-27: on the iPhone, the root letter is the one of "Tamaño del texto"
+     (17 px by default). Only in Safari for iOS (-webkit-touch-callout):
+     on a Mac, -apple-system-body is 13 px. The shorthand also sets the
+     family and the line height, which are put back. */
+  @supports (font: -apple-system-body) and (-webkit-touch-callout: none) {
+    html {
+      font: -apple-system-body;
+      font-family: var(--default-font-family);
+      line-height: 1.5;
+    }
+  }
+
+  /* Dark mode (§2.3, UX-21): the same names, other values. It follows the
+     iPhone, without a switch of its own (§2.9). */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-paper: #171216;
+      --color-surface: #221b21;
+      --color-sunken: #120e11;
+      --color-ink: #f4ede4;
+      --color-ink-soft: #b9adb3;
+      --color-line: #3a3037;
+      --color-line-strong: #8c8087;
+      --color-accent: #d9a8e8;
+      --color-accent-soft: #3a2542;
+      --color-on-accent: #221b1f;
+      --color-display: #2f2038;
+      --color-danger: #ffb3a8;
+      --color-danger-soft: #3d1512;
+      --color-on-danger: #221b1f;
+      --color-warning: #ffd27a;
+      --color-warning-soft: #3a2a00;
+      --color-warning-line: #c99a3a;
+      --color-success: #9eddb0;
+      --color-success-soft: #12301c;
+      --shadow-level-1: 0 1px 2px rgb(0 0 0 / 0.3);
+      --shadow-level-2: 0 8px 24px rgb(0 0 0 / 0.5);
+    }
   }
 
   /* Buttons and links reached with the keyboard or VoiceOver show the same

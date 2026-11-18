@@ -1,6 +1,7 @@
 import { ChevronLeft } from 'lucide-react'
 import { useRef } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { backLink, button } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
@@ -67,7 +68,8 @@ export function MealDetailPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        // The summary and the foods of the meal.
+        <LoadingShapes shapes={['h-9 w-2/3', 'h-28', 'h-20', 'h-20']} />
       )}
     </section>
   )

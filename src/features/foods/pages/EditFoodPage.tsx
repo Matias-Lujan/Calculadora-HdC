@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
 import { backLink, button } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
@@ -44,7 +45,8 @@ export function EditFoodPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        // The title and the first fields of the form.
+        <LoadingShapes shapes={['h-9 w-2/3', 'h-18', 'h-18', 'h-18']} />
       )}
     </section>
   )

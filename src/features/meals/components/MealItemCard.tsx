@@ -3,7 +3,7 @@ import { useId, useState } from 'react'
 import { FieldMessage } from '../../../components/FieldMessage.tsx'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { NumberInput } from '../../../components/NumberInput.tsx'
-import { card, segmented } from '../../../components/styles.ts'
+import { card, enter, segmented } from '../../../components/styles.ts'
 import {
   formatUserNumber,
   type ItemResult,
@@ -100,7 +100,7 @@ export function MealItemCard({
     <li
       id={`meal-item-${item.key}`}
       tabIndex={-1}
-      className={`flex flex-col gap-2 ${card}`}
+      className={`flex flex-col gap-2 ${card} ${enter}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col">
@@ -151,7 +151,7 @@ export function MealItemCard({
       {/* The field and the carbs on one line. Under the field, in its
           column, the notice of NumberInput and the "1 alfajor = 50 g" hint;
           errors, warnings and the open calculation take the whole width. */}
-      <div className="grid grid-cols-[11rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
+      <div className="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
         <div className="flex flex-col gap-1">
           <NumberInput
             id={inputId}

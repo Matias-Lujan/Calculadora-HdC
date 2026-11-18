@@ -35,7 +35,11 @@ type TextFieldProps = {
   onChange: (value: string) => void
   onBlur?: () => void
   error?: FoodFieldError | undefined
-  placeholder?: string
+  /**
+   * An example, under the field ("Por ejemplo: alfajor"): written inside it,
+   * it would go away when typing and have little contrast (UX-26).
+   */
+  hint?: string
   multiline?: boolean
 }
 
@@ -46,19 +50,25 @@ export function TextField({
   onChange,
   onBlur,
   error,
-  placeholder,
+  hint,
   multiline = false,
 }: TextFieldProps) {
   const errorId = `${id}-error`
+  const hintId = `${id}-hint`
   const invalid = error !== undefined
+  const describedBy = [
+    hint !== undefined ? hintId : null,
+    invalid ? errorId : null,
+  ]
+    .filter((value) => value !== null)
+    .join(' ')
   const shared = {
     id,
     name: id,
     value,
-    placeholder,
     onBlur,
     'aria-invalid': invalid,
-    'aria-describedby': invalid ? errorId : undefined,
+    'aria-describedby': describedBy === '' ? undefined : describedBy,
     className: field,
   }
   return (
@@ -80,6 +90,11 @@ export function TextField({
           autoComplete="off"
           onChange={(event) => onChange(event.target.value)}
         />
+      )}
+      {hint !== undefined && (
+        <p id={hintId} className="text-sm text-ink-soft">
+          {hint}
+        </p>
       )}
       <FieldError id={errorId} error={error} />
     </div>
@@ -124,7 +139,7 @@ export function RadioGroup<T extends string>({
       aria-invalid={invalid}
       aria-describedby={invalid ? errorId : undefined}
     >
-      <div className="flex min-h-11 flex-wrap items-center gap-x-1">
+      <div className="flex flex-wrap items-center gap-x-1">
         <span id={legendId} className={fieldLabel}>
           {legend}
         </span>

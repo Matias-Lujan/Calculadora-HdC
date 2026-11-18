@@ -1,5 +1,11 @@
+import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
-import { button, pageTitle } from '../../../components/styles.ts'
+import {
+  button,
+  card,
+  cardTitle,
+  pageTitle,
+} from '../../../components/styles.ts'
 import {
   LOAD_ERROR_MESSAGE,
   SIGN_OUT_ERROR_MESSAGE,
@@ -36,11 +42,13 @@ export function SettingsPage() {
           </button>
         </div>
       ) : (
-        <p className="text-ink-soft">Cargando…</p>
+        // «Tu ratio» and «Alertas».
+        <LoadingShapes shapes={['h-40', 'h-56']} />
       )}
 
       {/* SIGNED_OUT reaches RequireAuth, which goes to the login. */}
-      <div className="flex flex-col gap-2 border-t border-line pt-6">
+      <section className={`flex flex-col gap-3 ${card}`}>
+        <h2 className={cardTitle}>Cuenta</h2>
         <button
           type="button"
           className={button.secondary}
@@ -54,21 +62,26 @@ export function SettingsPage() {
             <p>{SIGN_OUT_ERROR_MESSAGE}</p>
           </Notice>
         )}
-      </div>
+      </section>
 
-      {/* USDA attribution for the table of foods (spec §5.2, §14 #50). */}
-      <p className="text-sm text-ink-soft">
-        Los valores de la tabla de alimentos son de{' '}
-        <a
-          href="https://fdc.nal.usda.gov/"
-          target="_blank"
-          rel="noreferrer"
-          className="text-accent underline"
-        >
-          USDA FoodData Central
-        </a>
-        , del Departamento de Agricultura de EE. UU. (dominio público).
-      </p>
+      {/* At the foot, in small (UX-25): the USDA attribution for the table
+          of foods (spec §5.2, §14 #50) and the reminder of what the app is
+          not. */}
+      <footer className="flex flex-col gap-2 text-xs text-ink-soft">
+        <p>
+          Los valores de la tabla de alimentos son de{' '}
+          <a
+            href="https://fdc.nal.usda.gov/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent underline"
+          >
+            USDA FoodData Central
+          </a>
+          , del Departamento de Agricultura de EE. UU. (dominio público).
+        </p>
+        <p>No es un dispositivo médico.</p>
+      </footer>
     </section>
   )
 }

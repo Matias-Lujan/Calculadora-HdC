@@ -24,6 +24,7 @@ import {
   itemCarbsText,
   ratioText,
   savedDoseNoteText,
+  savedMealText,
   savedItemLines,
   savedItemQuantityText,
   totalCarbsText,
@@ -390,6 +391,8 @@ describe('plain words on the screen', () => {
       mealRowLabel({ ...meal, applied_dose_units: 8.5 }),
       formatMealDateTime(meal.eaten_at, now),
       savedDoseNoteText(8.55, 15),
+      savedMealText(128.25, 8.5, false),
+      savedMealText(128.25, 8.5, true),
       daySummaryText({ day: '2026-11-14', meals: [meal], complete: true }),
       daySummaryText({
         day: '2026-11-14',
