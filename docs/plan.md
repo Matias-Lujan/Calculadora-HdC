@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. En curso: M7 (`mejora-aviso-uso`). Próxima: M2.** Última actualización: 2026-11-18.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. Próxima: M2.** Última actualización: 2026-11-23.
 
 ---
 
@@ -345,7 +345,7 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Pendiente |
-| M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | En curso (`mejora-aviso-uso`) |
+| M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 
 ### M1 — Revisión de UI/UX
 
@@ -395,12 +395,12 @@ Incluye (alcance acordado con el usuario, 2026-11-18):
 Ciclo: toca la base, así que implementer, tester y reviewer. Antes de mergear, la migración se aplica en `prod` y se corre `rls-check` contra `prod` ("Cambios que llegan a prod" en `CLAUDE.md`), con el OK del usuario.
 
 **Terminada cuando**:
-- [ ] La migración está aplicada en `dev`, probada con `rls-check`, y la ventana aparece una sola vez por usuario.
+- [x] La migración está aplicada en `dev`, probada con `rls-check`, y la ventana aparece una sola vez por usuario.
 - [x] Spec y `docs/decisiones.md` al día.
-- [ ] La migración está en `prod`, con `rls-check`, antes de mergear; y el usuario la probó en el iPhone.
+- [x] La migración está en `prod`, con `rls-check`, antes de mergear; y el usuario la probó en el iPhone.
 
 Hecho por el implementer (#82): la migración `20261118184810_user_settings_usage_notice` (columna y `grant update` de esa columna; el `select` ya era de toda la tabla), la ventana sobre toda la app con sesión, sus casos en `rls-check` y, en `ux-screens`, la aceptación automática del aviso del usuario de demo (sin estado nuevo de captura). La migración está aplicada en `dev`, `database.types.ts` regenerado y `rls-check` pasa en `dev`. El tester sumó que guardar Ajustes no manda la columna; el reviewer, sin hallazgos de lógica (el comentario de la migración cita §6.8 en vez de §10; no se edita porque ya está aplicada).
 
 La migración está aplicada en `prod` y `rls-check` pasa contra `prod` (2026-11-18). La prueba en la versión de prueba se salteó (el usuario no tenía a mano su usuario de `dev`).
 
-**Próximo paso**: mergear el PR y, después del merge, que el usuario confirme en el iPhone que la ventana aparece una vez y no vuelve.
+**Cerrada** el 2026-11-23 (PR #20). Después del merge, el usuario confirmó en el iPhone que la ventana aparece una vez y no vuelve.
