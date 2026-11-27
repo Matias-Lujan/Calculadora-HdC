@@ -45,6 +45,8 @@ const UNAUTHORIZED_AUTH_CODES = new Set([
   'refresh_token_not_found',
   'refresh_token_already_used',
   'bad_jwt',
+  // The user of the session no longer exists (for example, it was deleted).
+  'user_not_found',
 ])
 
 // PostgREST JWT errors (missing, invalid or expired token).
@@ -77,6 +79,21 @@ export function isUnauthorized(error: unknown): boolean {
     return typeof code === 'string' && UNAUTHORIZED_POSTGREST_CODES.has(code)
   }
   return false
+}
+
+/**
+ * PostgREST "permission denied" (42501). It is what a call without a user
+ * gets (anon has no permissions, spec §7.3), but RLS or a column grant can
+ * give it with a valid user too, so it is not a 401 by itself
+ * (src/lib/session.ts asks the server).
+ */
+export function isPermissionDenied(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '42501'
+  )
 }
 
 const TYPED_NUMBER_NOTICES: Record<TypedNumberNotice, string> = {

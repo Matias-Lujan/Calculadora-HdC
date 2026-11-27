@@ -25,6 +25,7 @@ import {
   authErrorMessage,
   cookingFactorUnusualMessage,
   foodFieldErrorMessage,
+  isPermissionDenied,
   isUnauthorized,
   UnauthorizedError,
   VisionError,
@@ -141,6 +142,7 @@ describe('isUnauthorized', () => {
     'refresh_token_not_found',
     'refresh_token_already_used',
     'bad_jwt',
+    'user_not_found',
   ])('is true for AuthApiError %s', (code) => {
     expect(isUnauthorized(new AuthApiError('x', 401, code))).toBe(true)
   })
@@ -224,6 +226,37 @@ describe('isUnauthorized', () => {
     'is false for non-error value %#',
     (value) => {
       expect(isUnauthorized(value)).toBe(false)
+    },
+  )
+})
+
+describe('isPermissionDenied', () => {
+  it('is true for a PostgrestError 42501', () => {
+    const error = new PostgrestError({
+      message: 'x',
+      details: '',
+      hint: '',
+      code: '42501',
+    })
+    expect(isPermissionDenied(error)).toBe(true)
+  })
+
+  it.each([
+    { code: 'PGRST116' },
+    { code: '23514' },
+    { code: 'PGRST301' },
+    { code: 42501 },
+    { code: '42501 ' },
+    { code: null },
+    {},
+  ])('is false for other codes %#', (value) => {
+    expect(isPermissionDenied(value)).toBe(false)
+  })
+
+  it.each([null, undefined, '42501', 42501, new Error('42501')])(
+    'is false for non-error value %#',
+    (value) => {
+      expect(isPermissionDenied(value)).toBe(false)
     },
   )
 })
