@@ -480,3 +480,59 @@ export const ARCHIVE_ERROR_MESSAGE =
 export const DELETE_ERROR_MESSAGE =
   'No se pudo borrar. Revisá la conexión y reintentá.'
 export const SIGN_OUT_ERROR_MESSAGE = 'No se pudo cerrar la sesión. Reintentá.'
+
+/**
+ * The expected errors of the glucose-latest function (spec §9.8) that the
+ * app knows. UNAUTHORIZED goes to the login (UnauthorizedError), and
+ * INTERNAL_ERROR, like any other failure, is an unexpected error.
+ */
+export const GLUCOSE_ERROR_CODES = [
+  'GLUCOSE_NOT_CONFIGURED',
+  'GLUCOSE_LOGIN_FAILED',
+  'GLUCOSE_ACTION_NEEDED',
+  'GLUCOSE_NOT_SHARED',
+  'GLUCOSE_UNAVAILABLE',
+] as const
+
+export type GlucoseErrorCode = (typeof GLUCOSE_ERROR_CODES)[number]
+
+/** An expected error of glucose-latest, with its code and retryable. */
+export class GlucoseError extends Error {
+  readonly code: GlucoseErrorCode
+  readonly retryable: boolean
+
+  constructor(code: GlucoseErrorCode, retryable: boolean) {
+    super(code)
+    this.name = 'GlucoseError'
+    this.code = code
+    this.retryable = retryable
+  }
+}
+
+/** When the glucose could not be read and there is none to show. */
+export const GLUCOSE_READ_ERROR_MESSAGE =
+  'No se pudo leer la glucosa. Se vuelve a probar sola.'
+
+// GLUCOSE_NOT_CONFIGURED is never shown: without it, the box does not appear
+// (spec §6.9).
+const GLUCOSE_ERRORS: Record<
+  Exclude<GlucoseErrorCode, 'GLUCOSE_NOT_CONFIGURED'>,
+  string
+> = {
+  GLUCOSE_LOGIN_FAILED:
+    'No se pudo entrar a tu cuenta de LibreLink. Revisá el email y la contraseña guardados.',
+  GLUCOSE_ACTION_NEEDED:
+    'LibreLink pide que aceptes sus condiciones. Abrí la app LibreLinkUp, entrá y aceptalas.',
+  GLUCOSE_NOT_SHARED:
+    'Tu cuenta no está compartiendo la glucosa. Revisalo en LibreLink, en Aplicaciones conectadas.',
+  GLUCOSE_UNAVAILABLE: GLUCOSE_READ_ERROR_MESSAGE,
+}
+
+export function glucoseErrorMessage(
+  code: Exclude<GlucoseErrorCode, 'GLUCOSE_NOT_CONFIGURED'>,
+): string {
+  return GLUCOSE_ERRORS[code]
+}
+
+// The glucose could not be read again, but the last one is still shown.
+export const GLUCOSE_UPDATE_ERROR_MESSAGE = 'No se pudo actualizar.'

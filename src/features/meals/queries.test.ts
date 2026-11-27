@@ -8,15 +8,20 @@ import {
 } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextMealsOffset } from './history.ts'
+import { GlucoseError } from '../../lib/errors.ts'
 import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
+  fetchLatestGlucose,
   fetchRecentMeals,
   fetchReferenceFoods,
   saveMeal,
 } from './api.ts'
 import {
+  GLUCOSE_REFETCH_MS,
+  glucoseKeys,
+  glucoseRefetchInterval,
   mealListOptions,
   mealsKeys,
   otherMealSave,
@@ -25,6 +30,7 @@ import {
   referenceFoodsOptions,
   useCreateMeal,
   useDeleteMeal,
+  useLatestGlucose,
   useMealList,
   useRecentMeals,
   useReferenceFoods,
@@ -296,5 +302,44 @@ describe('otherMealSave', () => {
         MOUNTED_AT,
       ),
     ).toBeNull()
+  })
+})
+
+describe('glucoseRefetchInterval', () => {
+  it('every minute without an error, or after one that may be momentary', () => {
+    expect(GLUCOSE_REFETCH_MS).toBe(MINUTE)
+    expect(glucoseRefetchInterval(null)).toBe(MINUTE)
+    expect(
+      glucoseRefetchInterval(new GlucoseError('GLUCOSE_UNAVAILABLE', true)),
+    ).toBe(MINUTE)
+    // A network error or an INTERNAL_ERROR: unexpected, read again.
+    expect(glucoseRefetchInterval(new TypeError('Failed to fetch'))).toBe(
+      MINUTE,
+    )
+  })
+
+  it.each([
+    'GLUCOSE_NOT_CONFIGURED',
+    'GLUCOSE_LOGIN_FAILED',
+    'GLUCOSE_ACTION_NEEDED',
+    'GLUCOSE_NOT_SHARED',
+  ] as const)('stops after %s, which is not retryable', (code) => {
+    expect(glucoseRefetchInterval(new GlucoseError(code, false))).toBe(false)
+  })
+})
+
+describe('useLatestGlucose', () => {
+  it('reads every minute only in sight, without retries, outside the meals prefix', () => {
+    expect(glucoseKeys.latest[0]).not.toBe(mealsKeys.all[0])
+    vi.mocked(useQuery).mockClear()
+    useLatestGlucose()
+    const options = vi.mocked(useQuery).mock.calls[0]?.[0]
+    expect(options).toMatchObject({
+      queryKey: glucoseKeys.latest,
+      queryFn: fetchLatestGlucose,
+      refetchIntervalInBackground: false,
+      retry: false,
+    })
+    expect(typeof options?.refetchInterval).toBe('function')
   })
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { QuantityMode } from '../../domain/dose/index.ts'
 import type { Tables, TablesInsert } from '../../lib/database.types.ts'
+import { GLUCOSE_ERROR_CODES } from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
 
 type ReferenceFoodRow = Pick<
@@ -290,3 +291,22 @@ export const recentMealSchema = z.object({
 >
 
 export type RecentMeal = z.infer<typeof recentMealSchema>
+
+/**
+ * The last reading of the sensor, as glucose-latest answers it (spec §9.8).
+ * Only shown on Inicio: it never goes into the calculation nor into a meal
+ * (CLAUDE.md, rule 7).
+ */
+export type { GlucoseReading } from '../../../supabase/functions/glucose-latest/contract.ts'
+
+/**
+ * The body of an expected error of glucose-latest. A code the app does not
+ * know (INTERNAL_ERROR included) does not match: it is an unexpected error.
+ */
+export const glucoseErrorSchema = z.object({
+  ok: z.literal(false),
+  error: z.object({
+    code: z.enum(GLUCOSE_ERROR_CODES),
+    retryable: z.boolean(),
+  }),
+})

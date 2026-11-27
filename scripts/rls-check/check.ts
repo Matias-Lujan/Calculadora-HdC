@@ -493,6 +493,41 @@ console.log('\nRegistros inmutables (privilegios por columna)')
   )
 }
 
+// --- libre_sessions: only the Edge Function, with the secret key ---------------
+
+console.log('\nlibre_sessions: ningún usuario la lee ni la escribe')
+{
+  const read = await a.supabase.from('libre_sessions').select('*')
+  check(
+    'libre_sessions: A no lee nada (ni su propia fila)',
+    read.error !== null || read.data?.length === 0,
+    `${read.data?.length} filas`,
+  )
+  const insert = await a.supabase.from('libre_sessions').insert({
+    user_id: a.id,
+    login_error: 'rls-check',
+  })
+  check('libre_sessions: A no puede insertar su fila', insert.error !== null)
+  const update = await a.supabase
+    .from('libre_sessions')
+    .update({ login_error: 'rls-check' })
+    .eq('user_id', a.id)
+    .select()
+  check(
+    'libre_sessions: A no puede actualizar',
+    update.error !== null || update.data?.length === 0,
+  )
+  const remove = await a.supabase
+    .from('libre_sessions')
+    .delete()
+    .eq('user_id', a.id)
+    .select()
+  check(
+    'libre_sessions: A no puede borrar',
+    remove.error !== null || remove.data?.length === 0,
+  )
+}
+
 // --- Anonymous access -----------------------------------------------------------
 
 console.log('\nSin sesión')
@@ -503,6 +538,7 @@ for (const table of [
   'meals',
   'meal_items',
   'vision_requests',
+  'libre_sessions',
 ]) {
   const { data, error } = await anon.from(table).select('*').limit(1)
   check(

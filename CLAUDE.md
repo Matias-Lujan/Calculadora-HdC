@@ -107,6 +107,7 @@ npx supabase db push --remote                               # sin --remote, la C
 npx supabase migration list --remote                        # qué migraciones están aplicadas
 npx supabase gen types typescript --project-id xyolhiklqqoejkapqbxt > src/lib/database.types.ts
 npx supabase functions deploy transcribe-label --use-api
+npx supabase functions deploy glucose-latest --use-api
 npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
 ```
 
@@ -117,6 +118,7 @@ npx supabase link --project-ref zoxlvutjqolwfjcsbtog        # vincular prod (si 
 npx supabase migration list --remote                        # confirmar el proyecto y qué falta aplicar
 npx supabase db push --remote
 npx supabase functions deploy transcribe-label --use-api   # solo si cambió la función
+npx supabase functions deploy glucose-latest --use-api     # solo si cambió la función
 npx supabase link --project-ref xyolhiklqqoejkapqbxt        # volver a dev
 node --env-file=.env.prod.local scripts/rls-check/check.ts  # si cambió una tabla o RLS; usuarios descartables de prod
 ```
@@ -148,7 +150,7 @@ Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests
 - **Fechas**: en la base son `timestamptz`, y en la UI se muestran en `America/Argentina/Buenos_Aires` con `Intl.DateTimeFormat`.
 - **Estilos**: clases de Tailwind en el componente, diseño mobile-first. Los elementos táctiles tienen que tener un tamaño cómodo para el dedo (44 px como mínimo). **Los colores se usan por su token** (`bg-paper`, `text-ink`, `bg-accent`…, definidos en `src/index.css` y explicados en `docs/ux/revision-1.md` §2), nunca por el nombre de Tailwind (`slate-500`): la paleta de Tailwind está anulada. Rojo, ámbar y verde (`danger`, `warning`, `success`) se usan solo para error, advertencia y guardado. Las clases que comparten varios componentes (botones, campos, tarjetas) están en `src/components/styles.ts`.
 - **SQL**: `snake_case`. En las políticas se usa `(select auth.uid())` y no `auth.uid()` suelto. Las funciones son `security invoker`, salvo que haya un motivo documentado.
-- **Edge Function**: `provider.ts` es el único archivo que conoce a Gemini (spec §9.2). Recibe la configuración y `fetch` por parámetro, sin leer `Deno.env` adentro, para que se pueda testear con Vitest.
+- **Edge Function**: `provider.ts` es el único archivo que conoce a Gemini (spec §9.2). Recibe la configuración y `fetch` por parámetro, sin leer `Deno.env` adentro, para que se pueda testear con Vitest. En `glucose-latest`, su `provider.ts` es el único que conoce LibreLinkUp (spec §9.8), con la misma regla.
 - No se loguean datos de salud (HC, dosis, alimentos) en la consola ni en los logs de la Edge Function.
 
 ## Estructura de un feature
@@ -208,5 +210,5 @@ Reglas:
 
 - `src/domain/` tiene que estar cubierto por tests, **con casos borde** y no solo el caso normal (lista mínima en spec §8.6). Un cambio en el cálculo sin test no se acepta.
 - Si cambia el comportamiento del cálculo, se sube `CALC_VERSION`.
-- El mapeo de errores de `provider.ts` se testea con un `fetch` simulado.
+- El mapeo de errores de los dos `provider.ts` se testea con un `fetch` simulado.
 - El aislamiento por RLS se prueba con `scripts/rls-check/` (plan, etapa 2), y se actualiza con cada tabla o política nueva.

@@ -44,6 +44,13 @@ import {
 } from './features/foods/labelForm.ts'
 import { formatDayTitle, formatMealDateTime } from './features/meals/eatenAt.ts'
 import {
+  GLUCOSE_INFO,
+  GLUCOSE_NO_READING_TEXT,
+  GLUCOSE_STALE_TEXT,
+  glucoseAgoText,
+  trendLabel,
+} from './features/meals/glucose.ts'
+import {
   appliedDoseText,
   daySummaryText,
   mealRowDetailText,
@@ -502,6 +509,22 @@ describe('plain words: every code, exhaustively', () => {
     const codes = Object.keys(visionCodes) as errors.VisionErrorCode[]
     expect([...errors.VISION_ERROR_CODES].sort()).toEqual([...codes].sort())
     expectPlain(codes.map(errors.visionErrorMessage))
+  })
+
+  it('glucose texts', () => {
+    expectPlain([
+      errors.glucoseErrorMessage('GLUCOSE_LOGIN_FAILED'),
+      errors.glucoseErrorMessage('GLUCOSE_ACTION_NEEDED'),
+      errors.glucoseErrorMessage('GLUCOSE_NOT_SHARED'),
+      errors.glucoseErrorMessage('GLUCOSE_UNAVAILABLE'),
+      GLUCOSE_INFO,
+      GLUCOSE_NO_READING_TEXT,
+      GLUCOSE_STALE_TEXT,
+      ...[0, 5, 90].map(glucoseAgoText),
+      ...(
+        ['falling_fast', 'falling', 'steady', 'rising', 'rising_fast'] as const
+      ).map(trendLabel),
+    ])
   })
 
   it('typed number notices', () => {
