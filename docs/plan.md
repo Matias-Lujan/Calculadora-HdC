@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. Próxima: M2.** Última actualización: 2026-11-23.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) en curso, rama `mejora-sesion-no-reconocida`.** Última actualización: 2026-11-26.
 
 ---
 
@@ -340,7 +340,7 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | # | Mejora | De dónde sale | Estado |
 |---|---|---|---|
 | M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | ✅ PR #17 |
-| M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | Próxima |
+| M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | En curso (`mejora-sesion-no-reconocida`) |
 | M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
@@ -382,6 +382,26 @@ Incluye (alcance acordado con el usuario, 2026-11-17, spec §14 #64):
 - Tanda 6 (detalle en #81): el punto de Inicio no se ve estando en Inicio, y para lectores de pantalla la pestaña suma ", con una comida sin guardar"; la barra no crece con la letra del iPhone (como las de iOS). Al tocar, el oscurecido es instantáneo y está siempre (no es movimiento); el achicarse, las entradas y los giros, solo sin "Reducir movimiento". Al quitar un alimento no se pliega la tarjeta: "Quitaste…" entra con el mismo fundido (plegar pedía demorar el borrado, que maneja el foco y "Deshacer"); plegar y desplegar es un fundido del contenido, no una animación de altura. Los campos de Configuración siguen a todo el ancho. Los atajos (chips) pasan a fondo blanco con el borde de los campos (3,8:1 sobre `paper` en claro, 4,9:1 en oscuro), porque el fondo hundido no se distinguía. "¿Borrar la comida…?" nombra el día como el resto con la forma que va dentro de una frase ("de hoy 13:05", la de "Copiaste la comida…"): "Hoy, 13:05" no entra en la oración. Con la letra al máximo, "unidades" baja debajo de la dosis en el visor. En oscuro, `warning-line` es `#C99A3A` (5,4:1 sobre `warning-soft`; la tabla no lo daba), `on-accent` y `on-danger` pasan a `#221B1F`, las sombras son negras más marcadas y el resto de la tabla 2.3 pasa sin ajustes (todo medido; lo más bajo, `line-strong` sobre `surface`, 4,45:1). La raíz mide 17 px (`106.25 %`) en todos lados y, en Safari de iOS (`@supports` con `-webkit-touch-callout`, porque en la Mac `-apple-system-body` es de 13 px), la letra del sistema; los tamaños de texto pasan a rem sobre 17, y los espacios, las esquinas y el ancho de página a px (`--spacing: 4px`), para que con la letra más grande no se coman la pantalla; el visor limita sus números a 1,5 veces; el lugar del sufijo de un campo va en `em`. "Borrar comida" también es el botón que abre la confirmación. La entrada usa `public/icon.svg`. El formulario de la foto no cambió (sus campos siguen con "(g)" en el rótulo). Capturas: `--oscuro`, y la espera también aguarda que no queden formas grises. A probar en el iPhone: "Tamaño del texto" al máximo (con y sin tamaños de accesibilidad) en el visor, las tarjetas de alimento, el rinde en una fila, Configuración y la barra; que al tocar un botón se note (`:active` en iOS); "Reducir movimiento"; el modo oscuro de noche y la barra de estado de la app instalada en oscuro; y el ícono nuevo, que seguramente pide quitar la app de la pantalla de inicio y volver a agregarla.
 
 **Cerrada** el 2026-11-18 (PR #17). Detalle conocido del script de capturas: si corta temprano por un error (por ejemplo, credenciales mal puestas), en Windows Node termina con "Assertion failed … UV_HANDLE_CLOSING" y el código 127 en lugar de 1; cuando todo sale bien, termina limpio. El permiso para correrlo está en `.claude/settings.json`.
+
+### M2 — Sesión que el servidor no reconoce
+
+Rama: `mejora-sesion-no-reconocida`.
+
+**Objetivo**: que una sesión que el servidor ya no reconoce lleve al login, igual que un 401, en lugar de mostrar "No se pudo guardar…" una y otra vez. Hoy, si la llamada llega sin usuario (como `anon`, que no tiene permisos sobre nada, §7.3), PostgREST responde `42501` (permiso denegado) e `isUnauthorized` no lo reconoce. Pero `42501` también lo puede dar una política de RLS o un `grant` por columna con un usuario válido. Por eso no se trata como 401 directamente: se le pregunta al servidor si la sesión sigue viva.
+
+Incluye:
+1. **Ante un `42501`** (en una lectura o en una escritura, desde el `onError` global de `src/lib/queryClient.ts`), la app pide el usuario al servidor (`supabase.auth.getUser()`). Si no hay sesión o el servidor la rechaza (`isUnauthorized`, más `user_not_found` y la sesión que falta), cierra la sesión local y vuelve al login, sin mensaje, como un 401 (§10, #33). Si el servidor confirma el usuario, o la red falla, no hace nada: queda el error genérico de siempre. Varios `42501` juntos hacen una sola consulta.
+2. **Tests** de la decisión (con el cliente de Auth simulado): `42501` con sesión válida no cierra; sin sesión, con `session_not_found` o con `user_not_found` cierra; una falla de red no cierra; otros códigos no consultan.
+3. Spec §10 y una fila en `docs/decisiones.md`.
+
+Ciclo: lógica de un feature sin cuentas, así que implementer y reviewer. No hay migración ni Edge Function.
+
+**Terminada cuando**:
+- [ ] Con la sesión borrada del servidor, guardar una comida en la versión de prueba lleva al login.
+- [x] Un `42501` con una sesión válida sigue mostrando el error genérico (test).
+- [x] Spec y `docs/decisiones.md` al día.
+
+Hecho por el implementer (#83): la decisión va en `src/lib/session.ts`, que recibe `getUser` y `signOut` por parámetro (con sus tests en `session.test.ts`, el cliente simulado), y el `onError` global de `queryClient.ts` la usa para todo error que no sea un 401; el reconocimiento del `42501` es `isPermissionDenied`, en `errors.ts`. Resuelto sin que el plan lo dijera: (1) `user_not_found` se sumó a los códigos de sesión inválida de `isUnauthorized` (lo más simple; también vale para un error directo de Auth); (2) si `getUser` tira una excepción, no se hace nada; (3) las lecturas con `42501` conservan sus reintentos (hasta 3), así que la consulta al servidor llega después del último; los guardados no se reintentan, así que van directo. Falta la prueba en la versión de prueba (primer "Terminada cuando").
 
 ### M7 — Aviso de uso aceptado por usuario
 

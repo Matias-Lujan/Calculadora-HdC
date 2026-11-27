@@ -1,13 +1,19 @@
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/react-query'
 import { isUnauthorized } from './errors.ts'
 import { clearMealDraft } from './mealDraftStorage.ts'
+import { createPermissionDeniedCheck } from './session.ts'
 import { supabase } from './supabase.ts'
 
+const checkPermissionDenied = createPermissionDeniedCheck(supabase.auth)
+
 // A revoked or expired session ends locally: onAuthStateChange emits
-// SIGNED_OUT and RequireAuth sends the user back to the login.
+// SIGNED_OUT and RequireAuth sends the user back to the login. A 42501 asks
+// the server first whether the session is still valid (session.ts).
 function onError(error: unknown) {
   if (isUnauthorized(error)) {
     void supabase.auth.signOut({ scope: 'local' })
+  } else {
+    void checkPermissionDenied(error)
   }
 }
 
