@@ -3,12 +3,14 @@ import {
   queryOptions,
   useInfiniteQuery,
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
   type InfiniteData,
+  type MutationState,
 } from '@tanstack/react-query'
 import { foodsKeys } from '../../lib/foods.ts'
-import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
+import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
   fetchMeal,
@@ -18,7 +20,7 @@ import {
   saveMeal,
 } from './api.ts'
 import { nextMealsOffset, withoutMeal } from './history.ts'
-import type { MealsPage } from './types.ts'
+import type { MealToSave, MealsPage, SavedMealResult } from './types.ts'
 
 export const mealsKeys = {
   all: ['meals'] as const,
@@ -54,12 +56,16 @@ export function useReferenceFoods() {
 // while saving, so a saved meal is never restored (spec §6.6, §14 #61).
 // It also saves a correction (saveMeal): the corrected meal leaves the
 // history and the shortcuts of Inicio with the same invalidation.
+// Its key lets an Inicio opened while a save of its meal is in progress
+// find it (useOtherMealSave).
 export function useCreateMeal() {
   const queryClient = useQueryClient()
   return useMutation({
+    mutationKey: saveMealKey,
     mutationFn: saveMeal,
-    onSuccess: () => {
-      clearMealDraft()
+    // Only if the kept draft is still this meal: one loaded meanwhile stays.
+    onSuccess: (_, { clientKey }) => {
+      clearMealDraftOf(clientKey)
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: mealsKeys.all }),
         queryClient.invalidateQueries({ queryKey: foodsKeys.list }),
@@ -126,4 +132,77 @@ export function useDeleteMeal() {
       ])
     },
   })
+}
+
+/** The key of the saves of a meal (useCreateMeal). */
+export const saveMealKey = ['save-meal'] as const
+
+/** What is read of each save of a meal in the mutation cache. */
+export type MealSaveSnapshot = Pick<
+  MutationState<SavedMealResult, unknown, MealToSave>,
+  'status' | 'variables' | 'data' | 'submittedAt'
+>
+
+/**
+ * A save of the meal in progress that another Inicio started (spec §6.6,
+ * §14 #85): pending, done (with what was saved and its result), or none.
+ */
+export type OtherMealSave =
+  | { status: 'pending' }
+  | { status: 'success'; saved: MealToSave; result: SavedMealResult }
+  | null
+
+/**
+ * Among the saves of the cache, the ones of the meal with `clientKey` that
+ * started before this Inicio opened (`mountedAt`; its own saves start after
+ * it). One that ended well wins: the meal is saved. Failed ones count as
+ * none, so the meal stays to retry.
+ */
+export function otherMealSave(
+  saves: readonly MealSaveSnapshot[],
+  clientKey: string,
+  mountedAt: number,
+): OtherMealSave {
+  const ofThisMeal = saves.filter(
+    (save) =>
+      save.submittedAt < mountedAt && save.variables?.clientKey === clientKey,
+  )
+  for (const save of ofThisMeal) {
+    if (
+      save.status === 'success' &&
+      save.variables !== undefined &&
+      save.data !== undefined
+    ) {
+      return { status: 'success', saved: save.variables, result: save.data }
+    }
+  }
+  return ofThisMeal.some((save) => save.status === 'pending')
+    ? { status: 'pending' }
+    : null
+}
+
+/**
+ * The save of the meal in progress started by an Inicio that is no longer
+ * open (the user left while it was saving and came back, spec §6.6): the
+ * form shows it as saving and, when it ends well, empties as after its own
+ * save.
+ */
+export function useOtherMealSave(
+  clientKey: string,
+  mountedAt: number,
+): OtherMealSave {
+  const saves = useMutationState({
+    filters: { mutationKey: saveMealKey },
+    select: (mutation): MealSaveSnapshot => {
+      const { status, variables, data, submittedAt } = mutation.state
+      return {
+        status,
+        // Only useCreateMeal uses this key, with saveMeal.
+        variables: variables as MealToSave | undefined,
+        data: data as SavedMealResult | undefined,
+        submittedAt,
+      }
+    },
+  })
+  return otherMealSave(saves, clientKey, mountedAt)
 }

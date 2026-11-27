@@ -80,9 +80,15 @@ export async function findOrCreateTableFood(
  *
  * Then the meal and all its items are saved in a single call to the
  * create_meal function (spec §7.2), which inserts them in one transaction:
- * all or nothing. Its error is thrown as is.
+ * all or nothing. Its error is thrown as is. It carries the key of the meal
+ * (`clientKey`): if that user already saved a meal with that key (a retry
+ * after a lost answer, or saving again after coming back to Inicio), the
+ * function inserts nothing and returns the id of that meal.
  */
-export async function createMeal(record: NewMealRecord): Promise<string> {
+export async function createMeal(
+  record: NewMealRecord,
+  clientKey: string,
+): Promise<string> {
   const copies = new Map<string, string>()
   for (const { food } of record.items) {
     if ('copy' in food && !copies.has(food.copy.reference_code)) {
@@ -93,7 +99,7 @@ export async function createMeal(record: NewMealRecord): Promise<string> {
     }
   }
   const payload: CreateMealPayload = {
-    meal: record.meal,
+    meal: { ...record.meal, client_key: clientKey },
     items: record.items.map(({ food, ...row }) => {
       const foodId =
         'id' in food ? food.id : copies.get(food.copy.reference_code)
@@ -209,22 +215,24 @@ export async function fetchRecentMeals(): Promise<RecentMeal[]> {
  * is two requests, without a function in the base: first the new meal is
  * created, all or nothing, with createMeal (if it fails, its error is
  * thrown and nothing is deleted); then the corrected one is soft-deleted.
- * That second step only touches a meal not deleted yet: if it fails (the
- * network, or the meal no longer exists or was already deleted), the new
+ * That second step is not filtered by deleted_at (like deleteMeal): a retry
+ * with the same key gets the meal already created and finds the corrected
+ * one already deleted by the first attempt, and that ends well too (spec
+ * §14 #85). If it fails (the network, or the meal no longer exists), the new
  * meal stays saved and `replacedDeleted` is false.
  */
 export async function saveMeal({
   record,
   replaces,
+  clientKey,
 }: MealToSave): Promise<SavedMealResult> {
-  const id = await createMeal(record)
+  const id = await createMeal(record, clientKey)
   if (replaces === null) return { id, replacedDeleted: null }
   try {
     const { error } = await supabase
       .from('meals')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', replaces)
-      .is('deleted_at', null)
       .select('id')
       .single()
     if (error) throw error

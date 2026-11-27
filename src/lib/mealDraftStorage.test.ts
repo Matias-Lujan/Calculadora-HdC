@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clearMealDraft,
+  clearMealDraftOf,
   hasMealDraft,
   readMealDraft,
   writeMealDraft,
@@ -76,5 +77,41 @@ describe('mealDraftStorage', () => {
   it('has no meal in progress if sessionStorage fails', () => {
     vi.stubGlobal('sessionStorage', { getItem: failing })
     expect(hasMealDraft()).toBe(false)
+  })
+})
+
+describe('clearMealDraftOf', () => {
+  const KEY = '00000000-0000-4000-8000-0000000000cc'
+
+  it('clears the draft of that meal', () => {
+    stubSessionStorage()
+    writeMealDraft({ items: [{ key: 0 }], clientKey: KEY })
+    clearMealDraftOf(KEY)
+    expect(readMealDraft()).toBeNull()
+  })
+
+  it('keeps the draft of another meal, or one without a key', () => {
+    stubSessionStorage()
+    const other = {
+      items: [{ key: 0 }],
+      clientKey: '00000000-0000-4000-8000-0000000000dd',
+    }
+    writeMealDraft(other)
+    clearMealDraftOf(KEY)
+    expect(readMealDraft()).toEqual(other)
+    writeMealDraft({ items: [{ key: 0 }] })
+    clearMealDraftOf(KEY)
+    expect(readMealDraft()).toEqual({ items: [{ key: 0 }] })
+  })
+
+  it('without a draft, or if the storage fails, does nothing', () => {
+    stubSessionStorage()
+    expect(() => clearMealDraftOf(KEY)).not.toThrow()
+    vi.stubGlobal('sessionStorage', {
+      getItem: failing,
+      setItem: failing,
+      removeItem: failing,
+    })
+    expect(() => clearMealDraftOf(KEY)).not.toThrow()
   })
 })

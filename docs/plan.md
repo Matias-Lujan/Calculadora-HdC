@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. No hay próxima marcada: las que quedan (M3 a M5) son opcionales.** Última actualización: 2026-11-26.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. No quedan mejoras en la tabla.** Última actualización: 2026-11-27.
 
 ---
 
@@ -341,9 +341,9 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 |---|---|---|---|
 | M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | ✅ PR #17 |
 | M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | ✅ PR #22 |
-| M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
-| M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
-| M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
+| M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | ✅ PR #25 |
+| M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | ✅ PR #25 |
+| M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | ✅ PR #25 |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Descartada (2026-11-26): no vale la pena (#84) |
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 
@@ -426,3 +426,27 @@ Hecho por el implementer (#82): la migración `20261118184810_user_settings_usag
 La migración está aplicada en `prod` y `rls-check` pasa contra `prod` (2026-11-18). La prueba en la versión de prueba se salteó (el usuario no tenía a mano su usuario de `dev`).
 
 **Cerrada** el 2026-11-23 (PR #20). Después del merge, el usuario confirmó en el iPhone que la ventana aparece una vez y no vuelve.
+
+### M3, M4 y M5 — Comida que no se guarda dos veces y fotos sueltas
+
+Rama: `mejora-guardado-y-fotos` (las tres juntas, un solo PR; alcance acordado con el usuario, 2026-11-26).
+
+**Objetivo**: que una comida nunca quede dos veces en el historial por un reintento o por salir y volver a Inicio mientras se guarda, y que no se acumulen fotos de etiquetas que no usa ningún alimento.
+
+Incluye:
+1. **M3 y M4, una clave por comida**: cada comida en curso lleva un identificador propio (un uuid creado por el cliente, guardado junto con la comida en curso, así sobrevive a salir de Inicio). `create_meal` lo recibe; si ese usuario ya guardó una comida con esa clave, no inserta nada y devuelve el `id` de la que ya está. Migración nueva, compatible con la versión publicada: columna que acepta `null` en `meals`, único por usuario (sin `grant` nuevo: el `insert` y el `select` de la tabla cubren la columna, y el `update` sigue limitado a `deleted_at`) y `create_meal` reemplazada. Cubre la respuesta perdida (M3, #58 (5)) y el guardado doble al volver a Inicio (M4, #61 (6)): al volver, Inicio muestra ese guardado en curso y se vacía cuando termina bien. Spec §6.6, §7.1 y §7.2.
+2. **M5, limpieza de fotos**: al abrir la pantalla de la foto, la app lista la carpeta del usuario en `food-photos` y borra las fotos de más de un día que no usa ningún alimento (archivados incluidos). Sin migración: las políticas de §7.4 ya permiten listar y borrar las propias. Spec §6.1 y §7.4.
+
+Ciclo: M3 y M4 tocan la base (implementer, tester y reviewer); M5 es lógica de un feature (implementer y reviewer). Antes de mergear, la migración se aplica en `prod` y se corre `rls-check` contra `prod`, con el OK del usuario.
+
+Hecho por el implementer, punto 1 (#85): la migración `20261127030023_meals_client_key.sql` (aplicada en `dev`, con `database.types.ts` regenerado) agrega `meals.client_key` (uuid null, unique `(user_id, client_key)`) y reemplaza `create_meal` con `on conflict do nothing`, que devuelve el `id` de la comida existente con esa clave (también si está borrada). La comida en curso lleva su clave en `sessionStorage` (se renueva con cada cambio de lo cargado) y la manda al guardar, también en una corrección; al terminar un guardado, el borrador se borra solo si tiene esa clave; el borrado de la corregida ya no filtra `deleted_at is null`. Si se vuelve a Inicio mientras sigue el guardado que empezó el Inicio anterior, el formulario lo encuentra (por la clave), se muestra guardando y se vacía con el aviso cuando termina bien; si falla, queda para reintentar. Casos nuevos en `scripts/rls-check/` y tests de la clave en el borrador, en el payload y de ese guardado en curso.
+
+**Terminada cuando**:
+- [x] Guardar dos veces la misma comida (misma clave) deja una sola en el historial (test contra `dev` en `rls-check` y tests del cliente).
+- [x] Las fotos sueltas de más de un día se borran al abrir la pantalla de la foto, y las que usa un alimento no (tests).
+- [x] Spec y `docs/decisiones.md` al día.
+- [x] La migración está en `prod` antes de mergear (2026-11-27; sin `rls-check` en `prod`: no crea tablas ni cambia RLS), y el usuario lo probó en la versión de prueba.
+
+Hecho por el implementer, punto 2 (#86): `src/features/foods/photoCleanup.ts` (qué borrar, con tests), la lectura y el borrado en `api.ts`, un hook en `queries.ts` y el disparo al montar `NewLabelFoodPage` (una vez por apertura, también en StrictMode). Sin migración: las políticas de `food-photos` ya permiten listar y borrar lo propio. Falta probarlo en `dev` con una foto suelta de más de un día.
+
+**Cerrada** el 2026-11-27 (PR #25). La migración está en `prod`; el usuario lo probó en la versión de prueba. Después del merge, confirmar en el iPhone que todo sigue andando.

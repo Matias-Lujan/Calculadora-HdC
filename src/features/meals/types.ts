@@ -93,10 +93,12 @@ export type NewMeal = Required<
     | 'carb_ratio_g_per_unit'
     | 'total_carbs_g'
     | 'calculated_dose_units'
-    | 'applied_dose_units'
     | 'calc_version'
   >
->
+> & {
+  /** Always given: saving asks for it (spec §6.6), though the column allows null. */
+  applied_dose_units: number
+}
 
 /**
  * An item of a meal to insert: a copy of the food values used and the
@@ -116,10 +118,15 @@ export type NewMealRecord = {
 }
 
 /**
- * What saving a meal from Inicio sends: the meal, and the id of the saved
- * meal it corrects ("Corregir", spec §6.7), or null for a new one.
+ * What saving a meal from Inicio sends: the meal, the id of the saved meal
+ * it corrects ("Corregir", spec §6.7) or null for a new one, and the key of
+ * the meal in progress (spec §7.2).
  */
-export type MealToSave = { record: NewMealRecord; replaces: string | null }
+export type MealToSave = {
+  record: NewMealRecord
+  replaces: string | null
+  clientKey: string
+}
 
 /**
  * The id of the saved meal and, when it corrects another one, whether that
@@ -129,11 +136,13 @@ export type SavedMealResult = { id: string; replacedDeleted: boolean | null }
 
 /**
  * The payload of the create_meal function (spec §7.2): the record, with
- * each item's food already resolved to its food_id. The function reads only
- * these keys; user_id, meal_id and id come from the column defaults.
+ * each item's food already resolved to its food_id, and the key of the meal
+ * (client_key: if that user already saved a meal with it, the function
+ * returns that one's id and inserts nothing). The function reads only these
+ * keys; user_id, meal_id and id come from the column defaults.
  */
 export type CreateMealPayload = {
-  meal: NewMeal
+  meal: NewMeal & { client_key: string }
   items: (Omit<NewMealItem, 'food'> & { food_id: string })[]
 }
 

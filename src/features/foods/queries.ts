@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { foodsKeys, type Food } from '../../lib/foods.ts'
 import {
   archiveFood,
+  cleanUpOrphanLabelPhotos,
   createFood,
   createLabelPhotoUrl,
   deleteLabelPhoto,
@@ -71,6 +72,11 @@ export function useTranscribeLabel() {
 
 export function useDeleteLabelPhoto() {
   return useMutation({ mutationFn: deleteLabelPhoto })
+}
+
+/** Background cleanup of loose label photos (api.ts). Nothing to refresh. */
+export function useCleanUpLabelPhotos() {
+  return useMutation({ mutationFn: cleanUpOrphanLabelPhotos })
 }
 
 export const labelPhotoKeys = {

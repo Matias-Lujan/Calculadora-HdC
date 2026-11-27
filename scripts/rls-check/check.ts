@@ -911,6 +911,93 @@ console.log('\ncreate_meal')
     archive.error === null && withArchived.error === null,
     archive.error?.message ?? withArchived.error?.message,
   )
+
+  // The key of the meal (M3 and M4): the same meal saved twice with the same
+  // key is a single meal; another user with the same key gets their own.
+  const clientKey = crypto.randomUUID()
+  const keyed = mealOf(foodA.id)
+  const withKey = { ...keyed, meal: { ...keyed.meal, client_key: clientKey } }
+  const beforeKeyed = await countMeals(a)
+  const [first, second] = await Promise.all([
+    a.supabase.rpc('create_meal', { payload: withKey }),
+    a.supabase.rpc('create_meal', { payload: withKey }),
+  ])
+  const third = await a.supabase.rpc('create_meal', { payload: withKey })
+  const keyedRows = await a.supabase
+    .from('meals')
+    .select('id, meal_items(id)')
+    .eq('client_key', clientKey)
+  check(
+    'create_meal: con la misma clave (también dos a la vez) devuelve el mismo id y deja una sola comida',
+    first.error === null &&
+      second.error === null &&
+      third.error === null &&
+      typeof first.data === 'string' &&
+      first.data === second.data &&
+      first.data === third.data &&
+      keyedRows.data?.length === 1 &&
+      keyedRows.data[0]?.id === first.data &&
+      keyedRows.data[0].meal_items.length === 1 &&
+      (await countMeals(a)) === (beforeKeyed ?? 0) + 1,
+    first.error?.message ??
+      second.error?.message ??
+      third.error?.message ??
+      JSON.stringify(keyedRows.data),
+  )
+
+  const fromB = mealOf(foodB.id)
+  const sameKeyB = await b.supabase.rpc('create_meal', {
+    payload: { ...fromB, meal: { ...fromB.meal, client_key: clientKey } },
+  })
+  const keyedByB = await b.supabase
+    .from('meals')
+    .select('id, user_id')
+    .eq('client_key', clientKey)
+  check(
+    'create_meal: B con la misma clave que A crea su propia comida y no recibe ni ve la de A',
+    sameKeyB.error === null &&
+      typeof sameKeyB.data === 'string' &&
+      sameKeyB.data !== first.data &&
+      keyedByB.data?.length === 1 &&
+      keyedByB.data[0]?.id === sameKeyB.data &&
+      keyedByB.data[0].user_id === b.id,
+    sameKeyB.error?.message ?? JSON.stringify(keyedByB.data),
+  )
+
+  // A meal saved and then deleted with that key: saving it again returns
+  // its id and does not create another one (spec §14 #85).
+  const deletedKey = crypto.randomUUID()
+  const toDelete = {
+    ...keyed,
+    meal: { ...keyed.meal, client_key: deletedKey },
+  }
+  const savedToDelete = await a.supabase.rpc('create_meal', {
+    payload: toDelete,
+  })
+  const deleted = await a.supabase
+    .from('meals')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', typeof savedToDelete.data === 'string' ? savedToDelete.data : '')
+  const beforeAgain = await countMeals(a)
+  const again = await a.supabase.rpc('create_meal', { payload: toDelete })
+  check(
+    'create_meal: con la clave de una comida borrada devuelve su id, sin crear otra',
+    savedToDelete.error === null &&
+      deleted.error === null &&
+      again.error === null &&
+      again.data === savedToDelete.data &&
+      (await countMeals(a)) === beforeAgain,
+    savedToDelete.error?.message ??
+      deleted.error?.message ??
+      again.error?.message,
+  )
+
+  // The key cannot be changed after saving (update is only deleted_at).
+  const changeKey = await a.supabase
+    .from('meals')
+    .update({ client_key: crypto.randomUUID() })
+    .eq('id', typeof first.data === 'string' ? first.data : '')
+  check('meals: la clave no se puede cambiar', changeKey.error !== null)
 }
 
 // --- Cleanup: files are not deleted with the users -------------------------------

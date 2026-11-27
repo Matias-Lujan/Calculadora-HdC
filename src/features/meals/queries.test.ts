@@ -9,7 +9,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextMealsOffset } from './history.ts'
 import { foodsKeys } from '../../lib/foods.ts'
-import { clearMealDraft } from '../../lib/mealDraftStorage.ts'
+import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
   fetchRecentMeals,
@@ -19,7 +19,9 @@ import {
 import {
   mealListOptions,
   mealsKeys,
+  otherMealSave,
   referenceFoodsKey,
+  saveMealKey,
   referenceFoodsOptions,
   useCreateMeal,
   useDeleteMeal,
@@ -27,10 +29,12 @@ import {
   useRecentMeals,
   useReferenceFoods,
 } from './queries.ts'
-import type { MealsPage } from './types.ts'
+import type { MealToSave, MealsPage } from './types.ts'
 
 vi.mock('../../lib/supabase.ts', () => ({ supabase: {} }))
-vi.mock('../../lib/mealDraftStorage.ts', () => ({ clearMealDraft: vi.fn() }))
+vi.mock('../../lib/mealDraftStorage.ts', () => ({
+  clearMealDraftOf: vi.fn(),
+}))
 
 // Only the hooks are replaced (to see what each hook passes them);
 // QueryClient and InfiniteQueryObserver stay the real ones.
@@ -118,21 +122,22 @@ describe('useReferenceFoods', () => {
 })
 
 describe('useCreateMeal', () => {
-  it('after saving, clears the kept meal and reads again the meals and the catalog list', async () => {
+  it('after saving, clears the kept meal (if it is that one) and reads again the meals and the catalog list', async () => {
     const client = new QueryClient()
     const invalidate = vi
       .spyOn(client, 'invalidateQueries')
       .mockResolvedValue(undefined)
     vi.mocked(useQueryClient).mockReturnValue(client)
     vi.mocked(useMutation).mockClear()
-    vi.mocked(clearMealDraft).mockClear()
+    vi.mocked(clearMealDraftOf).mockClear()
 
     useCreateMeal()
     const options = vi.mocked(useMutation).mock.calls[0]?.[0]
     expect(options?.mutationFn).toBe(saveMeal)
+    expect(options?.mutationKey).toEqual(saveMealKey)
     await options?.onSuccess?.(
       'id' as never,
-      undefined as never,
+      { clientKey: '00000000-0000-4000-8000-0000000000cc' } as never,
       undefined as never,
       undefined as never,
     )
@@ -140,7 +145,10 @@ describe('useCreateMeal', () => {
       { queryKey: mealsKeys.all },
       { queryKey: foodsKeys.list },
     ])
-    expect(clearMealDraft).toHaveBeenCalledTimes(1)
+    // Only the draft of the meal saved (its key).
+    expect(vi.mocked(clearMealDraftOf).mock.calls).toEqual([
+      ['00000000-0000-4000-8000-0000000000cc'],
+    ])
   })
 
   it('keeps the meal if saving fails (onSuccess only)', () => {
@@ -187,5 +195,106 @@ describe('useDeleteMeal', () => {
       { queryKey: mealsKeys.list },
       { queryKey: mealsKeys.recent },
     ])
+  })
+})
+
+// A save of the meal in progress started by an Inicio that is no longer open
+// (spec §6.6, §14 #85).
+describe('otherMealSave', () => {
+  const KEY = '00000000-0000-4000-8000-0000000000cc'
+  const OTHER_KEY = '00000000-0000-4000-8000-0000000000dd'
+  const MOUNTED_AT = 1_000_000
+  const result = {
+    id: '00000000-0000-4000-8000-0000000000aa',
+    replacedDeleted: null,
+  }
+  const variables = (clientKey: string): MealToSave => ({
+    record: {
+      meal: {
+        eaten_at: '2026-11-14T16:05:00.000Z',
+        carb_ratio_g_per_unit: 15,
+        total_carbs_g: 75,
+        calculated_dose_units: 5,
+        applied_dose_units: 5,
+        calc_version: '2',
+      },
+      items: [],
+    },
+    replaces: null,
+    clientKey,
+  })
+  const pending = (clientKey = KEY, submittedAt = MOUNTED_AT - 1) => ({
+    status: 'pending' as const,
+    variables: variables(clientKey),
+    data: undefined,
+    submittedAt,
+  })
+  const success = (clientKey = KEY, submittedAt = MOUNTED_AT - 1) => ({
+    status: 'success' as const,
+    variables: variables(clientKey),
+    data: result,
+    submittedAt,
+  })
+
+  it('none without saves', () => {
+    expect(otherMealSave([], KEY, MOUNTED_AT)).toBeNull()
+  })
+
+  it('a save of this meal in progress, started before this Inicio opened', () => {
+    expect(otherMealSave([pending()], KEY, MOUNTED_AT)).toEqual({
+      status: 'pending',
+    })
+  })
+
+  it('a save of this meal that ended well gives what was saved and its result', () => {
+    expect(otherMealSave([success()], KEY, MOUNTED_AT)).toEqual({
+      status: 'success',
+      saved: variables(KEY),
+      result,
+    })
+  })
+
+  it('ended well wins over another one still in progress', () => {
+    expect(otherMealSave([pending(), success()], KEY, MOUNTED_AT)?.status).toBe(
+      'success',
+    )
+  })
+
+  it('a failed one counts as none: the meal stays to retry', () => {
+    const failed = { ...pending(), status: 'error' as const }
+    expect(otherMealSave([failed], KEY, MOUNTED_AT)).toBeNull()
+  })
+
+  it('a save of another meal (another key) is not this one', () => {
+    expect(
+      otherMealSave([pending(OTHER_KEY), success(OTHER_KEY)], KEY, MOUNTED_AT),
+    ).toBeNull()
+  })
+
+  it('the saves of this Inicio itself (started after it opened) do not count', () => {
+    expect(
+      otherMealSave(
+        [pending(KEY, MOUNTED_AT), success(KEY, MOUNTED_AT + 5)],
+        KEY,
+        MOUNTED_AT,
+      ),
+    ).toBeNull()
+  })
+
+  it('a save still idle, without variables, is ignored', () => {
+    expect(
+      otherMealSave(
+        [
+          {
+            status: 'idle',
+            variables: undefined,
+            data: undefined,
+            submittedAt: 0,
+          },
+        ],
+        KEY,
+        MOUNTED_AT,
+      ),
+    ).toBeNull()
   })
 })

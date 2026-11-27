@@ -5,6 +5,8 @@ import type { MealCopyRequest } from './mealCopy.ts'
 import {
   copiedMealForm,
   initialMealForm,
+  mealChanged,
+  newClientKey,
   nextItemKey,
   parseStoredMealDraft,
   type StoredMealDraft,
@@ -54,6 +56,10 @@ const rice: Food = {
   cooking_factor: 2.6,
 }
 
+/** A uuid, as crypto.randomUUID() gives it. */
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
 const tableApple = tableFoodAsMealFood({
   reference_db: 'usda_fdc',
   reference_code: '99999',
@@ -72,6 +78,7 @@ const draft: StoredMealDraft = {
   appliedDoseText: '8',
   eatenAtText: '2026-11-16T13:30',
   correcting: null,
+  clientKey: '00000000-0000-4000-8000-0000000000dd',
 }
 
 /** What sessionStorage gives back: the draft as JSON, parsed. */
@@ -188,6 +195,7 @@ describe('initialMealForm', () => {
       appliedDoseText: null,
       eatenAtText: null,
       correcting: null,
+      clientKey: expect.stringMatching(UUID) as string,
       nextKey: 0,
       focusKey: null,
       notUsableFood: null,
@@ -342,6 +350,7 @@ describe('copiedMealForm', () => {
       appliedDoseText: null,
       eatenAtText: null,
       correcting: null,
+      clientKey: expect.stringMatching(UUID) as string,
       nextKey: 1,
       focusKey: null,
       notUsableFood: null,
@@ -392,5 +401,123 @@ describe('copiedMealForm', () => {
     const form = copiedMealForm(null, request, [])
     expect(form.items).toEqual([])
     expect(form.correcting).toBeNull()
+  })
+})
+
+// The key of the meal in progress (spec §7.2): it is kept with the meal, so
+// saving again after leaving Inicio does not create a second meal.
+describe('the key of the meal in progress', () => {
+  it('is kept and read back as it was', () => {
+    expect(parseStoredMealDraft(roundTrip(draft))?.clientKey).toBe(
+      draft.clientKey,
+    )
+    expect(initialMealForm(draft, null).clientKey).toBe(draft.clientKey)
+  })
+
+  it('a food that comes back from the photo is a change: a new key', () => {
+    const key = initialMealForm(draft, banana).clientKey
+    expect(key).toMatch(UUID)
+    expect(key).not.toBe(draft.clientKey)
+  })
+
+  it('a food from the photo that is not added keeps the key', () => {
+    const noFactor = { ...rice, cooking_factor: null }
+    expect(initialMealForm(draft, noFactor).clientKey).toBe(draft.clientKey)
+  })
+
+  it('a meal kept before the key existed gets a new one', () => {
+    const old: Record<string, unknown> = { ...draft }
+    delete old.clientKey
+    const parsed = parseStoredMealDraft(roundTrip(old))
+    expect(parsed?.clientKey).toMatch(UUID)
+    expect(parsed?.items).toEqual(draft.items)
+  })
+
+  it.each([null, 'abc', 1, ''])(
+    'gives null for a key that is not a uuid: %j',
+    (value) => {
+      expect(parseStoredMealDraft({ ...draft, clientKey: value })).toBeNull()
+    },
+  )
+
+  it('each new meal gets a different one', () => {
+    const first = initialMealForm(null, null).clientKey
+    const second = initialMealForm(null, banana).clientKey
+    expect(first).toMatch(UUID)
+    expect(second).toMatch(UUID)
+    expect(first).not.toBe(second)
+    expect(newClientKey()).not.toBe(newClientKey())
+  })
+
+  it('a saved meal loaded (repeat or correct) is a new meal, with a new key', () => {
+    const request: MealCopyRequest = {
+      mode: 'repeat',
+      mealId: '00000000-0000-4000-8000-0000000000aa',
+      eatenAt: '2026-11-15T11:30:00+00:00',
+      appliedDoseUnits: 7,
+      items: [
+        {
+          position: 0,
+          food_id: rice.id,
+          food_name: rice.name,
+          quantity_mode: 'grams',
+          units: null,
+          grams: 250,
+        },
+      ],
+    }
+    for (const mode of ['repeat', 'correct'] as const) {
+      const form = copiedMealForm(draft, { ...request, mode }, [rice])
+      expect(form.clientKey).toMatch(UUID)
+      expect(form.clientKey).not.toBe(draft.clientKey)
+    }
+  })
+
+  it('if nothing could be brought, the meal in progress keeps its key', () => {
+    const request: MealCopyRequest = {
+      mode: 'repeat',
+      mealId: '00000000-0000-4000-8000-0000000000aa',
+      eatenAt: '2026-11-15T11:30:00+00:00',
+      appliedDoseUnits: null,
+      items: [
+        {
+          position: 0,
+          food_id: rice.id,
+          food_name: rice.name,
+          quantity_mode: 'grams',
+          units: null,
+          grams: 250,
+        },
+      ],
+    }
+    expect(copiedMealForm(draft, request, []).clientKey).toBe(draft.clientKey)
+  })
+})
+
+describe('mealChanged', () => {
+  const entered = {
+    items: draft.items,
+    appliedDoseText: draft.appliedDoseText,
+    eatenAtText: draft.eatenAtText,
+  }
+
+  it('the same entered meal is not a change (a retry keeps the key)', () => {
+    expect(mealChanged(entered, { ...entered })).toBe(false)
+  })
+
+  it.each([
+    [
+      'the items (a quantity, an item added or removed)',
+      { items: [...draft.items] },
+    ],
+    ['the applied dose', { appliedDoseText: '9' }],
+    [
+      'the dose back to following the calculated one',
+      { appliedDoseText: null },
+    ],
+    ['the date', { eatenAtText: '2026-11-16T13:31' }],
+    ['the date back to "Ahora"', { eatenAtText: null }],
+  ])('a change of %s is a change', (_, change) => {
+    expect(mealChanged(entered, { ...entered, ...change })).toBe(true)
   })
 })
