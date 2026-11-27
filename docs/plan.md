@@ -337,6 +337,8 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 - Al empezar una mejora, se le escribe una subsección abajo (objetivo, qué incluye y "Terminada cuando", como las etapas), con el OK del usuario sobre el alcance, y su fila pasa a "En curso (`<rama>`)". Al cerrarla, "✅ PR #N".
 - Una idea nueva se agrega como fila; no hace falta decidir el alcance hasta empezarla. Lo que el spec dejó fuera del MVP (§2.2: glucemia de referencia, código de barras, recetas, exportar, uso sin conexión) entra a la tabla solo si el usuario lo pide.
 
+**Hacia dónde va**: el usuario piensa llevar la app a una "todo en uno" para diabetes (2026-11-28). No cambia el alcance de ninguna mejora, pero pesa al decidir: datos por usuario desde el diseño (M9), y lo de salud guardado solo cuando hace falta.
+
 | # | Mejora | De dónde sale | Estado |
 |---|---|---|---|
 | M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | ✅ PR #17 |
@@ -348,6 +350,7 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 | M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre 2, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | En curso (`mejora-glucosa-en-vivo`) |
 | M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
+| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | Próxima (después de mergear M8) |
 
 ### M1 — Revisión de UI/UX
 
@@ -478,3 +481,28 @@ Hecho por el implementer (#87 a #93): la migración `20261127040533_libre_sessio
 - [x] Spec y `docs/decisiones.md` al día.
 - [ ] `libre_sessions` está en `dev` con sus casos en `rls-check`, y la función entra a LibreLinkUp una sola vez y no en cada consulta (logs).
 - [ ] La migración, la función y los secrets están en `prod` antes de mergear, con `rls-check` contra `prod`, y el usuario lo confirmó en el iPhone.
+
+### M10 — Gráfico de glucosa de 24 horas
+
+Rama: a crear desde `main` cuando M8 esté mergeada (`mejora-grafico-glucosa`). Alcance a confirmar con el usuario al empezar la sesión; lo que sigue es lo conversado el 2026-11-28.
+
+**Objetivo**: ver en un gráfico cómo transcurrió la glucosa en las últimas 24 horas, de un vistazo. Como M8, es solo referencia: **no entra al cálculo** (regla 7).
+
+Lo que se sabe:
+- LibreLinkUp devuelve, además de la lectura actual, las de las últimas ~12 horas (una cada ~15 min, `/llu/connections/<patientId>/graph`). Para 24 horas hay que guardarlas.
+- **Guardado híbrido** (decidido por el usuario): (a) cuando la app consulta la glucosa, la función guarda de vez en cuando las 12 horas que devuelve LibreLinkUp; (b) una tarea programada en Supabase (por ejemplo `pg_cron`, cada pocas horas, siempre menos de 12) hace lo mismo aunque la app esté cerrada, para que no queden huecos. Ninguna de las dos entra a LibreLinkUp más de lo que ya permite `libre_sessions` (M8).
+- **Solo se guardan 24 horas**: lo más viejo se borra al guardar. No es un historial largo.
+
+Incluye (a planificar):
+1. Migración: tabla de lecturas por usuario (`user_id`, hora de la lectura, mg/dL; única por usuario y hora), con RLS: el usuario lee solo las suyas; escribe solo la función con la key secreta. Casos en `scripts/rls-check/`.
+2. Función: guardar las lecturas de las 12 horas (la misma `glucose-latest` o una aparte; decide el planner) y una forma segura de que la llame la tarea programada sin un usuario logueado.
+3. Tarea programada en `dev` y en `prod` (por migración si se puede, regla 6).
+4. Gráfico de 24 h (dónde va: Inicio debajo del recuadro o pantalla aparte; librería o SVG a mano; sin colores de rango salvo que el usuario decida otra cosa, por la regla de tokens). Decisiones para el planner y el usuario.
+
+Ciclo: planner (hay decisiones abiertas: dónde va, librería, cómo llama la tarea), implementer, tester (hay migración) y reviewer.
+
+**Terminada cuando**:
+- [ ] El gráfico muestra las últimas 24 h en el iPhone sobre `dev`, sin huecos aunque la app haya estado cerrada más de 12 h.
+- [ ] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.
+- [ ] Spec y `docs/decisiones.md` al día.
+- [ ] Migración, función y tarea en `prod` antes de mergear, con `rls-check` contra `prod`; el usuario lo confirmó en el iPhone.
