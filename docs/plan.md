@@ -401,10 +401,12 @@ Ciclo: lógica de un feature sin cuentas, así que implementer y reviewer. No ha
 - [x] Un `42501` con una sesión válida sigue mostrando el error genérico (test).
 - [x] Spec y `docs/decisiones.md` al día.
 
-Hecho por el implementer (#83): la decisión va en `src/lib/session.ts`, que recibe `getUser` y `signOut` por parámetro (con sus tests en `session.test.ts`, el cliente simulado), y el `onError` global de `queryClient.ts` la usa para todo error que no sea un 401; el reconocimiento del `42501` es `isPermissionDenied`, en `errors.ts`. Resuelto sin que el plan lo dijera: (1) `user_not_found` se sumó a los códigos de sesión inválida de `isUnauthorized` (lo más simple; también vale para un error directo de Auth); (2) si `getUser` tira una excepción, no se hace nada; (3) las lecturas con `42501` conservan sus reintentos (hasta 3), así que la consulta al servidor llega después del último; los guardados no se reintentan, así que van directo. Falta la prueba en la versión de prueba (primer "Terminada cuando").
+Hecho por el implementer (#83): la decisión va en `src/lib/session.ts`, que recibe `getUser` y `signOut` por parámetro (con sus tests en `session.test.ts`, el cliente simulado), y el `onError` global de `queryClient.ts` la usa para todo error que no sea un 401; el reconocimiento del `42501` es `isPermissionDenied`, en `errors.ts`. Resuelto sin que el plan lo dijera: (1) `user_not_found` se sumó a los códigos de sesión inválida de `isUnauthorized` (lo más simple; también vale para un error directo de Auth); (2) si `getUser` tira una excepción, no se hace nada; (3) las lecturas con `42501` conservan sus reintentos (hasta 3), así que la consulta al servidor llega después del último; los guardados no se reintentan, así que van directo.
 
 **Cerrada** el 2026-11-26 (PR #22). El usuario lo probó en la versión de prueba y confirmó en el iPhone que todo sigue andando.
+
 ### M7 — Aviso de uso aceptado por usuario
+
 **Objetivo**: que cada persona que use la app lea y acepte una vez que no es un dispositivo médico y que la dosis depende de sus propios datos, y que quede registrado que lo aceptó. Hoy la usa solo el usuario, pero quiere estar cubierto si algún día se la pasa a alguien.
 
 Incluye (alcance acordado con el usuario, 2026-11-18):
