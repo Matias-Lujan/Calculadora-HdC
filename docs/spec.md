@@ -24,7 +24,7 @@ Usuario: una persona con diabetes tipo 1, que usa la app desde Safari en iPhone 
 6. **Cálculo de dosis**: solo bolo por hidratos, con un ratio configurable. Se muestra **el valor exacto, sin redondear**, con el desglose completo.
 7. **Historial inmutable**: cada registro guarda los valores que se usaron en ese momento.
 8. **Configuración**: ratio y umbrales de alerta.
-9. **Glucosa del sensor en Inicio** (después del MVP, M8): el último valor del FreeStyle Libre 2, vía la API no oficial de LibreLinkUp, **solo como referencia**: nunca entra al cálculo ni se guarda con la comida (§6.9, §9.8, §13).
+9. **Glucosa del sensor en Inicio** (después del MVP, M8): el último valor de un sensor FreeStyle Libre, vía la API no oficial de LibreLinkUp, **solo como referencia**: nunca entra al cálculo ni se guarda con la comida (§6.9, §9.8, §13).
 
 ### 2.2 Fuera del MVP (el diseño no debe bloquearlos)
 
@@ -305,7 +305,7 @@ La pantalla (etapa 3):
 
 ### 6.9 Glucosa del sensor (M8, #87 a #93)
 
-Arriba de Inicio, un recuadro muestra la última lectura del sensor (FreeStyle Libre 2, que la sube desde la app LibreLink del celular), que da la función `glucose-latest` (§9.8). Es **solo una referencia**: no entra al cálculo (regla 7 de `CLAUDE.md`) ni se guarda con la comida. Inicio no lo espera: la comida se carga igual mientras carga o si falla.
+Arriba de Inicio, un recuadro muestra la última lectura del sensor (un FreeStyle Libre, que la sube desde la app LibreLink del celular), que da la función `glucose-latest` (§9.8). Es **solo una referencia**: no entra al cálculo (regla 7 de `CLAUDE.md`) ni se guarda con la comida. Inicio no lo espera: la comida se carga igual mientras carga o si falla.
 
 - Rótulo "Glucosa del sensor", con un ⓘ: "Es la última lectura de tu sensor, para tenerla a mano. No cambia la dosis.".
 - El valor en grande, "mg/dL" y la flecha de la tendencia (bajando rápido, bajando, estable, subiendo, subiendo rápido; para lectores de pantalla, con esas palabras). Si el sensor no da tendencia, sin flecha. Debajo, cuándo se midió: "ahora", "hace 5 min" o "hace más de una hora", al día aunque la lectura no cambie.
@@ -657,7 +657,7 @@ Los números que escribe el usuario (ratio, umbrales y, desde la etapa 5, gramos
 - Red de seguridad: si llega un `input` que no es un borrado reconstruible (texto predictivo con composición, autocompletado), el campo vuelve al texto anterior, con aviso `REJECTED`.
 - Después de cada edición aceptada, el componente pone `value` en el campo y el cursor en `caret`, y muestra el aviso si `notice` no es `null`. El aviso va debajo del campo, en gris (no es un error), y se borra con la siguiente edición aceptada sin aviso o al salir del campo. El valor del formulario es ese string. Se convierte a número con `parseUserNumber` (o `parsePositiveUserNumber`) al calcular o guardar. Para cargar un valor guardado en el campo se usa `formatUserNumber`, la inversa de `parseUserNumber`, que no redondea.
 - `notice` es un código (`TypedNumberNotice`): `DECIMAL_DOT` si se tipeó un "." (se convirtió en coma, o no entró porque ya había una coma), y `REJECTED` si la edición no entró por otro motivo. Los textos están en `src/lib/errors.ts`: `DECIMAL_DOT` → "Los decimales van con coma."; `REJECTED` → "Solo se pueden ingresar números, con coma para los decimales."
-- En el iPhone del usuario, el teclado de `inputMode="decimal"` muestra coma (verificado en la etapa 3). Convertir el "." en coma también cubre un teclado que muestre "." en lugar de "," (por la región o un teclado en inglés).
+- En un iPhone, el teclado de `inputMode="decimal"` muestra coma (verificado en la etapa 3). Convertir el "." en coma también cubre un teclado que muestre "." en lugar de "," (por la región o un teclado en inglés).
 - El cursor no salta al final al editar en el medio: la función devuelve dónde va (`caret`).
 - Los errores ("12," o ",5" incompletos, campo vacío) se muestran al salir del campo, como todo error de validación (CLAUDE.md), así que no molestan a mitad de tipeo.
 - El rango (> 0, etc.) **no** lo valida la conversión: lo valida quien usa el valor (el cálculo, §8.4, o el formulario).
@@ -907,7 +907,7 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 
 Devuelve la última lectura del sensor para el recuadro de Inicio (§6.9). La lee de **LibreLinkUp**, la API **no oficial** de Abbott que usa la app LibreLinkUp para seguir a otra persona: puede cambiar o dejar de andar sin aviso, y entonces el recuadro muestra su error, sin afectar al resto de la app.
 
-**Cuenta y secrets** (hasta M9, un solo usuario): entra con el email y la contraseña de la **cuenta principal** de LibreLink del usuario, que se sigue a sí misma (en LibreLink, Aplicaciones conectadas → LibreLinkUp → su propio email, y después aceptar la invitación y las condiciones en la app LibreLinkUp). Están en los secrets `LIBRE_EMAIL` y `LIBRE_PASSWORD`; `LIBRE_APP_USER_ID` es el id del usuario de la app que la ve (distinto en `dev` y en `prod`). Si falta alguno o el usuario es otro, responde `GLUCOSE_NOT_CONFIGURED` sin llamar a LibreLinkUp. Los carga el usuario, en los dos proyectos.
+**Cuenta y secrets** (hasta M9, un solo usuario): entra con el email y la contraseña de una **cuenta principal** de LibreLink, que se sigue a sí misma (en LibreLink, Aplicaciones conectadas → LibreLinkUp → el email de la misma cuenta, y después aceptar la invitación y las condiciones en la app LibreLinkUp). Están en los secrets `LIBRE_EMAIL` y `LIBRE_PASSWORD`; `LIBRE_APP_USER_ID` es el id del usuario de la app que la ve (distinto en `dev` y en `prod`). Si falta alguno o el usuario es otro, responde `GLUCOSE_NOT_CONFIGURED` sin llamar a LibreLinkUp. Los carga el usuario, en los dos proyectos.
 
 ```
 supabase/functions/glucose-latest/
@@ -972,9 +972,9 @@ Los mensajes de la app están en §6.9. La función hace a lo sumo cuatro llamad
 - **RLS activada en todas las tablas**, y con políticas en todas salvo `libre_sessions`, que usa solo `glucose-latest` con la key secreta: sin políticas ni `grant` a `anon` ni `authenticated`, así ningún usuario la lee ni la escribe (§7.3, #90).
 - **La key anon/publishable de Supabase va en el frontend y es pública por diseño.** La protección la dan RLS y el registro deshabilitado.
 - **Nunca** en el frontend ni en el repo: la `service_role` key, `GEMINI_API_KEY` ni las credenciales de LibreLink (`LIBRE_EMAIL`, `LIBRE_PASSWORD`). Esas van solo en los secrets de Supabase, con `LIBRE_APP_USER_ID` (§9.8); el pase de LibreLinkUp, en `libre_sessions`, que ningún usuario puede leer (§7.3).
-- La glucosa no se loguea ni se guarda: la función la lee y la devuelve. Excepción a no usar datos reales en `dev` (#89): sus secrets tienen la cuenta real de LibreLink del usuario, porque no hay sensor de prueba.
+- La glucosa no se loguea ni se guarda: la función la lee y la devuelve. Excepción a no usar datos reales en `dev` (#89): sus secrets tienen una cuenta real de LibreLink, porque no hay sensor de prueba.
 - A Gemini solo se envía la foto de la etiqueta. En la capa gratuita, Google puede usar esos datos para mejorar sus productos (§9.1).
-- `.env.local` está en `.gitignore`. Tiene las variables del frontend, la key de Gemini para los scripts locales y las credenciales de los usuarios de prueba descartables de `scripts/rls-check/`. **Nunca** tiene las credenciales del usuario real: para entrar a la app, el usuario escribe su contraseña en el login. Se versiona un `.env.example` sin valores.
+- `.env.local` está en `.gitignore`. Tiene las variables del frontend, la key de Gemini para los scripts locales y las credenciales de los usuarios de prueba descartables de `scripts/rls-check/`. **Nunca** tiene credenciales de usuarios reales: para entrar a la app, el usuario escribe su contraseña en el login. Se versiona un `.env.example` sin valores.
 - **El repo es privado por ahora**, y se va a hacer público sin fecha definida. Por eso, todo lo que se commitea se trata como si ya fuera público.
 - **La configuración personal y los registros viven solo en la base.** No hay seeds, fixtures ni ejemplos con datos reales en el repo. Los tests usan datos inventados.
 - Las fotos van a un bucket privado y se muestran con URLs firmadas.
@@ -1001,7 +1001,7 @@ Los mensajes de la app están en §6.9. La función hace a lo sumo cuatro llamad
 - **No hay Docker**, así que no se corre Supabase en local. Se trabaja contra el proyecto `dev` en la nube.
 - Las migraciones se guardan en `supabase/migrations/` y se aplican con la Supabase CLI, instalada como dependencia del proyecto: `npx supabase link` y `npx supabase db push --remote`, primero en `dev` y después en `prod`, antes de mergear y compatibles con la versión publicada (el orden completo está en `CLAUDE.md`, "Cambios que llegan a prod", #63). La Edge Function se despliega con `npx supabase functions deploy --use-api`, que la empaqueta del lado de Supabase y no necesita Docker.
 - **La configuración de Auth se maneja desde el panel.** `supabase/config.toml` solo sirve para un stack local, que no se usa. No se corre `npx supabase config push`, porque pisaría la configuración real de los proyectos con la del archivo (por ejemplo, podría reabrir el registro).
-- Los proyectos del plan gratuito se **pausan después de una semana sin actividad**. Con uso diario no le pasa a `prod`, pero sí le puede pasar a `dev`, que se reactiva desde el panel.
+- Los proyectos del plan gratuito se **pausan después de una semana sin actividad**. Mientras la app se use, no le pasa a `prod`, pero sí le puede pasar a `dev`, que se reactiva desde el panel.
 
 ### 12.2 Estructura del repo
 

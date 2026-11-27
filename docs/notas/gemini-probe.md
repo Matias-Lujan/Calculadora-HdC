@@ -15,7 +15,7 @@ Fechas: 2026-11-10 y 2026-11-11 · Plan: [etapa 1b](../plan.md#etapa-1b--prueba-
 
 ## Qué se probó
 
-**Fotos**: 5 productos de la alacena, sacadas con iPhone como lo haría un usuario común. Se pasaron a la PC por WhatsApp en modo HD, que conserva la resolución (JPEG de 3024×4032, alrededor de 1 MB) y quita los metadatos. Las fotos no están en el repo.
+**Fotos**: 5 productos comunes, sacadas con iPhone como lo haría un usuario común. Se pasaron a la PC por WhatsApp en modo HD, que conserva la resolución (JPEG de 3024×4032, alrededor de 1 MB) y quita los metadatos. Las fotos no están en el repo.
 
 | Foto | Producto | Particularidad |
 |---|---|---|
