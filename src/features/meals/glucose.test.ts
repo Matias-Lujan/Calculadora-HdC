@@ -33,7 +33,7 @@ describe('minutesSince', () => {
 
 describe('glucoseAgoText', () => {
   it.each([
-    [0, 'recién'],
+    [0, 'ahora'],
     [1, 'hace 1 min'],
     [15, 'hace 15 min'],
     [59, 'hace 59 min'],

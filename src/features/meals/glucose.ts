@@ -24,9 +24,9 @@ export function minutesSince(measuredAt: string, now: number): number {
   return Number.isNaN(minutes) ? 0 : Math.max(0, minutes)
 }
 
-/** "recién", "hace 5 min" or "hace más de una hora". */
+/** "ahora", "hace 5 min" or "hace más de una hora". */
 export function glucoseAgoText(minutes: number): string {
-  if (minutes < 1) return 'recién'
+  if (minutes < 1) return 'ahora'
   if (minutes < 60) return `hace ${minutes} min`
   return 'hace más de una hora'
 }

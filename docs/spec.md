@@ -308,7 +308,7 @@ La pantalla (etapa 3):
 Arriba de Inicio, un recuadro muestra la última lectura del sensor (FreeStyle Libre 2, que la sube desde la app LibreLink del celular), que da la función `glucose-latest` (§9.8). Es **solo una referencia**: no entra al cálculo (regla 7 de `CLAUDE.md`) ni se guarda con la comida. Inicio no lo espera: la comida se carga igual mientras carga o si falla.
 
 - Rótulo "Glucosa del sensor", con un ⓘ: "Es la última lectura de tu sensor, para tenerla a mano. No cambia la dosis.".
-- El valor en grande, "mg/dL" y la flecha de la tendencia (bajando rápido, bajando, estable, subiendo, subiendo rápido; para lectores de pantalla, con esas palabras). Si el sensor no da tendencia, sin flecha. Debajo, cuándo se midió: "recién", "hace 5 min" o "hace más de una hora", al día aunque la lectura no cambie.
+- El valor en grande, "mg/dL" y la flecha de la tendencia (bajando rápido, bajando, estable, subiendo, subiendo rápido; para lectores de pantalla, con esas palabras). Si el sensor no da tendencia, sin flecha. Debajo, cuándo se midió: "ahora", "hace 5 min" o "hace más de una hora", al día aunque la lectura no cambie.
 - **Lectura vieja** (más de 15 min): el valor en gris, sin flecha, y "hace 20 min · puede no ser la actual".
 - **Sin colores de rango**: rojo, ámbar y verde quedan para errores, advertencias y guardado.
 - Se vuelve a leer cada minuto mientras la app está a la vista y al volver a ella; en segundo plano, no.
