@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) en curso, rama `mejora-glucosa-en-vivo`, PR #27 sin mergear: falta probarla en `dev` con los secrets de LibreLink y llevarla a `prod` (ver M8, "Dónde quedó"). M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-27.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) terminada, PR #27. Próxima: M10 (gráfico de 24 horas). M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-28.
 
 ---
 
@@ -348,9 +348,9 @@ Desde el cierre de la etapa 7 la app está publicada sobre `prod`. Lo que sigue 
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | ✅ PR #25 |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Descartada (2026-11-26): no vale la pena (#84) |
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
-| M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | En curso (`mejora-glucosa-en-vivo`) |
+| M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | ✅ PR #27 |
 | M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
-| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | Próxima (después de mergear M8) |
+| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | Próxima |
 
 ### M1 — Revisión de UI/UX
 
@@ -475,18 +475,18 @@ Hecho por el implementer (#87 a #93): la migración `20261127040533_libre_sessio
 
 **En `prod` (2026-11-28)**: la migración `libre_sessions` está aplicada, `glucose-latest` desplegada (con el cambio de "ahora" y la hora del próximo intento) y `rls-check` pasa contra `prod`. Se probó en `dev` que el valor coincide con LibreLink y se actualiza solo. Falta: los secrets en `prod` (los carga el usuario), borrar los dos usuarios de `rls-check` de `prod`, el merge y la confirmación en el iPhone.
 
-**Dónde quedó (para la próxima sesión)**: falta, en este orden: (1) el usuario rehace los dos usuarios de `rls-check` en `dev` (el A no entra) y carga en `dev` los secrets `LIBRE_EMAIL`, `LIBRE_PASSWORD` y `LIBRE_APP_USER_ID` desde el panel, y hace que la cuenta de LibreLink se siga a sí misma (Aplicaciones conectadas → LibreLinkUp); (2) correr `rls-check` en `dev`; (3) probar en el iPhone con la Preview de la rama y revisar en los logs de la función que `LOGIN` aparezca una sola vez (si la cuenta principal no recibe lecturas, se vuelve a decidir qué cuenta va en los secrets); (4) llevar a `prod` la migración, `rls-check`, la función y los secrets, con el OK del usuario; (5) el usuario mergea el PR #27.
-
 **Terminada cuando**:
 - [x] En el iPhone, sobre `dev`, Inicio muestra el mismo valor que la app LibreLink y se actualiza solo.
 - [x] El mapeo de errores de la conexión con LibreLinkUp está testeado.
 - [x] Spec y `docs/decisiones.md` al día.
 - [x] `libre_sessions` está en `dev` con sus casos en `rls-check`, y la función entra a LibreLinkUp una sola vez y no en cada consulta (logs).
-- [ ] La migración, la función y los secrets están en `prod` antes de mergear, con `rls-check` contra `prod`, y se confirmó en el iPhone.
+- [x] La migración, la función y los secrets están en `prod` antes de mergear, con `rls-check` contra `prod`, y se confirmó en el iPhone.
+
+**Cerrada** el 2026-11-28 (PR #27). Después del merge se confirmó en el iPhone que la glucosa aparece en `prod` y el resto sigue andando.
 
 ### M10 — Gráfico de glucosa de 24 horas
 
-Rama: a crear desde `main` cuando M8 esté mergeada (`mejora-grafico-glucosa`). Alcance a confirmar con el usuario al empezar la sesión; lo que sigue es lo conversado el 2026-11-28.
+Rama: a crear desde `main` (`mejora-grafico-glucosa`). Alcance a confirmar con el usuario al empezar la sesión; lo que sigue es lo conversado el 2026-11-28.
 
 **Objetivo**: ver en un gráfico cómo transcurrió la glucosa en las últimas 24 horas, de un vistazo. Como M8, es solo referencia: **no entra al cálculo** (regla 7).
 
