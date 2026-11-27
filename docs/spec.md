@@ -983,7 +983,7 @@ La tabla está en [decisiones.md](decisiones.md). Las referencias "§14 #N" apun
 
 ## 15. Pendientes
 
-También están en el plan, como mejora M6 ("Después del MVP").
+Fueron la mejora M6 del plan, que se descartó (2026-11-26, #84) porque no vale la pena. Quedan anotados por si algún día hacen falta.
 
 - Revisar el texto vigente de la Res. GMC 05/25 (rotulado nutricional) y ajustar las instrucciones de transcripción si cambia el formato de las etiquetas.
 - Revisar los límites y términos vigentes de la capa gratuita de Gemini. La elección del modelo ya está hecha (etapa 1b).

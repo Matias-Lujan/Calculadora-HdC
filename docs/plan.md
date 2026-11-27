@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. Próxima: M6.** Última actualización: 2026-11-26.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. No hay próxima marcada: las que quedan (M3 a M5) son opcionales.** Última actualización: 2026-11-26.
 
 ---
 
@@ -344,7 +344,7 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
-| M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Próxima |
+| M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Descartada (2026-11-26): no vale la pena (#84) |
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 
 ### M1 — Revisión de UI/UX
