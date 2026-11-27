@@ -1329,7 +1329,14 @@ describe('doseWarning', () => {
  * TypeScript: a saved record has to pass them all. Returns the names of
  * the ones that fail.
  */
-function failedChecks(record: NewMealRecord): string[] {
+// The column allows a null applied dose, though the app always sends one.
+type CheckedRecord = Omit<NewMealRecord, 'meal'> & {
+  meal: Omit<NewMealRecord['meal'], 'applied_dose_units'> & {
+    applied_dose_units: number | null
+  }
+}
+
+function failedChecks(record: CheckedRecord): string[] {
   const failed: string[] = []
   const { meal, items } = record
   const near = (a: number, b: number) => Math.abs(a - b) <= 0.001
@@ -2103,7 +2110,7 @@ describe('the CHECK mirror itself', () => {
     const item = itemAt(record, 0)
     const withItem = (change: Partial<NewMealItem>): string[] =>
       failedChecks({ ...record, items: [{ ...item, ...change }] })
-    const withMeal = (change: Partial<NewMealRecord['meal']>): string[] =>
+    const withMeal = (change: Partial<CheckedRecord['meal']>): string[] =>
       failedChecks({ ...record, meal: { ...record.meal, ...change } })
     expect(withItem({ grams: 0, carbs_g: 0 })).toContain('0: grams')
     expect(withItem({ units: 0 })).toContain('0: units')

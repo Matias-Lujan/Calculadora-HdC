@@ -119,6 +119,7 @@ const record: NewMealRecord = {
 }
 
 const MEAL_ID = '00000000-0000-4000-8000-0000000000aa'
+const CLIENT_KEY = '00000000-0000-4000-8000-0000000000cc'
 
 /** The payload items createMeal sends for items of the catalog. */
 function catalogRows(items: NewMealItem[]) {
@@ -150,20 +151,25 @@ beforeEach(() => {
 describe('createMeal', () => {
   it('calls create_meal once with the meal and its items, and returns the id', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
-    await expect(createMeal(record)).resolves.toBe(MEAL_ID)
+    await expect(createMeal(record, CLIENT_KEY)).resolves.toBe(MEAL_ID)
 
     expect(fake.state.chains).toHaveLength(1)
     expect(fake.state.chains[0]?.table).toBe('rpc:create_meal')
     expect(methods(0)).toEqual(['rpc'])
     expect(argsOf(0, 'rpc')).toEqual([
       'create_meal',
-      { payload: { meal: record.meal, items: catalogRows(record.items) } },
+      {
+        payload: {
+          meal: { ...record.meal, client_key: CLIENT_KEY },
+          items: catalogRows(record.items),
+        },
+      },
     ])
   })
 
   it('the payload has only the keys create_meal reads', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
-    await createMeal(record)
+    await createMeal(record, CLIENT_KEY)
     const payload = payloadOf(0)
     expect(Object.keys(payload).sort()).toEqual(['items', 'meal'])
     expect(Object.keys(payload.meal).sort()).toEqual([
@@ -171,6 +177,7 @@ describe('createMeal', () => {
       'calc_version',
       'calculated_dose_units',
       'carb_ratio_g_per_unit',
+      'client_key',
       'eaten_at',
       'total_carbs_g',
     ])
@@ -205,7 +212,7 @@ describe('createMeal', () => {
         applied_dose_units: 0,
       },
     }
-    await createMeal(exact)
+    await createMeal(exact, CLIENT_KEY)
     const payload = payloadOf(0)
     expect(JSON.parse(JSON.stringify(payload))).toEqual(payload)
     expect(payload.meal.calculated_dose_units).toBe(128.2 / 15)
@@ -215,14 +222,14 @@ describe('createMeal', () => {
   it('does not modify the record', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
     const before = structuredClone(record)
-    await createMeal(record)
+    await createMeal(record, CLIENT_KEY)
     expect(record).toEqual(before)
   })
 
   it('a meal with one item sends an array of one item', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
     const one: NewMealRecord = { ...record, items: record.items.slice(0, 1) }
-    await expect(createMeal(one)).resolves.toBe(MEAL_ID)
+    await expect(createMeal(one, CLIENT_KEY)).resolves.toBe(MEAL_ID)
     expect(payloadOf(0).items).toEqual(catalogRows(record.items.slice(0, 1)))
   })
 
@@ -237,7 +244,7 @@ describe('createMeal', () => {
         position,
       })),
     }
-    await createMeal(many)
+    await createMeal(many, CLIENT_KEY)
     expect(fake.state.chains.map((chain) => chain.table)).toEqual([
       'rpc:create_meal',
     ])
@@ -248,7 +255,7 @@ describe('createMeal', () => {
 
   it('never writes the tables directly', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
-    await createMeal(record)
+    await createMeal(record, CLIENT_KEY)
     expect(fake.state.chains.map((chain) => chain.table)).not.toContain('meals')
     expect(fake.state.chains.map((chain) => chain.table)).not.toContain(
       'meal_items',
@@ -260,19 +267,19 @@ describe('createMeal', () => {
     // so the 401 handling can read its fields.
     const error = { message: 'x', code: 'P0001', details: '', hint: '' }
     fake.state.results = [{ data: null, error }]
-    await expect(createMeal(record)).rejects.toBe(error)
+    await expect(createMeal(record, CLIENT_KEY)).rejects.toBe(error)
     expect(fake.state.chains).toHaveLength(1)
 
     const expired = { message: 'JWT expired', code: 'PGRST301' }
     fake.state.chains = []
     fake.state.results = [{ data: null, error: expired }]
-    await expect(createMeal(record)).rejects.toBe(expired)
+    await expect(createMeal(record, CLIENT_KEY)).rejects.toBe(expired)
   })
 
   it('if the call rejects, createMeal rejects with that error', async () => {
     const network = new Error('network')
     fake.state.results = [network]
-    await expect(createMeal(record)).rejects.toBe(network)
+    await expect(createMeal(record, CLIENT_KEY)).rejects.toBe(network)
     expect(fake.state.chains).toHaveLength(1)
   })
 
@@ -283,14 +290,14 @@ describe('createMeal', () => {
     ['a string that is not a UUID', 'abc'],
   ])('an answer without a valid id (%s) throws', async (_, data) => {
     fake.state.results = [{ data, error: null }]
-    await expect(createMeal(record)).rejects.toThrow()
+    await expect(createMeal(record, CLIENT_KEY)).rejects.toThrow()
     expect(fake.state.chains).toHaveLength(1)
   })
 
   it('returns the id create_meal returned', async () => {
     const otherId = '00000000-0000-4000-8000-0000000000bb'
     fake.state.results = [{ data: otherId, error: null }]
-    await expect(createMeal(record)).resolves.toBe(otherId)
+    await expect(createMeal(record, CLIENT_KEY)).resolves.toBe(otherId)
   })
 })
 
@@ -763,7 +770,9 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await expect(createMeal(withItems([tableItem(0)]))).resolves.toBe(MEAL_ID)
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).resolves.toBe(MEAL_ID)
 
     expect(tables()).toEqual(['foods', 'rpc:create_meal'])
     expect(methods(0)).toEqual([
@@ -802,7 +811,9 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: NEW_COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await expect(createMeal(withItems([tableItem(0)]))).resolves.toBe(MEAL_ID)
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).resolves.toBe(MEAL_ID)
 
     expect(tables()).toEqual(['foods', 'foods', 'rpc:create_meal'])
     expect(methods(1)).toEqual(['insert', 'select', 'single'])
@@ -820,7 +831,10 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await createMeal(withItems([tableItem(0, 120), tableItem(1, 80)]))
+    await createMeal(
+      withItems([tableItem(0, 120), tableItem(1, 80)]),
+      CLIENT_KEY,
+    )
     expect(tables()).toEqual(['foods', 'rpc:create_meal'])
     const rows = payloadOf(1).items
     expect(rows.map((r) => r.food_id)).toEqual([COPY_ID, COPY_ID])
@@ -842,6 +856,7 @@ describe('createMeal with foods of the reference table', () => {
     ]
     await createMeal(
       withItems([tableItem(0), { ...catalogItem, position: 1 }, rice]),
+      CLIENT_KEY,
     )
     expect(tables()).toEqual(['foods', 'foods', 'foods', 'rpc:create_meal'])
     expect(fake.state.chains[1]?.calls).toContainEqual({
@@ -859,21 +874,25 @@ describe('createMeal with foods of the reference table', () => {
 
   it('a meal only of catalog foods never touches foods', async () => {
     fake.state.results = [{ data: MEAL_ID, error: null }]
-    await createMeal(withItems([catalogItem]))
+    await createMeal(withItems([catalogItem]), CLIENT_KEY)
     expect(tables()).toEqual(['rpc:create_meal'])
   })
 
   it('if looking for the copy fails, throws and does not insert the meal', async () => {
     const error = { message: 'x', code: '500' }
     fake.state.results = [{ data: null, error }]
-    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(error)
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).rejects.toBe(error)
     expect(tables()).toEqual(['foods'])
   })
 
   it('if looking for the copy rejects, throws and does not insert the meal', async () => {
     const network = new Error('network')
     fake.state.results = [network]
-    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(network)
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).rejects.toBe(network)
     expect(tables()).toEqual(['foods'])
   })
 
@@ -883,7 +902,9 @@ describe('createMeal with foods of the reference table', () => {
       { data: null, error: null },
       { data: null, error },
     ]
-    await expect(createMeal(withItems([tableItem(0)]))).rejects.toBe(error)
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).rejects.toBe(error)
     expect(tables()).toEqual(['foods', 'foods'])
   })
 
@@ -898,9 +919,9 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: NEW_COPY_ID }, error: null },
       error,
     ]
-    await expect(createMeal(withItems([tableItem(0), rice]))).rejects.toBe(
-      error,
-    )
+    await expect(
+      createMeal(withItems([tableItem(0), rice]), CLIENT_KEY),
+    ).rejects.toBe(error)
     expect(tables()).toEqual(['foods', 'foods', 'foods'])
     // Nothing is undone in foods.
     const all = fake.state.chains.flatMap((c) => c.calls.map((x) => x.method))
@@ -909,7 +930,9 @@ describe('createMeal with foods of the reference table', () => {
 
   it('a copy found or inserted without an id throws, without the meal', async () => {
     fake.state.results = [{ data: { other: 1 }, error: null }]
-    await expect(createMeal(withItems([tableItem(0)]))).rejects.toThrow()
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).rejects.toThrow()
     expect(tables()).toEqual(['foods'])
 
     fake.state.chains = []
@@ -917,7 +940,9 @@ describe('createMeal with foods of the reference table', () => {
       { data: null, error: null },
       { data: null, error: null },
     ]
-    await expect(createMeal(withItems([tableItem(0)]))).rejects.toThrow()
+    await expect(
+      createMeal(withItems([tableItem(0)]), CLIENT_KEY),
+    ).rejects.toThrow()
     expect(tables()).toEqual(['foods', 'foods'])
   })
 
@@ -928,7 +953,7 @@ describe('createMeal with foods of the reference table', () => {
     ]
     const twice = withItems([tableItem(0), tableItem(1)])
     const before = structuredClone(twice)
-    await createMeal(twice)
+    await createMeal(twice, CLIENT_KEY)
     expect(twice).toEqual(before)
   })
 
@@ -942,7 +967,10 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: NEW_COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await createMeal(withItems([tableItem(0), rice, tableItem(2, 50)]))
+    await createMeal(
+      withItems([tableItem(0), rice, tableItem(2, 50)]),
+      CLIENT_KEY,
+    )
     expect(tables()).toEqual(['foods', 'foods', 'rpc:create_meal'])
     const codeOf = (i: number) =>
       fake.state.chains[i]?.calls.find(
@@ -967,7 +995,7 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await createMeal(withItems([tableItem(0), copyItem]))
+    await createMeal(withItems([tableItem(0), copyItem]), CLIENT_KEY)
     expect(tables()).toEqual(['foods', 'rpc:create_meal'])
     const rows = payloadOf(1).items
     expect(rows.map((r) => r.food_id)).toEqual([COPY_ID, COPY_ID])
@@ -980,7 +1008,7 @@ describe('createMeal with foods of the reference table', () => {
       { data: MEAL_ID, error: null },
     ]
     const item = tableItem(0, 133)
-    await createMeal(withItems([item]))
+    await createMeal(withItems([item]), CLIENT_KEY)
     // The lookup only asks for the id: nothing of the copy enters the row.
     expect(argsOf(0, 'select')).toEqual(['id'])
     const rows = payloadOf(1).items
@@ -1001,7 +1029,7 @@ describe('createMeal with foods of the reference table', () => {
       { data: { id: COPY_ID }, error: null },
       { data: MEAL_ID, error: null },
     ]
-    await createMeal(withItems([tableItem(0), rice]))
+    await createMeal(withItems([tableItem(0), rice]), CLIENT_KEY)
     expect(tables()).toEqual([
       'foods',
       'foods',
@@ -1068,7 +1096,9 @@ describe('saveMeal', () => {
 
   it('a new meal: only createMeal', async () => {
     fake.state.results = [{ data: NEW_ID, error: null }]
-    await expect(saveMeal({ record, replaces: null })).resolves.toEqual({
+    await expect(
+      saveMeal({ record, replaces: null, clientKey: CLIENT_KEY }),
+    ).resolves.toEqual({
       id: NEW_ID,
       replacedDeleted: null,
     })
@@ -1077,13 +1107,15 @@ describe('saveMeal', () => {
     ])
   })
 
-  it('a correction: first creates the new meal, then deletes the corrected one, if it is not deleted yet', async () => {
+  it('a correction: first creates the new meal, then deletes the corrected one', async () => {
     fake.state.results = [
       { data: NEW_ID, error: null },
       { data: { id: MEAL_ID }, error: null },
     ]
     const before = Date.now()
-    await expect(saveMeal({ record, replaces: MEAL_ID })).resolves.toEqual({
+    await expect(
+      saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY }),
+    ).resolves.toEqual({
       id: NEW_ID,
       replacedDeleted: true,
     })
@@ -1094,20 +1126,21 @@ describe('saveMeal', () => {
       'meals',
     ])
     expect(payloadOf(0).items).toEqual(catalogRows(record.items))
-    expect(methods(1)).toEqual(['update', 'eq', 'is', 'select', 'single'])
+    expect(methods(1)).toEqual(['update', 'eq', 'select', 'single'])
     const payload = argsOf(1, 'update')?.[0] as Record<string, unknown>
     expect(Object.keys(payload)).toEqual(['deleted_at'])
     const sent = Date.parse(payload.deleted_at as string)
     expect(sent).toBeGreaterThanOrEqual(before)
     expect(sent).toBeLessThanOrEqual(after)
     expect(argsOf(1, 'eq')).toEqual(['id', MEAL_ID])
-    expect(argsOf(1, 'is')).toEqual(['deleted_at', null])
   })
 
   it('if creating fails, its error is thrown and nothing is deleted', async () => {
     const error = { message: 'x', code: '23514' }
     fake.state.results = [{ data: null, error }]
-    await expect(saveMeal({ record, replaces: MEAL_ID })).rejects.toBe(error)
+    await expect(
+      saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY }),
+    ).rejects.toBe(error)
     expect(fake.state.chains.map((chain) => chain.table)).toEqual([
       'rpc:create_meal',
     ])
@@ -1116,13 +1149,15 @@ describe('saveMeal', () => {
   it('if creating rejects (the network), nothing is deleted', async () => {
     const network = new Error('network')
     fake.state.results = [network]
-    await expect(saveMeal({ record, replaces: MEAL_ID })).rejects.toBe(network)
+    await expect(
+      saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY }),
+    ).rejects.toBe(network)
     expect(fake.state.chains).toHaveLength(1)
   })
 
   it.each([
     [
-      'no row updated (gone, or already deleted)',
+      'no row updated (gone, or another user\x27s)',
       { data: null, error: { message: 'x', code: 'PGRST116' } },
     ],
     ['a Supabase error', { data: null, error: { message: 'x', code: '500' } }],
@@ -1131,11 +1166,52 @@ describe('saveMeal', () => {
     'if deleting the corrected meal fails (%s), the new meal stays saved',
     async (_, deleteResult) => {
       fake.state.results = [{ data: NEW_ID, error: null }, deleteResult]
-      await expect(saveMeal({ record, replaces: MEAL_ID })).resolves.toEqual({
+      await expect(
+        saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY }),
+      ).resolves.toEqual({
         id: NEW_ID,
         replacedDeleted: false,
       })
       expect(fake.state.chains).toHaveLength(2)
     },
   )
+
+  it('sends the key of the meal in progress, in a new meal and in a correction', async () => {
+    fake.state.results = [
+      { data: NEW_ID, error: null },
+      { data: NEW_ID, error: null },
+      { data: { id: MEAL_ID }, error: null },
+    ]
+    await saveMeal({ record, replaces: null, clientKey: CLIENT_KEY })
+    await saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY })
+    expect(payloadOf(0).meal.client_key).toBe(CLIENT_KEY)
+    expect(payloadOf(1).meal.client_key).toBe(CLIENT_KEY)
+  })
+
+  it('a retry of a correction (same key) ends well: create_meal gives the meal already created and the corrected one, already deleted, is deleted again', async () => {
+    // The first attempt saved both, but its answer was lost. The retry gets
+    // the same id, and deleting the corrected one is not filtered by
+    // deleted_at, so the row comes back.
+    fake.state.results = [
+      { data: NEW_ID, error: null },
+      { data: { id: MEAL_ID }, error: null },
+    ]
+    await expect(
+      saveMeal({ record, replaces: MEAL_ID, clientKey: CLIENT_KEY }),
+    ).resolves.toEqual({ id: NEW_ID, replacedDeleted: true })
+    expect(fake.state.chains[1]?.calls.map((c) => c.method)).not.toContain('is')
+  })
+})
+
+describe('createMeal: the key of the meal', () => {
+  it('goes in meal.client_key, as given, without touching the record', async () => {
+    fake.state.results = [{ data: MEAL_ID, error: null }]
+    const before = structuredClone(record)
+    await createMeal(record, CLIENT_KEY)
+    expect(payloadOf(0).meal).toEqual({
+      ...record.meal,
+      client_key: CLIENT_KEY,
+    })
+    expect(record).toEqual(before)
+  })
 })

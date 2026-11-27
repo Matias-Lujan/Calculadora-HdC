@@ -186,6 +186,7 @@ export type Database = {
           calc_version: string
           calculated_dose_units: number
           carb_ratio_g_per_unit: number
+          client_key: string | null
           created_at: string
           deleted_at: string | null
           eaten_at: string
@@ -199,6 +200,7 @@ export type Database = {
           calc_version: string
           calculated_dose_units: number
           carb_ratio_g_per_unit: number
+          client_key?: string | null
           created_at?: string
           deleted_at?: string | null
           eaten_at: string
@@ -212,6 +214,7 @@ export type Database = {
           calc_version?: string
           calculated_dose_units?: number
           carb_ratio_g_per_unit?: number
+          client_key?: string | null
           created_at?: string
           deleted_at?: string | null
           eaten_at?: string

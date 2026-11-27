@@ -25,6 +25,35 @@ export type StoredMealDraft = {
   eatenAtText: string | null
   /** The saved meal this one corrects ("Corregir", spec §6.7), or null. */
   correcting: CorrectedMeal | null
+  /**
+   * The key of this meal (a uuid, spec §7.2): saving it again with the same
+   * key does not create a second meal. Each new meal gets a new one.
+   */
+  clientKey: string
+}
+
+/** The key of a new meal in progress. */
+export function newClientKey(): string {
+  return crypto.randomUUID()
+}
+
+/** What the key of the meal follows: what the user entered. */
+export type KeyedMeal = Pick<
+  StoredMealDraft,
+  'items' | 'appliedDoseText' | 'eatenAtText'
+>
+
+/**
+ * Whether what was entered changed (spec §14 #85): then it is another meal,
+ * with a new key. The items are compared by reference: the form only
+ * replaces the list when something in it changes.
+ */
+export function mealChanged(before: KeyedMeal, now: KeyedMeal): boolean {
+  return (
+    before.items !== now.items ||
+    before.appliedDoseText !== now.appliedDoseText ||
+    before.eatenAtText !== now.eatenAtText
+  )
 }
 
 const mealFoodSchema = foodSchema.extend({
@@ -79,6 +108,11 @@ const storedMealDraftSchema = z
     correcting: correctedMealSchema
       .nullish()
       .transform((value) => value ?? null),
+    // Missing in a meal kept before the key existed: it gets one now.
+    clientKey: z
+      .guid()
+      .optional()
+      .transform((value) => value ?? newClientKey()),
   })
   .refine(
     ({ items }) => new Set(items.map((item) => item.key)).size === items.length,
@@ -123,11 +157,14 @@ export type InitialMealForm = StoredMealDraft & {
   copyNotice: CopyNotice | null
 }
 
-const EMPTY_DRAFT: StoredMealDraft = {
-  items: [],
-  appliedDoseText: null,
-  eatenAtText: null,
-  correcting: null,
+function emptyDraft(): StoredMealDraft {
+  return {
+    items: [],
+    appliedDoseText: null,
+    eatenAtText: null,
+    correcting: null,
+    clientKey: newClientKey(),
+  }
 }
 
 /**
@@ -140,7 +177,7 @@ export function initialMealForm(
   stored: StoredMealDraft | null,
   addedFood: Food | null,
 ): InitialMealForm {
-  const draft = stored ?? EMPTY_DRAFT
+  const draft = stored ?? emptyDraft()
   const nextKey = nextItemKey(draft.items)
   const base = {
     ...draft,
@@ -159,6 +196,8 @@ export function initialMealForm(
   return {
     ...base,
     items: [...draft.items, newItemDraft(nextKey, addedFood)],
+    // A food added is a change: another meal, with a new key.
+    clientKey: newClientKey(),
     nextKey: nextKey + 1,
     focusKey: nextKey,
   }
@@ -188,6 +227,9 @@ export function copiedMealForm(
     appliedDoseText: copy.appliedDoseText,
     eatenAtText: copy.eatenAtText,
     correcting: copy.correcting,
+    // A loaded meal replaces the one in progress: it is a new meal, with a
+    // key of its own (the old one may belong to a meal already saved).
+    clientKey: newClientKey(),
     nextKey: nextItemKey(copy.items),
     focusKey: null,
     notUsableFood: null,

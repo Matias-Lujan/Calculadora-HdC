@@ -76,12 +76,15 @@ import {
   type RemovedItem,
 } from '../mealDraft.ts'
 import { savedMealText } from '../breakdown.ts'
-import { useCreateMeal } from '../queries.ts'
+import { useCreateMeal, useOtherMealSave } from '../queries.ts'
 import {
   copiedMealForm,
   initialMealForm,
+  mealChanged,
+  newClientKey,
   parseStoredMealDraft,
   type InitialMealForm,
+  type KeyedMeal,
   type StoredMealDraft,
 } from '../storedDraft.ts'
 import { tableFoodAsMealFood } from '../tableFoods.ts'
@@ -230,6 +233,23 @@ export function MealForm({
   // The saved meal this one corrects ("Corregir", spec §6.7), kept with the
   // meal in progress.
   const [correcting, setCorrecting] = useState(initial.correcting)
+  // The key of the meal in progress (spec §7.2), kept with it: saving it
+  // again unchanged (a retry) does not create a second meal. Any change to
+  // what was entered (items, quantities, dose, date; also emptying it or
+  // saving it) makes it another meal, with a new key, adjusted in the
+  // render: a retry after editing must not get the meal saved before the
+  // edit (spec §14 #85).
+  const [clientKey, setClientKey] = useState(initial.clientKey)
+  const [keyedMeal, setKeyedMeal] = useState<KeyedMeal>({
+    items,
+    appliedDoseText,
+    eatenAtText,
+  })
+  const enteredNow: KeyedMeal = { items, appliedDoseText, eatenAtText }
+  if (mealChanged(keyedMeal, enteredNow)) {
+    setKeyedMeal(enteredNow)
+    setClientKey(newClientKey())
+  }
   // The notices of a saved meal just loaded ("Repetir" or "Corregir"),
   // until the next change.
   const [copyNotice, setCopyNotice] = useState(initial.copyNotice)
@@ -248,6 +268,14 @@ export function MealForm({
   // search is not opened again until it lands.
   const leavingSearchRef = useRef(false)
   const createMeal = useCreateMeal()
+  // A save of this meal that an earlier Inicio started (the user left while
+  // it was saving and came back, spec §6.6, §14 #85): while it is in
+  // progress the form is saving; when it ends well, the form empties as
+  // after its own save (in the render, so the old meal is not shown).
+  const [mountedAt] = useState(() => Date.now())
+  const otherSave = useOtherMealSave(clientKey, mountedAt)
+  const otherSaving = otherSave?.status === 'pending'
+  const saving = createMeal.isPending || otherSaving
   // A save is in progress. isPending disables the fieldset only after the
   // next render, so a second tap in the same tick ("Guardar" or "Guardar
   // igual") would create a second meal without this (spec §14 #46).
@@ -353,9 +381,22 @@ export function MealForm({
       appliedDoseText,
       eatenAtText,
       correcting,
+      clientKey,
     }
     writeMealDraft(draft)
-  }, [items, appliedDoseText, eatenAtText, correcting])
+  }, [items, appliedDoseText, eatenAtText, correcting, clientKey])
+
+  // The save an earlier Inicio started ended well: the same as after a save
+  // of this form. reset gives a new key, so this runs once.
+  if (otherSave?.status === 'success') {
+    const { saved: other, result: otherResult } = otherSave
+    reset({
+      ...otherResult,
+      replaced: other.replaces,
+      totalCarbsG: other.record.meal.total_carbs_g,
+      appliedDoseUnits: other.record.meal.applied_dose_units,
+    })
+  }
 
   const inputs = useMemo(() => items.map(toMealItemInput), [items])
   const result = useMemo(
@@ -394,7 +435,7 @@ export function MealForm({
   // inside the tap (iOS opens the keyboard only that way, #44), and adds its
   // entry to the browser history (without moving the page).
   function openSearch(openerId: string) {
-    if (savingRef.current || leavingSearchRef.current) return
+    if (savingRef.current || otherSaving || leavingSearchRef.current) return
     searchOpenerRef.current = openerId
     flushSync(() => setSearchOpen(true))
     document.getElementById(FOOD_SEARCH_INPUT_ID)?.focus()
@@ -425,7 +466,7 @@ export function MealForm({
   // detail (spec §6.6). Inicio has no items here, so nothing is replaced.
   function handleRepeat(meal: RecentMeal) {
     const form = copiedMealForm(
-      { items, appliedDoseText, eatenAtText, correcting },
+      { items, appliedDoseText, eatenAtText, correcting, clientKey },
       {
         mode: 'repeat',
         mealId: meal.id,
@@ -453,6 +494,7 @@ export function MealForm({
         setEatenAtText(form.eatenAtText)
         setEatenAtShownError(false)
         setCorrecting(form.correcting)
+        setClientKey(form.clientKey)
       }
       setCopyNotice(form.copyNotice)
     })
@@ -526,11 +568,14 @@ export function MealForm({
     setEatenAtText(null)
     setEatenAtShownError(false)
     setCorrecting(null)
+    // Right away (the change of the meal gives another one too, a render
+    // later): the save of an earlier Inicio must stop matching.
+    setClientKey(newClientKey())
     setSaved(notice)
   }
 
   function save() {
-    if (savingRef.current) return
+    if (savingRef.current || otherSaving) return
     if (!result.ok) return
     // Correcting, the date and the dose as they were loaded save the exact
     // values of the corrected meal (spec §6.7).
@@ -559,11 +604,11 @@ export function MealForm({
       eatenAt,
     )
     // A correction creates the new meal and then deletes the corrected one
-    // (saveMeal, spec §6.7).
+    // (saveMeal, spec §6.7), with the same key as any other meal.
     const replaces = correcting?.mealId ?? null
     savingRef.current = true
     createMeal.mutate(
-      { record, replaces },
+      { record, replaces, clientKey },
       {
         onSuccess: (savedMeal) =>
           reset({
@@ -582,7 +627,7 @@ export function MealForm({
   function handleSave() {
     // A tap on "Guardar" right after "Guardar igual" must not reopen the
     // confirmation while the meal is being saved.
-    if (savingRef.current) return
+    if (savingRef.current || otherSaving) return
     const first = firstMealProblem(items, result, appliedDoseText, eatenAtText)
     // Rendered right away: the errors have to be on screen before going to
     // the first one, inside the tap (iOS only opens the keyboard that way).
@@ -681,7 +726,7 @@ export function MealForm({
       variant="secondary"
       className="shrink-0"
       onFile={(file) => {
-        if (savingRef.current) return
+        if (savingRef.current || otherSaving) return
         void navigate('/foods/label', {
           state: { ...FROM_MEAL_STATE, ...holdLabelPhoto(file) },
         })
@@ -706,7 +751,7 @@ export function MealForm({
           page is inert (the bar too, in an effect). */}
       <fieldset
         className="flex min-w-0 flex-col gap-4 [&_:is(input,button,a,select)]:scroll-mt-[calc(18rem+env(safe-area-inset-top))]"
-        disabled={createMeal.isPending}
+        disabled={saving}
         inert={searchOpen}
       >
         {/* Fixed until saving or cancelling, with the items not brought. */}
@@ -1136,7 +1181,7 @@ export function MealForm({
                   className={button.primary}
                   onClick={handleSave}
                 >
-                  {createMeal.isPending ? 'Guardando…' : 'Guardar comida'}
+                  {saving ? 'Guardando…' : 'Guardar comida'}
                 </button>
               </>
             )}

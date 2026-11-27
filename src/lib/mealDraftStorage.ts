@@ -49,3 +49,21 @@ export function clearMealDraft(): void {
     // Nothing to clear.
   }
 }
+
+/**
+ * Clears the stored draft only if it is the meal with `clientKey` (spec
+ * §14 #85): after a save ends, the draft may already be another meal (one
+ * loaded with "Repetir" or "Corregir" meanwhile), and that one stays. Only
+ * the key is looked at.
+ */
+export function clearMealDraftOf(clientKey: string): void {
+  const draft = readMealDraft()
+  if (
+    typeof draft === 'object' &&
+    draft !== null &&
+    'clientKey' in draft &&
+    draft.clientKey === clientKey
+  ) {
+    clearMealDraft()
+  }
+}

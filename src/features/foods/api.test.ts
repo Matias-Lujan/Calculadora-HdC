@@ -4,6 +4,7 @@ import { UnauthorizedError, VisionError } from '../../lib/errors.ts'
 import type { Food } from '../../lib/foods.ts'
 import {
   archiveFood,
+  cleanUpOrphanLabelPhotos,
   createFood,
   createLabelPhotoUrl,
   deleteLabelPhoto,
@@ -25,7 +26,11 @@ const fake = vi.hoisted(() => {
   const state = {
     table: '',
     calls: [] as Call[],
-    result: { data: null as unknown, error: null as unknown },
+    result: { data: null, error: null } as {
+      data: unknown
+      error: unknown
+      count?: number | null
+    },
     // Storage, functions and auth: what each call got and what it answers.
     bucket: '',
     storageCalls: [] as Call[],
@@ -36,7 +41,15 @@ const fake = vi.hoisted(() => {
   }
   function builder(): Record<string, unknown> {
     const b: Record<string, unknown> = {}
-    for (const method of ['select', 'is', 'eq', 'update', 'insert', 'single']) {
+    for (const method of [
+      'select',
+      'is',
+      'not',
+      'eq',
+      'update',
+      'insert',
+      'single',
+    ]) {
       b[method] = (...args: unknown[]) => {
         state.calls.push({ method, args })
         return b
@@ -46,7 +59,7 @@ const fake = vi.hoisted(() => {
     return b
   }
   const storageBucket = Object.fromEntries(
-    ['upload', 'remove', 'createSignedUrl'].map((method) => [
+    ['upload', 'remove', 'createSignedUrl', 'list'].map((method) => [
       method,
       (...args: unknown[]) => {
         state.storageCalls.push({ method, args })
@@ -508,5 +521,94 @@ describe('createLabelPhotoUrl', () => {
     expect(fake.state.storageCalls).toEqual([
       { method: 'createSignedUrl', args: ['user-1/photo.jpg', 600] },
     ])
+  })
+})
+
+describe('cleanUpOrphanLabelPhotos', () => {
+  const old = '2020-01-01T00:00:00Z'
+
+  it('lists the user folder (up to 1000, oldest first) and removes the loose old photos', async () => {
+    fake.state.session = { user: { id: 'user-1' } }
+    fake.state.storageResult = {
+      data: [
+        { name: 'used.jpg', id: 'a', created_at: old },
+        { name: 'loose.jpg', id: 'b', created_at: old },
+      ],
+      error: null,
+    }
+    fake.state.result = {
+      data: [{ photo_path: 'user-1/used.jpg' }],
+      count: 1,
+      error: null,
+    }
+    await cleanUpOrphanLabelPhotos()
+
+    expect(fake.state.bucket).toBe('food-photos')
+    expect(fake.state.storageCalls).toEqual([
+      {
+        method: 'list',
+        args: [
+          'user-1',
+          { limit: 1000, sortBy: { column: 'created_at', order: 'asc' } },
+        ],
+      },
+      { method: 'remove', args: [['user-1/loose.jpg']] },
+    ])
+    // Every food, archived ones included: no filter on archived_at.
+    expect(fake.state.table).toBe('foods')
+    expect(fake.state.calls).toEqual([
+      { method: 'select', args: ['photo_path', { count: 'exact' }] },
+      { method: 'not', args: ['photo_path', 'is', null] },
+    ])
+  })
+
+  it('does not call remove when nothing is loose', async () => {
+    fake.state.session = { user: { id: 'user-1' } }
+    fake.state.storageResult = { data: [], error: null }
+    fake.state.result = { data: [], error: null, count: 0 }
+    await cleanUpOrphanLabelPhotos()
+    expect(fake.state.storageCalls.map((c) => c.method)).toEqual(['list'])
+  })
+
+  it('removes nothing when the list of foods came incomplete', async () => {
+    // PostgREST cut the answer at max_rows: the count says there are more.
+    fake.state.session = { user: { id: 'user-1' } }
+    fake.state.storageResult = {
+      data: [{ name: 'loose.jpg', id: 'b', created_at: old }],
+      error: null,
+    }
+    fake.state.result = {
+      data: [{ photo_path: 'user-1/other.jpg' }],
+      error: null,
+      count: 2,
+    }
+    await cleanUpOrphanLabelPhotos()
+    expect(fake.state.storageCalls.map((c) => c.method)).toEqual(['list'])
+  })
+
+  it('does nothing without a session', async () => {
+    await cleanUpOrphanLabelPhotos()
+    expect(fake.state.storageCalls).toEqual([])
+    expect(fake.state.calls).toEqual([])
+  })
+
+  it('throws without removing when reading the foods fails', async () => {
+    fake.state.session = { user: { id: 'user-1' } }
+    fake.state.storageResult = {
+      data: [{ name: 'loose.jpg', id: 'b', created_at: old }],
+      error: null,
+    }
+    const error = new Error('boom')
+    fake.state.result = { data: null, error }
+    await expect(cleanUpOrphanLabelPhotos()).rejects.toBe(error)
+    expect(fake.state.storageCalls.map((c) => c.method)).toEqual(['list'])
+  })
+
+  it('throws without reading the foods when the list fails', async () => {
+    fake.state.session = { user: { id: 'user-1' } }
+    const error = new Error('boom')
+    fake.state.storageResult = { data: null, error }
+    await expect(cleanUpOrphanLabelPhotos()).rejects.toBe(error)
+    expect(fake.state.calls).toEqual([])
   })
 })

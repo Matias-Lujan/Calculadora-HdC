@@ -27,6 +27,7 @@ import { LabelProgress } from '../components/LabelProgress.tsx'
 import { LabelReadError } from '../components/LabelReadError.tsx'
 import { toResizedJpeg } from '../photo.ts'
 import {
+  useCleanUpLabelPhotos,
   useDeleteLabelPhoto,
   useTranscribeLabel,
   useUploadLabelPhoto,
@@ -178,6 +179,21 @@ export function NewLabelFoodPage() {
   })
   useEffect(() => {
     startPicked()
+  }, [])
+
+  // Opening the screen deletes, in the background and without showing
+  // anything, the photos left without a food more than a day ago (spec
+  // §6.1). Once per opening: the ref survives React's second run of the
+  // effect in development. A failure is ignored (it is only cleanup).
+  const cleanUpPhotos = useCleanUpLabelPhotos()
+  const cleanUpStartedRef = useRef(false)
+  const startCleanUp = useEffectEvent(() => {
+    if (cleanUpStartedRef.current) return
+    cleanUpStartedRef.current = true
+    cleanUpPhotos.mutate()
+  })
+  useEffect(() => {
+    startCleanUp()
   }, [])
 
   // Cancel deletes the uploaded photo without waiting (spec §6.1).

@@ -4,6 +4,7 @@ import type { TablesInsert } from '../../lib/database.types.ts'
 import { UnauthorizedError, VisionError } from '../../lib/errors.ts'
 import { FOOD_COLUMNS, foodSchema, type Food } from '../../lib/foods.ts'
 import { supabase } from '../../lib/supabase.ts'
+import { orphanPhotoPaths } from './photoCleanup.ts'
 import {
   transcribeErrorSchema,
   transcribeSuccessSchema,
@@ -175,4 +176,58 @@ export async function createLabelPhotoUrl(path: string): Promise<string> {
     .createSignedUrl(path, PHOTO_URL_SECONDS)
   if (error) throw error
   return data.signedUrl
+}
+
+/**
+ * The storage list answers 100 entries by default. 1000 is far more photos
+ * than one user keeps; the oldest come first, so if there were more, the
+ * old loose ones would still be reached first.
+ */
+const PHOTO_LIST_LIMIT = 1000
+
+/**
+ * Deletes the user's label photos that were left without a food (the
+ * connection dropped or the user left the screen, spec §6.1, §7.4): those
+ * older than a day that no food uses, archived ones included
+ * (photoCleanup.ts). Without a session it does nothing. Any failure throws
+ * before deleting anything.
+ */
+export async function cleanUpOrphanLabelPhotos(): Promise<void> {
+  const { data: auth, error: authError } = await supabase.auth.getSession()
+  if (authError) throw authError
+  const userId = auth.session?.user.id
+  if (userId === undefined) return
+
+  const { data: stored, error: listError } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .list(userId, {
+      limit: PHOTO_LIST_LIMIT,
+      sortBy: { column: 'created_at', order: 'asc' },
+    })
+  if (listError) throw listError
+
+  // RLS returns only the user's own foods; archived ones are not filtered.
+  // PostgREST cuts the answer at max_rows without an error: if fewer rows
+  // came than the count, a used photo could be missing, so nothing is
+  // deleted.
+  const {
+    data: foods,
+    count,
+    error: foodsError,
+  } = await supabase
+    .from('foods')
+    .select('photo_path', { count: 'exact' })
+    .not('photo_path', 'is', null)
+  if (foodsError) throw foodsError
+  if (foods === null || count !== foods.length) return
+
+  const orphans = orphanPhotoPaths(
+    userId,
+    stored,
+    foods.map((row) => row.photo_path),
+    Date.now(),
+  )
+  if (orphans.length === 0) return
+  const { error } = await supabase.storage.from(PHOTO_BUCKET).remove(orphans)
+  if (error) throw error
 }
