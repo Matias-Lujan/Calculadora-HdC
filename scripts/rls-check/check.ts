@@ -494,13 +494,15 @@ console.log('\nRegistros inmutables (privilegios por columna)')
 }
 
 // --- libre_sessions: only the Edge Function, with the secret key ---------------
+// authenticated has no privileges at all, so every call must fail (an empty
+// result would also pass on an empty table and hide a wrong grant).
 
 console.log('\nlibre_sessions: ningún usuario la lee ni la escribe')
 {
   const read = await a.supabase.from('libre_sessions').select('*')
   check(
     'libre_sessions: A no lee nada (ni su propia fila)',
-    read.error !== null || read.data?.length === 0,
+    read.error !== null,
     `${read.data?.length} filas`,
   )
   const insert = await a.supabase.from('libre_sessions').insert({
@@ -513,19 +515,13 @@ console.log('\nlibre_sessions: ningún usuario la lee ni la escribe')
     .update({ login_error: 'rls-check' })
     .eq('user_id', a.id)
     .select()
-  check(
-    'libre_sessions: A no puede actualizar',
-    update.error !== null || update.data?.length === 0,
-  )
+  check('libre_sessions: A no puede actualizar', update.error !== null)
   const remove = await a.supabase
     .from('libre_sessions')
     .delete()
     .eq('user_id', a.id)
     .select()
-  check(
-    'libre_sessions: A no puede borrar',
-    remove.error !== null || remove.data?.length === 0,
-  )
+  check('libre_sessions: A no puede borrar', remove.error !== null)
 }
 
 // --- Anonymous access -----------------------------------------------------------

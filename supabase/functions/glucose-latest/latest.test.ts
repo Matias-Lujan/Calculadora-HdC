@@ -114,6 +114,39 @@ describe('latestGlucose', () => {
     expect(loginMock).toHaveBeenCalledTimes(1)
   })
 
+  it('SESSION_EXPIRED y después un login fallido borra la sesión vieja y espera', async () => {
+    readMock.mockResolvedValue({ ok: false, error: 'SESSION_EXPIRED' })
+    loginMock.mockResolvedValue({ ok: false, error: 'BAD_CREDENTIALS' })
+    const outcome = await run(withSession)
+
+    expect(outcome).toEqual({
+      result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED' },
+      state: {
+        session: null,
+        loginAfter: NOW + LOGIN_WAIT_MS,
+        loginError: 'GLUCOSE_LOGIN_FAILED',
+      },
+      changed: true,
+      events: [
+        'READ_FAILED SESSION_EXPIRED',
+        'LOGIN',
+        'LOGIN_FAILED BAD_CREDENTIALS',
+      ],
+    })
+    expect(loginMock).toHaveBeenCalledTimes(1)
+    expect(readMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('una sesión que vence 1 ms después todavía se usa, sin entrar', async () => {
+    readMock.mockResolvedValue({ ok: true, reading: READING })
+    const almost = { ...KEPT, expiresAt: NOW + 1 }
+    const outcome = await run({ ...withSession, session: almost })
+
+    expect(readMock).toHaveBeenCalledWith(almost, CONFIG)
+    expect(loginMock).not.toHaveBeenCalled()
+    expect(outcome.changed).toBe(false)
+  })
+
   it('un segundo SESSION_EXPIRED da GLUCOSE_UNAVAILABLE y espera, sin otro login', async () => {
     readMock.mockResolvedValue({ ok: false, error: 'SESSION_EXPIRED' })
     loginMock.mockResolvedValue({ ok: true, session: NEW })

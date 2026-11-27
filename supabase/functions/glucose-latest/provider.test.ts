@@ -86,6 +86,20 @@ describe('login', () => {
     ])
   })
 
+  it('tras una redirección, el error del segundo login pasa tal cual (con su espera)', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) =>
+      String(url).startsWith('https://api.libreview.io')
+        ? answer({ status: 0, data: { redirect: true, region: 'eu' } })
+        : answer({ status: 429, data: { data: { lockout: 600 } } }),
+    )
+    expect(await login(CREDENTIALS, config(fetchMock))).toEqual({
+      ok: false,
+      error: 'LOCKED',
+      retryAfterSeconds: 600,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
   it('una segunda redirección da BAD_RESPONSE, sin una tercera llamada', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () =>
       answer({ status: 0, data: { redirect: true, region: 'eu' } }),

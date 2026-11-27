@@ -105,6 +105,39 @@ export type Database = {
         }
         Relationships: []
       }
+      libre_sessions: {
+        Row: {
+          account_id_hash: string | null
+          api_url: string | null
+          expires_at: string | null
+          login_after: string | null
+          login_error: string | null
+          token: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id_hash?: string | null
+          api_url?: string | null
+          expires_at?: string | null
+          login_after?: string | null
+          login_error?: string | null
+          token?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id_hash?: string | null
+          api_url?: string | null
+          expires_at?: string | null
+          login_after?: string | null
+          login_error?: string | null
+          token?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       meal_items: {
         Row: {
           carbs_g: number

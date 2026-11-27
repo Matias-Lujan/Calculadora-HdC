@@ -969,7 +969,7 @@ Los mensajes de la app están en §6.9. La función hace a lo sumo cuatro llamad
 
 ## 11. Seguridad y datos personales
 
-- **RLS activada y con políticas en todas las tablas**, sin excepción (§7.3).
+- **RLS activada en todas las tablas**, y con políticas en todas salvo `libre_sessions`, que usa solo `glucose-latest` con la key secreta: sin políticas ni `grant` a `anon` ni `authenticated`, así ningún usuario la lee ni la escribe (§7.3, #90).
 - **La key anon/publishable de Supabase va en el frontend y es pública por diseño.** La protección la dan RLS y el registro deshabilitado.
 - **Nunca** en el frontend ni en el repo: la `service_role` key, `GEMINI_API_KEY` ni las credenciales de LibreLink (`LIBRE_EMAIL`, `LIBRE_PASSWORD`). Esas van solo en los secrets de Supabase, con `LIBRE_APP_USER_ID` (§9.8); el pase de LibreLinkUp, en `libre_sessions`, que ningún usuario puede leer (§7.3).
 - La glucosa no se loguea ni se guarda: la función la lee y la devuelve. Excepción a no usar datos reales en `dev` (#89): sus secrets tienen la cuenta real de LibreLink del usuario, porque no hay sensor de prueba.
