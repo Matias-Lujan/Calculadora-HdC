@@ -24,12 +24,12 @@ Usuario: una persona con diabetes tipo 1, que usa la app desde Safari en iPhone 
 6. **Cálculo de dosis**: solo bolo por hidratos, con un ratio configurable. Se muestra **el valor exacto, sin redondear**, con el desglose completo.
 7. **Historial inmutable**: cada registro guarda los valores que se usaron en ese momento.
 8. **Configuración**: ratio y umbrales de alerta.
+9. **Glucosa del sensor en Inicio** (después del MVP, M8): el último valor del FreeStyle Libre 2, vía la API no oficial de LibreLinkUp, **solo como referencia**: nunca entra al cálculo ni se guarda con la comida (§6.9, §9.8, §13).
 
 ### 2.2 Fuera del MVP (el diseño no debe bloquearlos)
 
 | Funcionalidad | Cómo queda preparado el diseño |
 |---|---|
-| Glucemia desde FreeStyle Libre 2 Plus vía la API no oficial de LibreLinkUp | Solo como dato de referencia en pantalla, **nunca como entrada del cálculo**. Iría en una Edge Function aparte, con las credenciales en los secrets de Supabase. Si algún día se guarda junto al registro, se agregan columnas opcionales a `meals`. Ver §13. |
 | Escaneo de código de barras | Se agrega una columna `barcode` opcional en `foods` (migración trivial). |
 | Corrección por glucemia, insulina activa, ratios distintos por comida | El cálculo vive en un módulo aislado (§8) y cada registro guarda el ratio que se usó, así que el historial no se rompe si cambia la fórmula. |
 | Tandas de cocción con factor propio | — |
@@ -303,6 +303,19 @@ La pantalla (etapa 3):
 - Rótulos (etapa 6b, #52; "unidades" desde M1, #65): "Alerta de dosis máxima (unidades)" y "Alerta de gramos por alimento (g)" (antes "por ítem"), en `src/features/settings/fields.ts`. Las dos alertas tienen un ⓘ (desde M1, #67, dicen que también avisan en el momento): "Si la dosis calculada da más que esto, la app te avisa en el momento y te pide que confirmes antes de guardar la comida." y "Si cargás más gramos que esto de un solo alimento, la app te avisa en el momento y te pide que confirmes antes de guardar. Sirve para detectar un error de tipeo.".
 - Debajo del formulario, en la tarjeta "Cuenta", está el botón **"Cerrar sesión"** (§10).
 
+### 6.9 Glucosa del sensor (M8, #87 a #93)
+
+Arriba de Inicio, un recuadro muestra la última lectura del sensor (FreeStyle Libre 2, que la sube desde la app LibreLink del celular), que da la función `glucose-latest` (§9.8). Es **solo una referencia**: no entra al cálculo (regla 7 de `CLAUDE.md`) ni se guarda con la comida. Inicio no lo espera: la comida se carga igual mientras carga o si falla.
+
+- Rótulo "Glucosa del sensor", con un ⓘ: "Es la última lectura de tu sensor, para tenerla a mano. No cambia la dosis.".
+- El valor en grande, "mg/dL" y la flecha de la tendencia (bajando rápido, bajando, estable, subiendo, subiendo rápido; para lectores de pantalla, con esas palabras). Si el sensor no da tendencia, sin flecha. Debajo, cuándo se midió: "ahora", "hace 5 min" o "hace más de una hora", al día aunque la lectura no cambie.
+- **Lectura vieja** (más de 15 min): el valor en gris, sin flecha, y "hace 20 min · puede no ser la actual".
+- **Sin colores de rango**: rojo, ámbar y verde quedan para errores, advertencias y guardado.
+- Se vuelve a leer cada minuto mientras la app está a la vista y al volver a ella; en segundo plano, no.
+- Mientras carga la primera vez, una forma gris del tamaño del valor. Si el sensor no tiene lecturas: "El sensor no tiene lecturas por ahora.".
+- **Si falla**, un aviso corto en gris, que no bloquea nada. Con una lectura ya cargada, se sigue mostrando y debajo dice "No se pudo actualizar.". Sin lectura: "No se pudo entrar a tu cuenta de LibreLink. Revisá el email y la contraseña guardados." (contraseña rechazada), "LibreLink pide que aceptes sus condiciones. Abrí la app LibreLinkUp, entrá y aceptalas.", "Tu cuenta no está compartiendo la glucosa. Revisalo en LibreLink, en Aplicaciones conectadas." o, para todo lo demás, "No se pudo leer la glucosa. Se vuelve a probar sola.". Con cualquier error se sigue consultando cada minuto, así el recuadro se arregla solo cuando el usuario resuelve el problema en LibreLink (la función entra a lo sumo una vez cada 15 min, §9.8). Mientras la función espera después de un login fallido, debajo del aviso (o de "No se pudo actualizar.") una línea chica en gris dice cuándo vuelve a probar: "Se vuelve a probar a las 15:20:05", en hora de Argentina (#94).
+- **Solo lo ve un usuario** hasta M9: el que está habilitado en la función (§9.8). Para cualquier otro, la función responde "no configurada" y el recuadro no aparece.
+
 ## 7. Modelo de datos
 
 Convenciones:
@@ -421,6 +434,21 @@ Cada registro guarda los valores que se usaron, así que editar el alimento desp
 
 No se puede actualizar ni borrar, así el tope diario no se puede resetear.
 
+**`libre_sessions`** (M8): la sesión de LibreLinkUp de la función `glucose-latest` (§9.8), para no entrar en cada consulta. Una fila por usuario.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `user_id` | uuid PK, FK `auth.users` | |
+| `api_url` | text null | La API regional de la cuenta |
+| `token` | text null | El pase de LibreLinkUp (dura unos 6 meses) |
+| `account_id_hash` | text null | sha256 del id de la cuenta de LibreLinkUp, que se manda en cada lectura |
+| `expires_at` | timestamptz null | Cuándo vence el pase |
+| `login_after` | timestamptz null | Después de un login fallido, no se vuelve a entrar antes de esta hora |
+| `login_error` | text null | El código que dio ese login, que se responde mientras se espera |
+| `updated_at` | timestamptz not null default now() | Lo mantiene un trigger |
+
+Check: la sesión está completa o vacía (`api_url`, `token`, `account_id_hash` y `expires_at`, todos o ninguno). Ningún usuario la lee ni la escribe, ni siquiera la propia (tiene un pase de su cuenta de LibreLink): solo la función, con la key secreta (§7.3). Nunca guarda glucosa.
+
 ### 7.2 Integridad
 
 - **La fuente de verdad del cálculo es el módulo TypeScript (§8).** La base guarda las entradas y los resultados, y sus CHECK actúan como **red de seguridad**: rangos válidos, campos requeridos según el modo, y coherencia aritmética de cada fila (por ejemplo, que `carbs_g` sea igual a `grams × effective_carbs_per_100g / 100`, con una tolerancia de 0,001).
@@ -444,6 +472,7 @@ En las políticas se usa `(select auth.uid())`, que Postgres evalúa una vez por
 | `meals` | propias | `with check` propias | propias (solo `deleted_at`, por privilegio de columna) | — |
 | `meal_items` | propias | `with check` propias | — | — |
 | `vision_requests` | propias | `with check` propias | — | — (el tope no se resetea) |
+| `libre_sessions` | — | — | — | — (solo la función `glucose-latest`, con la key secreta, que no pasa por RLS; `select`, `insert` y `update` solo para `service_role`) |
 
 Las fotos tienen sus propias políticas (§7.4).
 
@@ -692,7 +721,9 @@ En la tabla, "aviso" es el `notice`; sin aviso es `null`. Las ediciones se escri
 | "-5", "+5", "12,5 g", "12%", "<0,5", "12 5", "1,2,3", "1e3", "Infinity", "NaN" | `null` | Signos, unidades, espacios internos, más de una coma, exponentes o palabras |
 | "999…9" (400 dígitos) | `null` | No entra en un `number` |
 
-## 9. Edge Function `transcribe-label`
+## 9. Edge Functions: `transcribe-label` y `glucose-latest`
+
+§9.1 a §9.7 son de `transcribe-label`, la lectura de etiquetas; §9.8, de `glucose-latest`, la glucosa del sensor.
 
 ### 9.1 Proveedor: Gemini, capa gratuita
 
@@ -872,6 +903,54 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 
 **Control de calorías** (`src/domain/label/energy.ts`, etapa 6, #56). `parseLabelEnergyKcal(texto)` saca las kcal de la energía transcripta: busca un número justo antes de "kcal" (al principio o después de un espacio, "=", "(", "/", ":" o ";"), que tiene que ser uno solo, y lo pasa por `parseLabelNumber`, con sus mismas reglas. "107 kcal", "107kcal", "107 Kcal", "107 kcal = 449 kJ", "449 kJ = 107 kcal" y "107 kcal (449 kJ)" dan 107; "107,5 kcal" da 107,5 y "0 kcal", 0. Dan `null` (sin control): el vacío, solo kJ ("449 kJ"), sin unidad ("107"), una cota ("<4 kcal", "≤ 4 kcal", "menos de 4 kcal"), dos valores ("107 kcal / 120 kcal"), "-5 kcal", "1.234 kcal" (ambiguo) y un número que no entra. `carbsExceedLabelEnergy({ carbsG, fiberG, energyKcal })` da `true` si `(HC − fibra) × 4 > kcal × 1,05 + 4`, sin redondear: 4 kcal por gramo de HC (Res. GMC 46/03, 3.3.1); + 4 kcal por el redondeo de la etiqueta; × 1,05 por los factores específicos de las etiquetas importadas. La fibra `null` cuenta como 0. Da `false` si falta una entrada, no es finita o es negativa, o si la fibra es mayor que los HC. Siempre se compara con la energía de la misma columna (por porción con la de la porción, cada 100 g con la de 100 g).
 
+### 9.8 Edge Function `glucose-latest` (M8, #88 a #92)
+
+Devuelve la última lectura del sensor para el recuadro de Inicio (§6.9). La lee de **LibreLinkUp**, la API **no oficial** de Abbott que usa la app LibreLinkUp para seguir a otra persona: puede cambiar o dejar de andar sin aviso, y entonces el recuadro muestra su error, sin afectar al resto de la app.
+
+**Cuenta y secrets** (hasta M9, un solo usuario): entra con el email y la contraseña de la **cuenta principal** de LibreLink del usuario, que se sigue a sí misma (en LibreLink, Aplicaciones conectadas → LibreLinkUp → su propio email, y después aceptar la invitación y las condiciones en la app LibreLinkUp). Están en los secrets `LIBRE_EMAIL` y `LIBRE_PASSWORD`; `LIBRE_APP_USER_ID` es el id del usuario de la app que la ve (distinto en `dev` y en `prod`). Si falta alguno o el usuario es otro, responde `GLUCOSE_NOT_CONFIGURED` sin llamar a LibreLinkUp. Los carga el usuario, en los dos proyectos.
+
+```
+supabase/functions/glucose-latest/
+  index.ts      # HTTP, CORS, auth, usuario habilitado, lectura y guardado de libre_sessions,
+                # respuesta HTTP. Es el único que usa Deno; no tiene tests
+  latest.ts     # cuándo entra, cuándo espera y qué se guarda (puro, con tests)
+  provider.ts   # ÚNICO archivo que conoce LibreLinkUp: login y lectura (con tests, fetch simulado)
+  contract.ts   # esquema zod de la respuesta, que también usa la app
+  deno.json     # como el de transcribe-label
+```
+
+`provider.ts` no lee secrets ni escribe logs: recibe las credenciales, la sesión, `fetch` y un timeout de 10 s por llamada.
+
+**Protocolo**:
+- Login: `POST https://api.libreview.io/llu/auth/login` con el email y la contraseña. Si responde una redirección a otra región (un código como `eu` o `eu2`, que se valida), se repite una sola vez en `https://api-<región>.libreview.io`. Todas las llamadas mandan `product: llu.android` y `version: 4.16.0` (constantes: LibreLinkUp rechaza clientes viejos); las lecturas, además, el pase (`Authorization: Bearer`) y `Account-Id` (sha256 del id de la cuenta).
+- Lectura: `GET <api>/llu/connections`. Se usa la primera conexión (la propia cuenta, que se sigue a sí misma). De su `glucoseMeasurement` salen el valor en mg/dL (entero > 0, sin redondear: si no, es una respuesta inválida), la flecha (1 a 5, de bajando rápido a subiendo rápido; otro valor, sin tendencia) y la hora (`FactoryTimestamp`, en UTC). Una conexión sin lectura no es un error: responde `reading: null`.
+- **Nunca acepta condiciones** ni hace pasos de la cuenta: si LibreLinkUp los pide, responde `GLUCOSE_ACTION_NEEDED`.
+
+**Sesión y espera** (`libre_sessions`, §7.1): Supabase no conserva la memoria de la función entre llamadas, y Abbott bloquea la cuenta si se entra muchas veces. Por eso:
+- con una sesión vigente, solo lee; entra de nuevo solo si no hay sesión, si venció o si LibreLinkUp la rechaza (una sola vez por llamada);
+- después de un **login fallido** (por cualquier motivo), no vuelve a entrar por 15 min, o lo que pida Abbott si es más; mientras tanto responde el mismo error sin llamar. Si una sesión recién dada también la rechaza, espera igual;
+- un error de lectura con la sesión vigente no la borra ni crea espera;
+- si no se puede guardar la sesión, responde igual. Dos llamadas a la vez sin sesión pueden entrar dos veces: se acepta.
+
+Los logs tienen solo códigos (`LOGIN`, `LOGIN_FAILED <código>`, `READ_FAILED <código>`, `SAVE_FAILED`): nunca el email, la contraseña, el pase ni la glucosa.
+
+**Contrato HTTP**: `POST` sin cuerpo (otro método da `INVALID_REQUEST`; `OPTIONS`, el preflight), con el JWT del usuario (`auth.getClaims`) y CORS abierto, como §9.3.
+- Si sale bien: `200 { "ok": true, "reading": { "mgdl": 123, "trend": "steady", "measured_at": "<ISO UTC>" } }`, con `trend` uno de `falling_fast`, `falling`, `steady`, `rising`, `rising_fast` o `null`, y `reading: null` si el sensor no tiene lectura.
+- Si falla: `{ "ok": false, "error": { "code": "…", "retryable": true|false, "retry_at": "<ISO UTC>" } }`. `retry_at` va solo cuando la respuesta sale de una espera después de un login fallido (la que empieza en esa llamada o una que sigue): es la hora a partir de la cual vuelve a entrar. `retryable` dice si la misma llamada puede andar enseguida; la app igual sigue consultando cada minuto con cualquier código menos `GLUCOSE_NOT_CONFIGURED` (§6.9, #94).
+
+| `code` | HTTP | Cuándo | `retryable` |
+|---|---|---|---|
+| `GLUCOSE_NOT_CONFIGURED` | 503 | Faltan los secrets o el usuario no es el habilitado | no (el recuadro no aparece) |
+| `GLUCOSE_LOGIN_FAILED` | 502 | LibreLinkUp rechazó el email o la contraseña | no |
+| `GLUCOSE_ACTION_NEEDED` | 502 | La cuenta tiene que aceptar condiciones o verificar el email | no |
+| `GLUCOSE_NOT_SHARED` | 502 | La cuenta no sigue a nadie (no comparte la glucosa) | no |
+| `GLUCOSE_UNAVAILABLE` | 503 | Cuenta bloqueada por intentos, cliente rechazado, LibreLinkUp caído, timeout o respuesta inválida | sí |
+| `UNAUTHORIZED` | 401 | No hay sesión | no (lleva al login) |
+| `INVALID_REQUEST` | 400 | El método no es `POST` | no |
+| `INTERNAL_ERROR` | 500 | Falla inesperada (falta la key de la plataforma, no se pudo leer `libre_sessions`, excepción) | sí |
+
+Los mensajes de la app están en §6.9. La función hace a lo sumo cuatro llamadas a LibreLinkUp (lectura, login con redirección y otra lectura), así que la app la espera hasta 45 s.
+
 ## 10. Autenticación y sesión
 
 - **Email + contraseña.** No se usa magic link: en una app agregada a la pantalla de inicio de iOS, el link se abre en Safari y no en la app instalada, que tiene su propio almacenamiento.
@@ -890,9 +969,10 @@ La pantalla usa `labelCarbsPer100g({ basis, carbsG, portionG, fiberG })` (`src/d
 
 ## 11. Seguridad y datos personales
 
-- **RLS activada y con políticas en todas las tablas**, sin excepción (§7.3).
+- **RLS activada en todas las tablas**, y con políticas en todas salvo `libre_sessions`, que usa solo `glucose-latest` con la key secreta: sin políticas ni `grant` a `anon` ni `authenticated`, así ningún usuario la lee ni la escribe (§7.3, #90).
 - **La key anon/publishable de Supabase va en el frontend y es pública por diseño.** La protección la dan RLS y el registro deshabilitado.
-- **Nunca** en el frontend ni en el repo: la `service_role` key ni `GEMINI_API_KEY`.
+- **Nunca** en el frontend ni en el repo: la `service_role` key, `GEMINI_API_KEY` ni las credenciales de LibreLink (`LIBRE_EMAIL`, `LIBRE_PASSWORD`). Esas van solo en los secrets de Supabase, con `LIBRE_APP_USER_ID` (§9.8); el pase de LibreLinkUp, en `libre_sessions`, que ningún usuario puede leer (§7.3).
+- La glucosa no se loguea ni se guarda: la función la lee y la devuelve. Excepción a no usar datos reales en `dev` (#89): sus secrets tienen la cuenta real de LibreLink del usuario, porque no hay sensor de prueba.
 - A Gemini solo se envía la foto de la etiqueta. En la capa gratuita, Google puede usar esos datos para mejorar sus productos (§9.1).
 - `.env.local` está en `.gitignore`. Tiene las variables del frontend, la key de Gemini para los scripts locales y las credenciales de los usuarios de prueba descartables de `scripts/rls-check/`. **Nunca** tiene las credenciales del usuario real: para entrar a la app, el usuario escribe su contraseña en el login. Se versiona un `.env.example` sin valores.
 - **El repo es privado por ahora**, y se va a hacer público sin fecha definida. Por eso, todo lo que se commitea se trata como si ya fuera público.
@@ -947,6 +1027,7 @@ supabase/
   functions/
     deno.d.ts             # declaración mínima de Deno para que tsc chequee index.ts (tsconfig.functions.json)
     transcribe-label/     # Edge Function (§9.2): index.ts, readLabel.ts, dailyCap.ts, provider.ts, prompt.ts, schema.ts, deno.json + tests
+    glucose-latest/       # Edge Function (§9.8): index.ts, latest.ts, provider.ts, contract.ts, deno.json + tests
 scripts/
   gemini-probe/           # prueba de transcripción con fotos reales (etapa 1b); importa las instrucciones y el esquema de la función
   rls-check/              # prueba de aislamiento contra la API real (etapa 2)
@@ -972,7 +1053,7 @@ Tiene que incluir:
 
 ## 13. Futuro: notas para no bloquear
 
-- **LibreLinkUp**: una Edge Function `glucose-latest` lee el último valor con credenciales guardadas en los secrets o en Vault, y la UI lo muestra **como referencia** en la pantalla de registro. El módulo de cálculo **no recibe** la glucemia como parámetro. Si se quiere guardar junto al registro, se agregan `glucose_reference_mgdl` y `glucose_reference_at` (opcionales) a `meals`.
+- **LibreLinkUp**: hecho en M8 (§6.9, §9.8): la Edge Function `glucose-latest` lee el último valor y la UI lo muestra **como referencia** en Inicio. El módulo de cálculo **no recibe** la glucemia como parámetro. Falta: (1) **M9**, imprescindible antes de abrir el registro: cada usuario carga su propia cuenta de LibreLink en Configuración (guardada cifrada en la base) y ve solo su glucosa, en lugar de los secrets de un solo usuario; (2) si algún día se quiere guardar junto al registro, se agregan `glucose_reference_mgdl` y `glucose_reference_at` (opcionales) a `meals`.
 - **Código de barras**: columna `barcode` en `foods` y un lector en el cliente.
 - **Corrección, insulina activa, ratios por franja horaria**: se extiende el módulo de cálculo con una nueva `CALC_VERSION`. Los registros viejos conservan su versión y su ratio.
 - **Recetas**: tablas `recipes` y `recipe_ingredients`, de las que sale un `food` con `source = recipe`.

@@ -9,11 +9,13 @@ import {
   type InfiniteData,
   type MutationState,
 } from '@tanstack/react-query'
+import { GlucoseError } from '../../lib/errors.ts'
 import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
   fetchMeal,
+  fetchLatestGlucose,
   fetchMealsPage,
   fetchRecentMeals,
   fetchReferenceFoods,
@@ -205,4 +207,42 @@ export function useOtherMealSave(
     },
   })
   return otherMealSave(saves, clientKey, mountedAt)
+}
+
+export const glucoseKeys = {
+  // The last reading of the sensor (spec §6.9). Outside mealsKeys.all:
+  // saving a meal does not change it.
+  latest: ['glucose', 'latest'] as const,
+}
+
+/** How often the glucose is read again while Inicio is in sight. */
+export const GLUCOSE_REFETCH_MS = 60_000
+
+/**
+ * Every minute, also after an error. The errors of the LibreLink account
+ * (wrong password, terms to accept, not shared) keep it going too, so the
+ * box gets well on its own once the user fixes them: the function logs in
+ * once every 15 min at most, whatever the app asks. Only a user without
+ * the glucose set up stops it.
+ */
+export function glucoseRefetchInterval(error: unknown): number | false {
+  if (error instanceof GlucoseError && error.code === 'GLUCOSE_NOT_CONFIGURED')
+    return false
+  return GLUCOSE_REFETCH_MS
+}
+
+/**
+ * The last reading of the sensor, read again every minute while the app is
+ * in sight and when going back to it (refetchOnWindowFocus, on by
+ * default). Without retries: the next minute is the retry, and each one
+ * could log in to LibreLinkUp. A 401 goes to the login (global QueryCache).
+ */
+export function useLatestGlucose() {
+  return useQuery({
+    queryKey: glucoseKeys.latest,
+    queryFn: fetchLatestGlucose,
+    refetchInterval: (query) => glucoseRefetchInterval(query.state.error),
+    refetchIntervalInBackground: false,
+    retry: false,
+  })
 }

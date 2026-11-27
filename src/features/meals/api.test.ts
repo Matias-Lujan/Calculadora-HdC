@@ -1,9 +1,12 @@
+import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { GlucoseError, UnauthorizedError } from '../../lib/errors.ts'
 import {
   MEALS_PAGE_SIZE,
   RECENT_MEALS_LIMIT,
   createMeal,
   deleteMeal,
+  fetchLatestGlucose,
   fetchMeal,
   fetchMealsPage,
   fetchRecentMeals,
@@ -28,6 +31,9 @@ const fake = vi.hoisted(() => {
   const state = {
     chains: [] as Chain[],
     results: [] as Result[],
+    // Edge Functions: what each call got and what it answers.
+    invokeCalls: [] as unknown[][],
+    invokeResult: { data: null as unknown, error: null as unknown },
   }
   function builder(chain: Chain, result: Result): Record<string, unknown> {
     const b: Record<string, unknown> = {}
@@ -66,6 +72,12 @@ const fake = vi.hoisted(() => {
         table: `rpc:${fn}`,
         calls: [{ method: 'rpc', args: [fn, args] }],
       }),
+    functions: {
+      invoke: (...args: unknown[]) => {
+        state.invokeCalls.push(args)
+        return Promise.resolve(state.invokeResult)
+      },
+    },
   }
   return { state, supabase }
 })
@@ -146,6 +158,8 @@ function payloadOf(index: number): CreateMealPayload {
 beforeEach(() => {
   fake.state.chains = []
   fake.state.results = []
+  fake.state.invokeCalls = []
+  fake.state.invokeResult = { data: null, error: null }
 })
 
 describe('createMeal', () => {
@@ -1213,5 +1227,136 @@ describe('createMeal: the key of the meal', () => {
       client_key: CLIENT_KEY,
     })
     expect(record).toEqual(before)
+  })
+})
+
+/** A failed call to the function, as functions-js returns it. */
+function httpError(status: number, body: string): FunctionsHttpError {
+  return new FunctionsHttpError(
+    new Response(body, {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  )
+}
+
+function errorBody(code: string, retryable?: boolean): string {
+  return JSON.stringify({ ok: false, error: { code, retryable } })
+}
+
+describe('fetchLatestGlucose', () => {
+  // Invented reading.
+  const reading = {
+    mgdl: 118,
+    trend: 'steady',
+    measured_at: '2026-11-27T15:05:00.000Z',
+  }
+
+  it('calls glucose-latest and returns the validated reading', async () => {
+    fake.state.invokeResult = { data: { ok: true, reading }, error: null }
+    await expect(fetchLatestGlucose()).resolves.toEqual(reading)
+    expect(fake.state.invokeCalls).toEqual([
+      ['glucose-latest', { timeout: 45_000 }],
+    ])
+  })
+
+  it('a sensor without a reading gives null', async () => {
+    fake.state.invokeResult = { data: { ok: true, reading: null }, error: null }
+    await expect(fetchLatestGlucose()).resolves.toBeNull()
+  })
+
+  it.each([
+    ['a decimal value', { ...reading, mgdl: 118.5 }],
+    ['an unknown trend', { ...reading, trend: 'up' }],
+    ['a date that is not ISO', { ...reading, measured_at: '11/27/2026' }],
+  ])('a 200 with %s throws', async (_label, bad) => {
+    fake.state.invokeResult = { data: { ok: true, reading: bad }, error: null }
+    await expect(fetchLatestGlucose()).rejects.toThrow()
+  })
+
+  it.each([
+    [503, 'GLUCOSE_NOT_CONFIGURED', false],
+    [502, 'GLUCOSE_LOGIN_FAILED', false],
+    [502, 'GLUCOSE_ACTION_NEEDED', false],
+    [502, 'GLUCOSE_NOT_SHARED', false],
+    [503, 'GLUCOSE_UNAVAILABLE', true],
+  ] as const)(
+    '%i %s gives a GlucoseError (retryable %s)',
+    async (status, code, retryable) => {
+      fake.state.invokeResult = {
+        data: null,
+        error: httpError(status, errorBody(code, retryable)),
+      }
+      const error: unknown = await fetchLatestGlucose().catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(GlucoseError)
+      expect(error).toMatchObject({ code, retryable, retryAt: null })
+    },
+  )
+
+  it('a wait after a failed login carries when it tries again', async () => {
+    const retryAt = '2026-11-27T15:20:05.000Z'
+    fake.state.invokeResult = {
+      data: null,
+      error: httpError(
+        502,
+        JSON.stringify({
+          ok: false,
+          error: {
+            code: 'GLUCOSE_ACTION_NEEDED',
+            retryable: false,
+            retry_at: retryAt,
+          },
+        }),
+      ),
+    }
+    const error: unknown = await fetchLatestGlucose().catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(GlucoseError)
+    expect(error).toMatchObject({ code: 'GLUCOSE_ACTION_NEEDED', retryAt })
+  })
+
+  it('a retry_at that is not ISO is thrown as it came', async () => {
+    const error = httpError(
+      502,
+      JSON.stringify({
+        ok: false,
+        error: {
+          code: 'GLUCOSE_LOGIN_FAILED',
+          retryable: false,
+          retry_at: 'a las tres',
+        },
+      }),
+    )
+    fake.state.invokeResult = { data: null, error }
+    await expect(fetchLatestGlucose()).rejects.toBe(error)
+  })
+
+  it('a 401 gives UnauthorizedError, whatever its body', async () => {
+    for (const body of [
+      errorBody('UNAUTHORIZED', false),
+      JSON.stringify({ msg: 'Invalid JWT' }),
+      'not json',
+    ]) {
+      fake.state.invokeResult = { data: null, error: httpError(401, body) }
+      await expect(fetchLatestGlucose()).rejects.toBeInstanceOf(
+        UnauthorizedError,
+      )
+    }
+  })
+
+  it.each([
+    ['a body that is not JSON', 500, 'not json'],
+    ['INTERNAL_ERROR', 500, errorBody('INTERNAL_ERROR', true)],
+    ['INVALID_REQUEST', 400, errorBody('INVALID_REQUEST', false)],
+    ['a code without retryable', 503, errorBody('GLUCOSE_UNAVAILABLE')],
+  ])('%s is thrown as it came', async (_label, status, body) => {
+    const error = httpError(status, body)
+    fake.state.invokeResult = { data: null, error }
+    await expect(fetchLatestGlucose()).rejects.toBe(error)
+  })
+
+  it('a network error is thrown as it came', async () => {
+    const error = new FunctionsFetchError(new TypeError('Failed to fetch'))
+    fake.state.invokeResult = { data: null, error }
+    await expect(fetchLatestGlucose()).rejects.toBe(error)
   })
 })

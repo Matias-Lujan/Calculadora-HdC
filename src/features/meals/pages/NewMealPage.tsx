@@ -4,8 +4,13 @@ import { button, pageTitle } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { useFoods } from '../../../lib/foods.ts'
 import { useSettings } from '../../../lib/settings.ts'
+import { GlucoseCard } from '../components/GlucoseCard.tsx'
 import { EMPTY_MEAL_TITLE, MealForm } from '../components/MealForm.tsx'
-import { useRecentMeals, useReferenceFoods } from '../queries.ts'
+import {
+  useLatestGlucose,
+  useRecentMeals,
+  useReferenceFoods,
+} from '../queries.ts'
 
 /** Home ("Inicio", `/`): a new meal (spec §6.6). */
 export function NewMealPage() {
@@ -15,6 +20,9 @@ export function NewMealPage() {
   // Only for the shortcuts of an empty Inicio: Inicio does not wait for it,
   // and without it (loading or failed) they are not shown.
   const recentMeals = useRecentMeals()
+  // Only a reference, apart from the meal (spec §6.9): it never goes into
+  // the calculation, and Inicio does not wait for it.
+  const glucose = useLatestGlucose()
   const queries = [foods, referenceFoods, settings]
 
   // A query fails "without data" only if it never loaded. With data, a later
@@ -26,6 +34,11 @@ export function NewMealPage() {
 
   return (
     <section className="flex flex-col gap-4">
+      <GlucoseCard
+        reading={glucose.data}
+        error={glucose.error}
+        isPending={glucose.isPending}
+      />
       {/* With the meal loaded, MealForm writes the title ("Corregir comida"
           while correcting). */}
       {foods.data !== undefined &&

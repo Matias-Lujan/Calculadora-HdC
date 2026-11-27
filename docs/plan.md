@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. No quedan mejoras en la tabla.** Última actualización: 2026-11-27.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) en curso, rama `mejora-glucosa-en-vivo`, PR #27 sin mergear: falta probarla en `dev` con los secrets del usuario y llevarla a `prod` (ver M8, "Dónde quedó"). M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-27.
 
 ---
 
@@ -337,6 +337,8 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 - Al empezar una mejora, se le escribe una subsección abajo (objetivo, qué incluye y "Terminada cuando", como las etapas), con el OK del usuario sobre el alcance, y su fila pasa a "En curso (`<rama>`)". Al cerrarla, "✅ PR #N".
 - Una idea nueva se agrega como fila; no hace falta decidir el alcance hasta empezarla. Lo que el spec dejó fuera del MVP (§2.2: glucemia de referencia, código de barras, recetas, exportar, uso sin conexión) entra a la tabla solo si el usuario lo pide.
 
+**Hacia dónde va**: el usuario piensa llevar la app a una "todo en uno" para diabetes (2026-11-28). No cambia el alcance de ninguna mejora, pero pesa al decidir: datos por usuario desde el diseño (M9), y lo de salud guardado solo cuando hace falta.
+
 | # | Mejora | De dónde sale | Estado |
 |---|---|---|---|
 | M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | ✅ PR #17 |
@@ -346,6 +348,9 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | ✅ PR #25 |
 | M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Descartada (2026-11-26): no vale la pena (#84) |
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
+| M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre 2, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | En curso (`mejora-glucosa-en-vivo`) |
+| M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
+| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | Próxima (después de mergear M8) |
 
 ### M1 — Revisión de UI/UX
 
@@ -450,3 +455,56 @@ Hecho por el implementer, punto 1 (#85): la migración `20261127030023_meals_cli
 Hecho por el implementer, punto 2 (#86): `src/features/foods/photoCleanup.ts` (qué borrar, con tests), la lectura y el borrado en `api.ts`, un hook en `queries.ts` y el disparo al montar `NewLabelFoodPage` (una vez por apertura, también en StrictMode). Sin migración: las políticas de `food-photos` ya permiten listar y borrar lo propio. Falta probarlo en `dev` con una foto suelta de más de un día.
 
 **Cerrada** el 2026-11-27 (PR #25). La migración está en `prod`; el usuario lo probó en la versión de prueba y, después del merge, confirmó en el iPhone que todo sigue andando.
+
+### M8 — Glucosa del sensor en vivo
+
+Rama: `mejora-glucosa-en-vivo` (alcance acordado con el usuario, 2026-11-27).
+
+**Objetivo**: ver en Inicio la glucosa actual del sensor (FreeStyle Libre 2, que sube sus lecturas desde la app LibreLink del celular), actualizada sola, mientras se carga la comida. Es solo una referencia: **no entra al cálculo** (regla 7 de `CLAUDE.md`) **ni se guarda** con la comida.
+
+Incluye:
+1. **Edge Function `glucose-latest`**: entra a LibreLinkUp (API no oficial) con el email y la contraseña de la cuenta principal del usuario, guardados en los secrets de Supabase (`LIBRE_EMAIL`, `LIBRE_PASSWORD`; el comando lo corre el usuario, en `dev` y en `prod`), y devuelve el último valor en mg/dL, la tendencia y la hora de la lectura. Solo la ve el usuario de la app habilitado en el secret `LIBRE_APP_USER_ID` (su id en cada proyecto); para otro usuario, la función responde "no configurada" y el recuadro no aparece. Que cada usuario cargue su propia cuenta es M9, y es obligatorio antes de abrir el registro. La conexión con LibreLinkUp va en un archivo propio que recibe la configuración y `fetch` por parámetro, con su mapeo de errores testeado con un `fetch` simulado. Guarda la sesión de LibreLinkUp (el pase que dura unos 6 meses) en una tabla nueva, `libre_sessions`, que solo lee y escribe la función con la key secreta (RLS sin políticas, sin `grant` a `anon` ni `authenticated`), para no entrar en cada consulta: Supabase no conserva la memoria de la función, y Abbott bloquea la cuenta si se entra muchas veces. Después de un login fallido, espera 15 min (o lo que pida Abbott) antes de reintentar. Decidido por el usuario (2026-11-27). Spec §9 (como referencia de la otra función) y §13.
+2. **Recuadro en Inicio**: el valor, la flecha de tendencia y "hace X min"; se actualiza cada minuto mientras la app está visible y al volver a ella. Una lectura de más de 15 min se marca como vieja; si falla, un aviso corto que no bloquea nada. Sin colores de rango (rojo, ámbar y verde quedan para errores, advertencias y guardado). Sin términos técnicos.
+3. **Docs**: spec (§2.2 y §13 pasan a funcionalidad) y `docs/decisiones.md` (cuenta principal, datos reales en `dev` como excepción pedida por el usuario, no se guarda).
+
+Paso previo del usuario: en LibreLink, Aplicaciones conectadas → LibreLinkUp → agregar su propio email; después entrar a la app LibreLinkUp con el mismo email y contraseña y aceptar la invitación y las condiciones. Sin eso, LibreLinkUp no devuelve lecturas para la cuenta principal.
+
+Ciclo: planner (hecho, la API no oficial tenía detalles abiertos), implementer, tester (hay migración) y reviewer. Antes de mergear, la migración, la función y los secrets van a `prod`, y `rls-check` corre contra `prod`, con el OK del usuario.
+
+Hecho por el implementer (#87 a #93): la migración `20261127040533_libre_sessions.sql` (aplicada en `dev` el 2026-11-27, con `database.types.ts` regenerado), la función `supabase/functions/glucose-latest/` (`provider.ts`, `latest.ts`, `contract.ts`, `index.ts`, con tests del mapeo de errores con `fetch` simulado y de cuándo entra y cuándo espera), los casos de `libre_sessions` en `scripts/rls-check/`, y en Inicio el recuadro (`GlucoseCard`, con `useLatestGlucose` y los textos en `glucose.ts` y `lib/errors.ts`, con tests). Spec §2.1, §6.9, §7.1, §7.3, §9.8, §11, §12.2 y §13. El tester sumó 3 casos borde y endureció los casos de `rls-check` (las cuatro operaciones de A tienen que dar error); el reviewer, sin hallazgos de código (los de docs, corregidos: la excepción de la regla 1 y de los datos reales en `dev`, en `CLAUDE.md` y spec §11). Función desplegada en `dev` (2026-11-27; sin secrets todavía: sin sesión responde 401 y el preflight 200). PR #27 abierto, CI en verde, **sin mergear**. El 2026-11-28 el usuario cargó los usuarios de prueba y los secrets en `dev`: `rls-check` pasa en `dev` (72 casos, 5 de `libre_sessions`) y un usuario que no es el habilitado recibe `GLUCOSE_NOT_CONFIGURED`. Al probar en el iPhone, el recuadro quedó trabado en "LibreLink pide que aceptes sus condiciones…" después de aceptarlas: ahora solo `GLUCOSE_NOT_CONFIGURED` corta el minuto a minuto, y la función manda `retry_at` en las respuestas de una espera, que el recuadro muestra como "Se vuelve a probar a las HH:MM:SS" (#94). Cambia la función: hay que volver a desplegarla en `dev` antes de probar.
+
+**En `prod` (2026-11-28)**: la migración `libre_sessions` está aplicada, `glucose-latest` desplegada (con el cambio de "ahora" y la hora del próximo intento) y `rls-check` pasa contra `prod`. El usuario probó en `dev` que el valor coincide con LibreLink y se actualiza solo. Falta: los secrets en `prod` (los carga el usuario), borrar los dos usuarios de `rls-check` de `prod`, el merge y la confirmación en el iPhone.
+
+**Dónde quedó (para la próxima sesión)**: falta, en este orden: (1) el usuario rehace los dos usuarios de `rls-check` en `dev` (el A no entra) y carga en `dev` los secrets `LIBRE_EMAIL`, `LIBRE_PASSWORD` y `LIBRE_APP_USER_ID` desde el panel, y se sigue a sí mismo en LibreLink (Aplicaciones conectadas → LibreLinkUp); (2) correr `rls-check` en `dev`; (3) probar en el iPhone con la Preview de la rama y revisar en los logs de la función que `LOGIN` aparezca una sola vez (si la cuenta principal no recibe lecturas, se vuelve a decidir qué cuenta va en los secrets); (4) llevar a `prod` la migración, `rls-check`, la función y los secrets, con el OK del usuario; (5) el usuario mergea el PR #27.
+
+**Terminada cuando**:
+- [x] En el iPhone, sobre `dev`, Inicio muestra el mismo valor que la app LibreLink y se actualiza solo.
+- [x] El mapeo de errores de la conexión con LibreLinkUp está testeado.
+- [x] Spec y `docs/decisiones.md` al día.
+- [x] `libre_sessions` está en `dev` con sus casos en `rls-check`, y la función entra a LibreLinkUp una sola vez y no en cada consulta (logs).
+- [ ] La migración, la función y los secrets están en `prod` antes de mergear, con `rls-check` contra `prod`, y el usuario lo confirmó en el iPhone.
+
+### M10 — Gráfico de glucosa de 24 horas
+
+Rama: a crear desde `main` cuando M8 esté mergeada (`mejora-grafico-glucosa`). Alcance a confirmar con el usuario al empezar la sesión; lo que sigue es lo conversado el 2026-11-28.
+
+**Objetivo**: ver en un gráfico cómo transcurrió la glucosa en las últimas 24 horas, de un vistazo. Como M8, es solo referencia: **no entra al cálculo** (regla 7).
+
+Lo que se sabe:
+- LibreLinkUp devuelve, además de la lectura actual, las de las últimas ~12 horas (una cada ~15 min, `/llu/connections/<patientId>/graph`). Para 24 horas hay que guardarlas.
+- **Guardado híbrido** (decidido por el usuario): (a) cuando la app consulta la glucosa, la función guarda de vez en cuando las 12 horas que devuelve LibreLinkUp; (b) una tarea programada en Supabase (por ejemplo `pg_cron`, cada pocas horas, siempre menos de 12) hace lo mismo aunque la app esté cerrada, para que no queden huecos. Ninguna de las dos entra a LibreLinkUp más de lo que ya permite `libre_sessions` (M8).
+- **Solo se guardan 24 horas**: lo más viejo se borra al guardar. No es un historial largo.
+
+Incluye (a planificar):
+1. Migración: tabla de lecturas por usuario (`user_id`, hora de la lectura, mg/dL; única por usuario y hora), con RLS: el usuario lee solo las suyas; escribe solo la función con la key secreta. Casos en `scripts/rls-check/`.
+2. Función: guardar las lecturas de las 12 horas (la misma `glucose-latest` o una aparte; decide el planner) y una forma segura de que la llame la tarea programada sin un usuario logueado.
+3. Tarea programada en `dev` y en `prod` (por migración si se puede, regla 6).
+4. Gráfico de 24 h (dónde va: Inicio debajo del recuadro o pantalla aparte; librería o SVG a mano; sin colores de rango salvo que el usuario decida otra cosa, por la regla de tokens). Decisiones para el planner y el usuario.
+
+Ciclo: planner (hay decisiones abiertas: dónde va, librería, cómo llama la tarea), implementer, tester (hay migración) y reviewer.
+
+**Terminada cuando**:
+- [ ] El gráfico muestra las últimas 24 h en el iPhone sobre `dev`, sin huecos aunque la app haya estado cerrada más de 12 h.
+- [ ] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.
+- [ ] Spec y `docs/decisiones.md` al día.
+- [ ] Migración, función y tarea en `prod` antes de mergear, con `rls-check` contra `prod`; el usuario lo confirmó en el iPhone.

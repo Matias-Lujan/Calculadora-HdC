@@ -44,7 +44,7 @@ Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.m
 - **Toda migración tiene que ser compatible con la versión publicada**, porque entre el paso (2) y el (4) la app de producción corre el código viejo contra la base nueva. Agregar (columnas que aceptan `null` o tienen default, funciones, tablas) está bien. Renombrar, borrar o volver obligatorio algo que la versión publicada usa se hace en dos PR: primero el código deja de usarlo, después la migración.
 - **Edge Function y secrets**: se despliegan y se prueban en `dev`; antes de mergear, se despliegan en `prod` (también compatibles con la versión publicada). Un secret nuevo se carga en los dos proyectos; si es una key, el comando lo corre el usuario.
 - **Si algo se rompe en producción**: el frontend se vuelve a la versión anterior desde Vercel (*Instant Rollback* del deploy anterior) mientras se arregla. La base no se toca desde el panel: un arreglo es una migración nueva.
-- **Nunca** se usan el usuario real ni sus datos para probar, se cargan datos de prueba (salvo `rls-check`, con usuarios descartables) ni se borran datos en `prod`. Después del merge, el usuario confirma en el iPhone que todo sigue andando.
+- **Nunca** se usan el usuario real ni sus datos para probar, se cargan datos de prueba (salvo `rls-check`, con usuarios descartables) ni se borran datos en `prod`. La única excepción es la cuenta de LibreLink del usuario en los secrets de `dev`, para probar la glucosa en vivo (decisiones #89; con M9 pasa a cargarla cada usuario). Después del merge, el usuario confirma en el iPhone que todo sigue andando.
 - Un usuario nuevo se crea siempre **después** de las migraciones: el trigger `on_auth_user_created` crea su configuración.
 
 ### Ciclo por funcionalidad (agentes)
@@ -74,7 +74,7 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
 
 ## Reglas que no se negocian
 
-1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas. Sin excepción, aunque la tabla parezca interna. Los proyectos tienen desactivada la exposición automática de tablas, así que la misma migración da los permisos explícitos (`revoke all ... from anon, authenticated` y después solo los `grant` necesarios, por columna cuando corresponde). Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
+1. **RLS en toda tabla nueva.** La migración que crea una tabla, en el mismo archivo, activa RLS y define sus políticas, aunque la tabla parezca interna. La única excepción es una tabla que usa solo una Edge Function con la key secreta (hoy `libre_sessions`, spec §7.3 y decisiones #90): RLS activada **sin** políticas y sin ningún `grant` a `anon` ni `authenticated`, para que ningún usuario la lea ni la escriba. Los proyectos tienen desactivada la exposición automática de tablas, así que la misma migración da los permisos explícitos (`revoke all ... from anon, authenticated` y después solo los `grant` necesarios, por columna cuando corresponde). Además, la tabla tiene `user_id` con FK a `auth.users on delete cascade`, salvo los datos públicos de solo lectura como `reference_foods`. También se agregan sus casos a `scripts/rls-check/`.
 2. **Las cuentas viven solo en `src/domain/`**: el cálculo de HC y dosis, el formato para mostrarlos y la conversión y el formato de lo que tipea el usuario, en `dose/`; la conversión del texto de una etiqueta a número y de porción a 100 g, en `label/`. Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman a esos módulos. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
 3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, que es pública por diseño. En la app, la `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Los scripts locales leen `GEMINI_API_KEY` y las credenciales de los usuarios de prueba de `.env.local` (de `dev`) o de `.env.prod.local` (solo para correr `rls-check` contra `prod`), que no se commitean. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
 4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español. **Sin términos técnicos en la pantalla**: nada de "factor", "estado", "HC asimilables" ni nombres parecidos; se dice con palabras de todos los días ("100 g crudo rinden 260 g cocido") y, si hace falta, con un ícono de información (ⓘ) que lo explique en una o dos frases (spec §14 #48).
@@ -107,6 +107,7 @@ npx supabase db push --remote                               # sin --remote, la C
 npx supabase migration list --remote                        # qué migraciones están aplicadas
 npx supabase gen types typescript --project-id xyolhiklqqoejkapqbxt > src/lib/database.types.ts
 npx supabase functions deploy transcribe-label --use-api
+npx supabase functions deploy glucose-latest --use-api
 npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
 ```
 
@@ -117,6 +118,7 @@ npx supabase link --project-ref zoxlvutjqolwfjcsbtog        # vincular prod (si 
 npx supabase migration list --remote                        # confirmar el proyecto y qué falta aplicar
 npx supabase db push --remote
 npx supabase functions deploy transcribe-label --use-api   # solo si cambió la función
+npx supabase functions deploy glucose-latest --use-api     # solo si cambió la función
 npx supabase link --project-ref xyolhiklqqoejkapqbxt        # volver a dev
 node --env-file=.env.prod.local scripts/rls-check/check.ts  # si cambió una tabla o RLS; usuarios descartables de prod
 ```
@@ -148,7 +150,7 @@ Vercel corre `npm test && npm run build` (en `vercel.json`): si fallan los tests
 - **Fechas**: en la base son `timestamptz`, y en la UI se muestran en `America/Argentina/Buenos_Aires` con `Intl.DateTimeFormat`.
 - **Estilos**: clases de Tailwind en el componente, diseño mobile-first. Los elementos táctiles tienen que tener un tamaño cómodo para el dedo (44 px como mínimo). **Los colores se usan por su token** (`bg-paper`, `text-ink`, `bg-accent`…, definidos en `src/index.css` y explicados en `docs/ux/revision-1.md` §2), nunca por el nombre de Tailwind (`slate-500`): la paleta de Tailwind está anulada. Rojo, ámbar y verde (`danger`, `warning`, `success`) se usan solo para error, advertencia y guardado. Las clases que comparten varios componentes (botones, campos, tarjetas) están en `src/components/styles.ts`.
 - **SQL**: `snake_case`. En las políticas se usa `(select auth.uid())` y no `auth.uid()` suelto. Las funciones son `security invoker`, salvo que haya un motivo documentado.
-- **Edge Function**: `provider.ts` es el único archivo que conoce a Gemini (spec §9.2). Recibe la configuración y `fetch` por parámetro, sin leer `Deno.env` adentro, para que se pueda testear con Vitest.
+- **Edge Function**: `provider.ts` es el único archivo que conoce a Gemini (spec §9.2). Recibe la configuración y `fetch` por parámetro, sin leer `Deno.env` adentro, para que se pueda testear con Vitest. En `glucose-latest`, su `provider.ts` es el único que conoce LibreLinkUp (spec §9.8), con la misma regla.
 - No se loguean datos de salud (HC, dosis, alimentos) en la consola ni en los logs de la Edge Function.
 
 ## Estructura de un feature
@@ -208,5 +210,5 @@ Reglas:
 
 - `src/domain/` tiene que estar cubierto por tests, **con casos borde** y no solo el caso normal (lista mínima en spec §8.6). Un cambio en el cálculo sin test no se acepta.
 - Si cambia el comportamiento del cálculo, se sube `CALC_VERSION`.
-- El mapeo de errores de `provider.ts` se testea con un `fetch` simulado.
+- El mapeo de errores de los dos `provider.ts` se testea con un `fetch` simulado.
 - El aislamiento por RLS se prueba con `scripts/rls-check/` (plan, etapa 2), y se actualiza con cada tabla o política nueva.

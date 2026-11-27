@@ -1,6 +1,11 @@
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { GlucoseError, UnauthorizedError } from '../../lib/errors.ts'
 import { supabase } from '../../lib/supabase.ts'
+import { glucoseSuccessSchema } from '../../../supabase/functions/glucose-latest/contract.ts'
 import {
+  glucoseErrorSchema,
+  type GlucoseReading,
   listedMealSchema,
   recentMealSchema,
   referenceFoodSchema,
@@ -240,4 +245,40 @@ export async function saveMeal({
   } catch {
     return { id, replacedDeleted: false }
   }
+}
+
+/**
+ * glucose-latest makes four calls to LibreLinkUp at most, of up to 10 s
+ * each (spec §9.8): the client waits a bit longer.
+ */
+const GLUCOSE_TIMEOUT_MS = 45_000
+
+/**
+ * The error to throw for a failed call to glucose-latest: a 401 (from the
+ * function or the platform, whatever its body) is UnauthorizedError; an
+ * expected error of §9.8 is a GlucoseError; anything else (INTERNAL_ERROR,
+ * a body that is not JSON, the network) is thrown as it came.
+ */
+async function glucoseFailure(error: unknown): Promise<unknown> {
+  if (!(error instanceof FunctionsHttpError)) return error
+  const response: unknown = error.context
+  if (!(response instanceof Response)) return error
+  if (response.status === 401) return new UnauthorizedError()
+  const body: unknown = await response.json().catch(() => null)
+  const parsed = glucoseErrorSchema.safeParse(body)
+  if (!parsed.success) return error
+  const { code, retryable, retry_at } = parsed.data.error
+  return new GlucoseError(code, retryable, retry_at ?? null)
+}
+
+/**
+ * The last reading of the sensor (spec §6.9, §9.8), validated with zod;
+ * null if the sensor has none right now. A 200 with another shape throws.
+ */
+export async function fetchLatestGlucose(): Promise<GlucoseReading | null> {
+  const { data, error } = await supabase.functions.invoke('glucose-latest', {
+    timeout: GLUCOSE_TIMEOUT_MS,
+  })
+  if (error) throw await glucoseFailure(error)
+  return glucoseSuccessSchema.parse(data as unknown).reading
 }
