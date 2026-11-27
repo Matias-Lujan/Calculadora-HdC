@@ -5,7 +5,7 @@
 > Los valores que muestra esta app son una ayuda para hacer una cuenta que el usuario igual revisa y decide. No usar para tomar decisiones de tratamiento sin el criterio de un profesional de la salud.
 > Si otra persona la usa, la dosis depende de su propio ratio y de que los datos que cargue (alimentos, cantidades, alertas) estén bien: los tiene que revisar con su médico, y el uso es bajo su responsabilidad. El software se entrega sin garantía (ver [LICENSE](LICENSE)).
 
-App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de insulina rápida por hidratos, pensada para el uso personal de una persona con diabetes tipo 1. Se usa desde Safari en iPhone, agregada a la pantalla de inicio.
+App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de insulina rápida por hidratos, pensada para personas con diabetes tipo 1 que cuentan hidratos. Se usa desde Safari en iPhone, agregada a la pantalla de inicio.
 
 ## Qué hace
 
@@ -18,12 +18,12 @@ App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de 
 
 - **Solo calcula el bolo por hidratos.** No corrige por glucemia, no tiene en cuenta la insulina activa y usa un único ratio para todas las comidas.
 - No redondea la dosis al incremento de ninguna lapicera: muestra el valor exacto, y el usuario decide cuánto aplicarse.
-- No lee datos de sensores de glucosa.
+- La glucosa del sensor (FreeStyle Libre, vía LibreLinkUp) se muestra en Inicio solo como referencia: no entra al cálculo ni se guarda.
 - No funciona sin conexión.
 
 ## Estado
 
-MVP en uso. El avance por etapas está en [docs/plan.md](docs/plan.md). La versión publicada está en https://calculadora-hdc.vercel.app/, pero no tiene registro abierto: los usuarios se crean a mano.
+MVP terminado y publicado. El avance por etapas está en [docs/plan.md](docs/plan.md). La versión publicada está en https://calculadora-hdc.vercel.app/, pero no tiene registro abierto: los usuarios se crean a mano.
 
 ## Documentación
 

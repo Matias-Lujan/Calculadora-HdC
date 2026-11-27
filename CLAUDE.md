@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-App web personal para contar hidratos de carbono y calcular el bolo de insulina rápida (diabetes tipo 1). Es mobile-first: se usa desde Safari en iPhone, agregada a la pantalla de inicio. **No es un dispositivo médico.**
+App web para contar hidratos de carbono y calcular el bolo de insulina rápida (diabetes tipo 1). Es mobile-first: se usa desde Safari en iPhone, agregada a la pantalla de inicio. **No es un dispositivo médico.**
 
 ## Dónde está cada cosa
 
@@ -31,20 +31,20 @@ Cada mejora se trabaja en una **sesión nueva**, que arranca solo con lo que est
 5. Los mensajes de commit van en inglés. La descripción del PR va en español: un resumen de lo hecho, cómo se probó, qué hay que hacer en `prod` (si hay algo) y una sección "Decisiones para revisar" con todo lo que se resolvió donde el spec no decía nada.
 6. El usuario revisa y mergea el PR. Después se vuelve a `main` con `git checkout main` y `git pull`. Las ramas mergeadas se conservan.
 
-Con el MVP en uso, cambia una cosa importante: **lo que se mergea a `main` le llega enseguida a la app que el usuario usa todos los días.** Cada cambio se prueba antes en la versión de prueba de la rama (Vercel *Preview*, sobre `dev`), en el iPhone cuando toca pantallas.
+Con el MVP publicado, cambia una cosa importante: **lo que se mergea a `main` le llega enseguida a la app publicada.** Cada cambio se prueba antes en la versión de prueba de la rama (Vercel *Preview*, sobre `dev`), en el iPhone cuando toca pantallas.
 
 Solo se usa Claude Code. Si algún día se suma otro asistente que lee `AGENTS.md` (por ejemplo, Codex), el contenido de este archivo pasa a `AGENTS.md`, y acá queda una sola línea, `@AGENTS.md`, que lo importa. Así hay una sola fuente de reglas.
 
 ### Cambios que llegan a prod
 
-`prod` tiene los datos reales del usuario y la app instalada apunta ahí. Vercel despliega `main` en producción (sobre `prod`) apenas se mergea un PR; las versiones de prueba de las ramas usan `dev`.
+`prod` tiene los datos de los usuarios y la app instalada apunta ahí. Vercel despliega `main` en producción (sobre `prod`) apenas se mergea un PR; las versiones de prueba de las ramas usan `dev`.
 
 - **Se desarrolla y se prueba siempre en `dev`.** `prod` recibe solo lo que ya pasó por `dev`, con el OK del usuario en cada paso.
 - **Orden con migraciones**: (1) se aplican y se prueban en `dev`; (2) con el PR aprobado y **antes de mergear**, la sesión principal las aplica en `prod` (vincular `prod`, `db push --remote`, volver a vincular `dev`; ver Comandos); (3) si la migración crea una tabla o cambia RLS, corre `scripts/rls-check/` contra `prod` (con `.env.prod.local` y dos usuarios descartables creados en `prod` y borrados al terminar); (4) el usuario mergea.
 - **Toda migración tiene que ser compatible con la versión publicada**, porque entre el paso (2) y el (4) la app de producción corre el código viejo contra la base nueva. Agregar (columnas que aceptan `null` o tienen default, funciones, tablas) está bien. Renombrar, borrar o volver obligatorio algo que la versión publicada usa se hace en dos PR: primero el código deja de usarlo, después la migración.
 - **Edge Function y secrets**: se despliegan y se prueban en `dev`; antes de mergear, se despliegan en `prod` (también compatibles con la versión publicada). Un secret nuevo se carga en los dos proyectos; si es una key, el comando lo corre el usuario.
 - **Si algo se rompe en producción**: el frontend se vuelve a la versión anterior desde Vercel (*Instant Rollback* del deploy anterior) mientras se arregla. La base no se toca desde el panel: un arreglo es una migración nueva.
-- **Nunca** se usan el usuario real ni sus datos para probar, se cargan datos de prueba (salvo `rls-check`, con usuarios descartables) ni se borran datos en `prod`. La única excepción es la cuenta de LibreLink del usuario en los secrets de `dev`, para probar la glucosa en vivo (decisiones #89; con M9 pasa a cargarla cada usuario). Después del merge, el usuario confirma en el iPhone que todo sigue andando.
+- **Nunca** se usan cuentas ni datos reales para probar, se cargan datos de prueba (salvo `rls-check`, con usuarios descartables) ni se borran datos en `prod`. La única excepción es una cuenta real de LibreLink en los secrets de `dev`, para probar la glucosa en vivo (decisiones #89; con M9 pasa a cargarla cada usuario). Después del merge, se confirma en el iPhone que todo sigue andando.
 - Un usuario nuevo se crea siempre **después** de las migraciones: el trigger `on_auth_user_created` crea su configuración.
 
 ### Ciclo por funcionalidad (agentes)
@@ -78,7 +78,7 @@ Los agentes están en `.claude/agents/`. La **sesión principal coordina**: le p
 2. **Las cuentas viven solo en `src/domain/`**: el cálculo de HC y dosis, el formato para mostrarlos y la conversión y el formato de lo que tipea el usuario, en `dose/`; la conversión del texto de una etiqueta a número y de porción a 100 g, en `label/`. Ningún componente, hook ni función SQL hace cuentas de HC o de dosis por su cuenta: todos llaman a esos módulos. Las CHECK de la base son una red de seguridad (spec §7.2), no una segunda implementación. El módulo es TypeScript puro y no importa React, Supabase ni APIs del navegador. Lo hace cumplir oxlint: dentro de `src/domain/**` solo se permiten imports de la misma carpeta (`./`) y `vitest`, y están prohibidos `window`, `document`, `fetch`, `console` y otros globals del navegador.
 3. **Ningún secret en el frontend ni en el repo.** En el frontend solo van `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, que es pública por diseño. En la app, la `service_role`, `GEMINI_API_KEY` y cualquier otra key van solo en los secrets de Supabase. Los scripts locales leen `GEMINI_API_KEY` y las credenciales de los usuarios de prueba de `.env.local` (de `dev`) o de `.env.prod.local` (solo para correr `rls-check` contra `prod`), que no se commitean. Toda variable con prefijo `VITE_` termina en el bundle público: nunca le pongas ese prefijo a un secret.
 4. **Código en inglés, UI en español.** Identificadores, tablas, columnas, comentarios y nombres de archivo van en inglés. Los textos que ve el usuario van en español rioplatense, y los docs también en español. **Sin términos técnicos en la pantalla**: nada de "factor", "estado", "HC asimilables" ni nombres parecidos; se dice con palabras de todos los días ("100 g crudo rinden 260 g cocido") y, si hace falta, con un ícono de información (ⓘ) que lo explique en una o dos frases (spec §14 #48).
-5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados. Las credenciales del usuario real no se guardan en ningún archivo, ni siquiera en `.env.local`: las pruebas usan usuarios descartables. El repo es privado por ahora, pero se va a hacer público: todo lo que se commitea se trata como público.
+5. **Datos personales fuera del repo.** No se commitean configuración real, registros, fotos ni seeds con datos reales. Los tests usan datos inventados. Las credenciales de usuarios reales no se guardan en ningún archivo, ni siquiera en `.env.local`: las pruebas usan usuarios descartables. El repo es público: todo lo que se commitea se lee desde afuera.
 6. **Cambios de esquema solo por migraciones.** Nunca se cambia el esquema desde el panel. Una migración ya aplicada no se edita: se crea una nueva.
 7. **El cálculo no recibe la glucemia.** Si en el futuro se integra LibreLinkUp, el valor se muestra como referencia y nunca entra al cálculo (spec §13).
 

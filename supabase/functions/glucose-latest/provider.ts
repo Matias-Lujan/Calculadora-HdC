@@ -219,7 +219,7 @@ async function loginAt(
     case 2:
       return { ok: false, error: 'BAD_CREDENTIALS' }
     case 4: {
-      // Terms, privacy policy or email: never accepted from here, the owner
+      // Terms, privacy policy or email: never accepted from here, the account holder
       // does it in the LibreLinkUp app.
       const step = stepSchema.safeParse(answer.body)
       return step.success && ACCOUNT_STEPS.has(step.data.data.step.type)
