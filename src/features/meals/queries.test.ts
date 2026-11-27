@@ -319,12 +319,20 @@ describe('glucoseRefetchInterval', () => {
   })
 
   it.each([
-    'GLUCOSE_NOT_CONFIGURED',
     'GLUCOSE_LOGIN_FAILED',
     'GLUCOSE_ACTION_NEEDED',
     'GLUCOSE_NOT_SHARED',
-  ] as const)('stops after %s, which is not retryable', (code) => {
-    expect(glucoseRefetchInterval(new GlucoseError(code, false))).toBe(false)
+  ] as const)(
+    'keeps reading every minute after %s, to get well once fixed',
+    (code) => {
+      expect(glucoseRefetchInterval(new GlucoseError(code, false))).toBe(MINUTE)
+    },
+  )
+
+  it('stops only for a user without the glucose set up', () => {
+    expect(
+      glucoseRefetchInterval(new GlucoseError('GLUCOSE_NOT_CONFIGURED', false)),
+    ).toBe(false)
   })
 })
 

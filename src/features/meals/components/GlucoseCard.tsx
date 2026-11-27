@@ -20,6 +20,7 @@ import {
   GLUCOSE_NO_READING_TEXT,
   GLUCOSE_STALE_TEXT,
   glucoseAgoText,
+  glucoseRetryText,
   isStaleReading,
   minutesSince,
   trendLabel,
@@ -100,6 +101,16 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
     )
   }
 
+  // While the function waits after a failed login: when it tries again.
+  const retryText =
+    error instanceof GlucoseError && error.retryAt !== null
+      ? glucoseRetryText(error.retryAt)
+      : null
+  const retry =
+    retryText !== null ? (
+      <p className="text-sm text-ink-soft">{retryText}</p>
+    ) : null
+
   if (reading === undefined) {
     // Never loaded: only the message.
     const message =
@@ -110,13 +121,17 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
       <div className={`${card} flex flex-col gap-1`}>
         {title}
         <p className="text-base text-ink-soft">{message}</p>
+        {retry}
       </div>
     )
   }
 
   const updateFailed =
     error !== null && error !== undefined ? (
-      <p className="text-sm text-ink-soft">{GLUCOSE_UPDATE_ERROR_MESSAGE}</p>
+      <>
+        <p className="text-sm text-ink-soft">{GLUCOSE_UPDATE_ERROR_MESSAGE}</p>
+        {retry}
+      </>
     ) : null
 
   if (reading === null) {

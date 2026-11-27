@@ -308,5 +308,7 @@ export const glucoseErrorSchema = z.object({
   error: z.object({
     code: z.enum(GLUCOSE_ERROR_CODES),
     retryable: z.boolean(),
+    // While waiting after a failed login: when it logs in again.
+    retry_at: z.iso.datetime().optional(),
   }),
 })

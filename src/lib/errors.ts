@@ -496,16 +496,25 @@ export const GLUCOSE_ERROR_CODES = [
 
 export type GlucoseErrorCode = (typeof GLUCOSE_ERROR_CODES)[number]
 
-/** An expected error of glucose-latest, with its code and retryable. */
+/**
+ * An expected error of glucose-latest, with its code and retryable, and
+ * retryAt (ISO) while the function waits after a failed login.
+ */
 export class GlucoseError extends Error {
   readonly code: GlucoseErrorCode
   readonly retryable: boolean
+  readonly retryAt: string | null
 
-  constructor(code: GlucoseErrorCode, retryable: boolean) {
+  constructor(
+    code: GlucoseErrorCode,
+    retryable: boolean,
+    retryAt: string | null = null,
+  ) {
     super(code)
     this.name = 'GlucoseError'
     this.code = code
     this.retryable = retryable
+    this.retryAt = retryAt
   }
 }
 

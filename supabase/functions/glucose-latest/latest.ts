@@ -39,7 +39,8 @@ export interface LibreState {
 
 export type LatestResult =
   | { ok: true; reading: GlucoseReading | null }
-  | { ok: false; code: LatestErrorCode }
+  /** retryAt: while waiting after a failed login, when it logs in again. */
+  | { ok: false; code: LatestErrorCode; retryAt?: number }
 
 export interface LatestOutcome {
   result: LatestResult
@@ -76,14 +77,21 @@ function errorCode(error: ProviderError): LatestErrorCode {
   }
 }
 
-/** The state after a failed login: no session, and a wait. */
+/**
+ * The answer and the state after a failed login: no session, and a wait;
+ * the answer says when it logs in again.
+ */
 function waiting(
   now: number,
   code: LatestErrorCode,
   retryAfterSeconds?: number,
-): LibreState {
+): { result: LatestResult; state: LibreState } {
   const wait = Math.max(LOGIN_WAIT_MS, (retryAfterSeconds ?? 0) * 1000)
-  return { session: null, loginAfter: now + wait, loginError: code }
+  const loginAfter = now + wait
+  return {
+    result: { ok: false, code, retryAt: loginAfter },
+    state: { session: null, loginAfter, loginError: code },
+  }
 }
 
 export async function latestGlucose(
@@ -116,7 +124,11 @@ export async function latestGlucose(
   } else if (state.loginAfter !== null && state.loginAfter > now) {
     // Still waiting after a failed login: no call at all.
     return {
-      result: { ok: false, code: state.loginError ?? 'GLUCOSE_UNAVAILABLE' },
+      result: {
+        ok: false,
+        code: state.loginError ?? 'GLUCOSE_UNAVAILABLE',
+        retryAt: state.loginAfter,
+      },
       state,
       changed: false,
       events,
@@ -129,8 +141,7 @@ export async function latestGlucose(
     const code = errorCode(logged.error)
     events.push(`LOGIN_FAILED ${logged.error}`)
     return {
-      result: { ok: false, code },
-      state: waiting(now, code, logged.retryAfterSeconds),
+      ...waiting(now, code, logged.retryAfterSeconds),
       changed: true,
       events,
     }
@@ -148,8 +159,7 @@ export async function latestGlucose(
     // A session just given is rejected: logging in again on every call
     // could lock the account, so it waits as after a failed login.
     return {
-      result: { ok: false, code: 'GLUCOSE_UNAVAILABLE' },
-      state: waiting(now, 'GLUCOSE_UNAVAILABLE'),
+      ...waiting(now, 'GLUCOSE_UNAVAILABLE'),
       changed: true,
       events,
     }

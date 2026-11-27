@@ -219,12 +219,15 @@ export const glucoseKeys = {
 export const GLUCOSE_REFETCH_MS = 60_000
 
 /**
- * Every minute, also after an error that may be momentary. An expected
- * error that is not (wrong password, terms to accept, not shared, or no
- * glucose for this user) stops it: going back to the app tries once more.
+ * Every minute, also after an error. The errors of the LibreLink account
+ * (wrong password, terms to accept, not shared) keep it going too, so the
+ * box gets well on its own once the user fixes them: the function logs in
+ * once every 15 min at most, whatever the app asks. Only a user without
+ * the glucose set up stops it.
  */
 export function glucoseRefetchInterval(error: unknown): number | false {
-  if (error instanceof GlucoseError && !error.retryable) return false
+  if (error instanceof GlucoseError && error.code === 'GLUCOSE_NOT_CONFIGURED')
+    return false
   return GLUCOSE_REFETCH_MS
 }
 

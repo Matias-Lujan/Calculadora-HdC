@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   GLUCOSE_STALE_MINUTES,
   glucoseAgoText,
+  glucoseRetryText,
   isStaleReading,
   minutesSince,
   trendLabel,
@@ -65,5 +66,27 @@ describe('trendLabel', () => {
       'subiendo',
       'subiendo rápido',
     ])
+  })
+})
+
+describe('glucoseRetryText', () => {
+  it('da la hora de Buenos Aires, con segundos', () => {
+    // 18:20:05 UTC son las 15:20:05 en Buenos Aires (UTC-3).
+    expect(glucoseRetryText('2026-11-27T18:20:05.000Z')).toBe(
+      'Se vuelve a probar a las 15:20:05',
+    )
+  })
+
+  it('pasada la medianoche UTC sigue en el día anterior, con 24 h', () => {
+    expect(glucoseRetryText('2026-11-28T02:05:00.000Z')).toBe(
+      'Se vuelve a probar a las 23:05:00',
+    )
+    expect(glucoseRetryText('2026-11-28T03:00:09.000Z')).toBe(
+      'Se vuelve a probar a las 00:00:09',
+    )
+  })
+
+  it('una fecha rota no da texto', () => {
+    expect(glucoseRetryText('no es fecha')).toBeNull()
   })
 })

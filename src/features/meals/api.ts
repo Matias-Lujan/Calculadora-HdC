@@ -267,7 +267,8 @@ async function glucoseFailure(error: unknown): Promise<unknown> {
   const body: unknown = await response.json().catch(() => null)
   const parsed = glucoseErrorSchema.safeParse(body)
   if (!parsed.success) return error
-  return new GlucoseError(parsed.data.error.code, parsed.data.error.retryable)
+  const { code, retryable, retry_at } = parsed.data.error
+  return new GlucoseError(code, retryable, retry_at ?? null)
 }
 
 /**

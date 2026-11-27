@@ -1289,9 +1289,46 @@ describe('fetchLatestGlucose', () => {
       }
       const error: unknown = await fetchLatestGlucose().catch((e: unknown) => e)
       expect(error).toBeInstanceOf(GlucoseError)
-      expect(error).toMatchObject({ code, retryable })
+      expect(error).toMatchObject({ code, retryable, retryAt: null })
     },
   )
+
+  it('a wait after a failed login carries when it tries again', async () => {
+    const retryAt = '2026-11-27T15:20:05.000Z'
+    fake.state.invokeResult = {
+      data: null,
+      error: httpError(
+        502,
+        JSON.stringify({
+          ok: false,
+          error: {
+            code: 'GLUCOSE_ACTION_NEEDED',
+            retryable: false,
+            retry_at: retryAt,
+          },
+        }),
+      ),
+    }
+    const error: unknown = await fetchLatestGlucose().catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(GlucoseError)
+    expect(error).toMatchObject({ code: 'GLUCOSE_ACTION_NEEDED', retryAt })
+  })
+
+  it('a retry_at that is not ISO is thrown as it came', async () => {
+    const error = httpError(
+      502,
+      JSON.stringify({
+        ok: false,
+        error: {
+          code: 'GLUCOSE_LOGIN_FAILED',
+          retryable: false,
+          retry_at: 'a las tres',
+        },
+      }),
+    )
+    fake.state.invokeResult = { data: null, error }
+    await expect(fetchLatestGlucose()).rejects.toBe(error)
+  })
 
   it('a 401 gives UnauthorizedError, whatever its body', async () => {
     for (const body of [

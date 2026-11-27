@@ -313,7 +313,7 @@ Arriba de Inicio, un recuadro muestra la última lectura del sensor (FreeStyle L
 - **Sin colores de rango**: rojo, ámbar y verde quedan para errores, advertencias y guardado.
 - Se vuelve a leer cada minuto mientras la app está a la vista y al volver a ella; en segundo plano, no.
 - Mientras carga la primera vez, una forma gris del tamaño del valor. Si el sensor no tiene lecturas: "El sensor no tiene lecturas por ahora.".
-- **Si falla**, un aviso corto en gris, que no bloquea nada. Con una lectura ya cargada, se sigue mostrando y debajo dice "No se pudo actualizar.". Sin lectura: "No se pudo entrar a tu cuenta de LibreLink. Revisá el email y la contraseña guardados." (contraseña rechazada), "LibreLink pide que aceptes sus condiciones. Abrí la app LibreLinkUp, entrá y aceptalas.", "Tu cuenta no está compartiendo la glucosa. Revisalo en LibreLink, en Aplicaciones conectadas." o, para todo lo demás, "No se pudo leer la glucosa. Se vuelve a probar sola.". Los tres primeros no se resuelven solos, así que dejan de reintentar cada minuto (se vuelve a probar al volver a la app); el resto sigue cada minuto.
+- **Si falla**, un aviso corto en gris, que no bloquea nada. Con una lectura ya cargada, se sigue mostrando y debajo dice "No se pudo actualizar.". Sin lectura: "No se pudo entrar a tu cuenta de LibreLink. Revisá el email y la contraseña guardados." (contraseña rechazada), "LibreLink pide que aceptes sus condiciones. Abrí la app LibreLinkUp, entrá y aceptalas.", "Tu cuenta no está compartiendo la glucosa. Revisalo en LibreLink, en Aplicaciones conectadas." o, para todo lo demás, "No se pudo leer la glucosa. Se vuelve a probar sola.". Con cualquier error se sigue consultando cada minuto, así el recuadro se arregla solo cuando el usuario resuelve el problema en LibreLink (la función entra a lo sumo una vez cada 15 min, §9.8). Mientras la función espera después de un login fallido, debajo del aviso (o de "No se pudo actualizar.") una línea chica en gris dice cuándo vuelve a probar: "Se vuelve a probar a las 15:20:05", en hora de Argentina (#94).
 - **Solo lo ve un usuario** hasta M9: el que está habilitado en la función (§9.8). Para cualquier otro, la función responde "no configurada" y el recuadro no aparece.
 
 ## 7. Modelo de datos
@@ -936,7 +936,7 @@ Los logs tienen solo códigos (`LOGIN`, `LOGIN_FAILED <código>`, `READ_FAILED <
 
 **Contrato HTTP**: `POST` sin cuerpo (otro método da `INVALID_REQUEST`; `OPTIONS`, el preflight), con el JWT del usuario (`auth.getClaims`) y CORS abierto, como §9.3.
 - Si sale bien: `200 { "ok": true, "reading": { "mgdl": 123, "trend": "steady", "measured_at": "<ISO UTC>" } }`, con `trend` uno de `falling_fast`, `falling`, `steady`, `rising`, `rising_fast` o `null`, y `reading: null` si el sensor no tiene lectura.
-- Si falla: `{ "ok": false, "error": { "code": "…", "retryable": true|false } }`:
+- Si falla: `{ "ok": false, "error": { "code": "…", "retryable": true|false, "retry_at": "<ISO UTC>" } }`. `retry_at` va solo cuando la respuesta sale de una espera después de un login fallido (la que empieza en esa llamada o una que sigue): es la hora a partir de la cual vuelve a entrar. `retryable` dice si la misma llamada puede andar enseguida; la app igual sigue consultando cada minuto con cualquier código menos `GLUCOSE_NOT_CONFIGURED` (§6.9, #94).
 
 | `code` | HTTP | Cuándo | `retryable` |
 |---|---|---|---|

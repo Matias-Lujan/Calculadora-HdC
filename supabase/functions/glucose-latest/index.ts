@@ -59,9 +59,14 @@ function json(status: number, body: unknown): Response {
   })
 }
 
-function fail(code: ErrorCode): Response {
+/** retryAt (ms): while waiting after a failed login, sent as retry_at. */
+function fail(code: ErrorCode, retryAt?: number): Response {
   const { status, retryable } = ERRORS[code]
-  return json(status, { ok: false, error: { code, retryable } })
+  const error =
+    retryAt === undefined
+      ? { code, retryable }
+      : { code, retryable, retry_at: new Date(retryAt).toISOString() }
+  return json(status, { ok: false, error })
 }
 
 function internalError(reason: string): Response {
@@ -194,7 +199,9 @@ async function handle(request: Request): Promise<Response> {
     if (saveError !== null) console.error('glucose-latest: SAVE_FAILED')
   }
 
-  if (!outcome.result.ok) return fail(outcome.result.code)
+  if (!outcome.result.ok) {
+    return fail(outcome.result.code, outcome.result.retryAt)
+  }
   return json(200, { ok: true, reading: outcome.result.reading })
 }
 

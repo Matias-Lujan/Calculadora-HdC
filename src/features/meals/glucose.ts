@@ -49,3 +49,22 @@ export function trendLabel(
 ): string {
   return TREND_LABELS[trend]
 }
+
+const retryClock = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  numberingSystem: 'latn',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+/**
+ * "Se vuelve a probar a las 15:20:05", in Buenos Aires time, for when the
+ * glucose waits after a failed login to LibreLink; null for a broken date.
+ */
+export function glucoseRetryText(retryAt: string): string | null {
+  const time = Date.parse(retryAt)
+  if (Number.isNaN(time)) return null
+  return `Se vuelve a probar a las ${retryClock.format(time)}`
+}

@@ -120,7 +120,11 @@ describe('latestGlucose', () => {
     const outcome = await run(withSession)
 
     expect(outcome).toEqual({
-      result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED' },
+      result: {
+        ok: false,
+        code: 'GLUCOSE_LOGIN_FAILED',
+        retryAt: NOW + LOGIN_WAIT_MS,
+      },
       state: {
         session: null,
         loginAfter: NOW + LOGIN_WAIT_MS,
@@ -152,7 +156,11 @@ describe('latestGlucose', () => {
     loginMock.mockResolvedValue({ ok: true, session: NEW })
     const outcome = await run(withSession)
 
-    expect(outcome.result).toEqual({ ok: false, code: 'GLUCOSE_UNAVAILABLE' })
+    expect(outcome.result).toEqual({
+      ok: false,
+      code: 'GLUCOSE_UNAVAILABLE',
+      retryAt: NOW + LOGIN_WAIT_MS,
+    })
     expect(outcome.state).toEqual({
       session: null,
       loginAfter: NOW + LOGIN_WAIT_MS,
@@ -168,7 +176,11 @@ describe('latestGlucose', () => {
     const outcome = await run(EMPTY_STATE)
 
     expect(outcome).toEqual({
-      result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED' },
+      result: {
+        ok: false,
+        code: 'GLUCOSE_LOGIN_FAILED',
+        retryAt: NOW + LOGIN_WAIT_MS,
+      },
       state: {
         session: null,
         loginAfter: NOW + 15 * 60 * 1000,
@@ -189,7 +201,11 @@ describe('latestGlucose', () => {
   ] as const)('un login fallido con %s da %s y espera', async (error, code) => {
     loginMock.mockResolvedValue({ ok: false, error })
     const outcome = await run(EMPTY_STATE)
-    expect(outcome.result).toEqual({ ok: false, code })
+    expect(outcome.result).toEqual({
+      ok: false,
+      code,
+      retryAt: NOW + LOGIN_WAIT_MS,
+    })
     expect(outcome.state).toEqual({
       session: null,
       loginAfter: NOW + LOGIN_WAIT_MS,
@@ -206,7 +222,7 @@ describe('latestGlucose', () => {
     const outcome = await run(state)
 
     expect(outcome).toEqual({
-      result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED' },
+      result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED', retryAt: NOW + 1 },
       state,
       changed: false,
       events: [],
@@ -221,7 +237,11 @@ describe('latestGlucose', () => {
       loginAfter: NOW + 1,
       loginError: null,
     })
-    expect(outcome.result).toEqual({ ok: false, code: 'GLUCOSE_UNAVAILABLE' })
+    expect(outcome.result).toEqual({
+      ok: false,
+      code: 'GLUCOSE_UNAVAILABLE',
+      retryAt: NOW + 1,
+    })
     expect(loginMock).not.toHaveBeenCalled()
   })
 
@@ -255,7 +275,11 @@ describe('latestGlucose', () => {
         retryAfterSeconds: seconds,
       })
       const outcome = await run(EMPTY_STATE)
-      expect(outcome.result).toEqual({ ok: false, code: 'GLUCOSE_UNAVAILABLE' })
+      expect(outcome.result).toEqual({
+        ok: false,
+        code: 'GLUCOSE_UNAVAILABLE',
+        retryAt: NOW + wait,
+      })
       expect(outcome.state.loginAfter).toBe(NOW + wait)
     },
   )
@@ -300,5 +324,16 @@ describe('latestGlucose', () => {
       loginError: null,
     })
     expect(outcome.changed).toBe(true)
+  })
+
+  it('un error sin espera no dice cuándo vuelve a probar', async () => {
+    readMock.mockResolvedValue({ ok: false, error: 'NO_CONNECTION' })
+    const kept = await run(withSession)
+    expect(kept.result).not.toHaveProperty('retryAt')
+
+    loginMock.mockResolvedValue({ ok: true, session: NEW })
+    readMock.mockResolvedValue({ ok: false, error: 'UNAVAILABLE' })
+    const fresh = await run(EMPTY_STATE)
+    expect(fresh.result).not.toHaveProperty('retryAt')
   })
 })
