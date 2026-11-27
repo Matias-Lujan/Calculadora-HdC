@@ -405,7 +405,6 @@ Hecho por el implementer (#83): la decisión va en `src/lib/session.ts`, que rec
 
 **Cerrada** el 2026-11-26 (PR #22). El usuario lo probó en la versión de prueba y confirmó en el iPhone que todo sigue andando.
 ### M7 — Aviso de uso aceptado por usuario
-
 **Objetivo**: que cada persona que use la app lea y acepte una vez que no es un dispositivo médico y que la dosis depende de sus propios datos, y que quede registrado que lo aceptó. Hoy la usa solo el usuario, pero quiere estar cubierto si algún día se la pasa a alguien.
 
 Incluye (alcance acordado con el usuario, 2026-11-18):
