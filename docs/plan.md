@@ -449,4 +449,4 @@ Hecho por el implementer, punto 1 (#85): la migración `20261127030023_meals_cli
 
 Hecho por el implementer, punto 2 (#86): `src/features/foods/photoCleanup.ts` (qué borrar, con tests), la lectura y el borrado en `api.ts`, un hook en `queries.ts` y el disparo al montar `NewLabelFoodPage` (una vez por apertura, también en StrictMode). Sin migración: las políticas de `food-photos` ya permiten listar y borrar lo propio. Falta probarlo en `dev` con una foto suelta de más de un día.
 
-**Cerrada** el 2026-11-27 (PR #25). La migración está en `prod`; el usuario lo probó en la versión de prueba. Después del merge, confirmar en el iPhone que todo sigue andando.
+**Cerrada** el 2026-11-27 (PR #25). La migración está en `prod`; el usuario lo probó en la versión de prueba y, después del merge, confirmó en el iPhone que todo sigue andando.
