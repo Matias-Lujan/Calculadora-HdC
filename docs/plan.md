@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) en curso, rama `mejora-sesion-no-reconocida`.** Última actualización: 2026-11-26.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app se usa a diario sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. Próxima: M6.** Última actualización: 2026-11-26.
 
 ---
 
@@ -340,11 +340,11 @@ Desde el cierre de la etapa 7 la app está en uso diario sobre `prod`. Lo que si
 | # | Mejora | De dónde sale | Estado |
 |---|---|---|---|
 | M1 | Revisión de UI/UX: un agente revisor de UX con criterios explícitos (a definir con el usuario antes de empezar) y una pasada por todas las pantallas, priorizando el uso diario en el iPhone | Pedido del usuario al cerrar el MVP | ✅ PR #17 |
-| M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | En curso (`mejora-sesion-no-reconocida`) |
+| M2 | Sesión que el servidor no reconoce: guardar responde `42501` y se ve el error genérico; tendría que llevar al login, como un 401 (`isUnauthorized`, §10) | Hallado al probar `create_meal` (etapa 7, PR #14) | ✅ PR #22 |
 | M3 | Comida duplicada si se pierde la respuesta de `create_meal` y se reintenta (§7.2, riesgo aceptado en #58); por ejemplo, con una clave de idempotencia | Etapa 7 (#58) | Pendiente, opcional |
 | M4 | Salir de Inicio mientras se guarda y volver antes de que termine: la comida se ve cargada y se puede guardar dos veces (#61) | Etapa 7 (#61) | Pendiente, opcional |
 | M5 | Fotos de etiquetas que quedan sin alimento en `food-photos` (se corta la conexión o se sale de la pantalla, §6.1) | Etapa 6 (#55) | Pendiente, opcional |
-| M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Pendiente |
+| M6 | Pendientes del spec (§15): revisar la Res. GMC 05/25 y los límites de Gemini, y renombrar "Jugo de limón" en el seed USDA (migración nueva) | Spec §15 | Próxima |
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 
 ### M1 — Revisión de UI/UX
@@ -397,12 +397,14 @@ Incluye:
 Ciclo: lógica de un feature sin cuentas, así que implementer y reviewer. No hay migración ni Edge Function.
 
 **Terminada cuando**:
-- [ ] Con la sesión borrada del servidor, guardar una comida en la versión de prueba lleva al login.
+- [x] Con la sesión borrada del servidor, guardar una comida en la versión de prueba lleva al login.
 - [x] Un `42501` con una sesión válida sigue mostrando el error genérico (test).
 - [x] Spec y `docs/decisiones.md` al día.
 
 Hecho por el implementer (#83): la decisión va en `src/lib/session.ts`, que recibe `getUser` y `signOut` por parámetro (con sus tests en `session.test.ts`, el cliente simulado), y el `onError` global de `queryClient.ts` la usa para todo error que no sea un 401; el reconocimiento del `42501` es `isPermissionDenied`, en `errors.ts`. Resuelto sin que el plan lo dijera: (1) `user_not_found` se sumó a los códigos de sesión inválida de `isUnauthorized` (lo más simple; también vale para un error directo de Auth); (2) si `getUser` tira una excepción, no se hace nada; (3) las lecturas con `42501` conservan sus reintentos (hasta 3), así que la consulta al servidor llega después del último; los guardados no se reintentan, así que van directo. Falta la prueba en la versión de prueba (primer "Terminada cuando").
 
+
+**Cerrada** el 2026-11-26 (PR #22). El usuario lo probó en la versión de prueba y confirmó en el iPhone que todo sigue andando.
 ### M7 — Aviso de uso aceptado por usuario
 
 **Objetivo**: que cada persona que use la app lea y acepte una vez que no es un dispositivo médico y que la dosis depende de sus propios datos, y que quede registrado que lo aceptó. Hoy la usa solo el usuario, pero quiere estar cubierto si algún día se la pasa a alguien.
