@@ -155,6 +155,13 @@
     scroll-padding-bottom: calc(80px + env(safe-area-inset-bottom));
   }
 
+  /* The glucose chart fits the screen (UX-37): without the bounce of iOS,
+     a drag over it does not move the whole page. It still scrolls when it
+     does not fit (the biggest letter). */
+  html:has([data-fixed-screen]) {
+    overscroll-behavior-y: none;
+  }
+
   /* UX-27: on the iPhone, the root letter is the one of "Tamaño del texto"
      (17 px by default). Only in Safari for iOS (-webkit-touch-callout):
      on a Mac, -apple-system-body is 13 px. The shorthand also sets the
