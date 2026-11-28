@@ -514,8 +514,10 @@ Hecho por el implementer, parte 2 (pantalla y gráfico, #100 a #104): `glucoseCh
 
 **En `prod`, antes de mergear y en este orden**: `db push` de las dos migraciones; deploy de `glucose-latest` con `--no-verify-jwt` (después de la migración: la función nueva lee `graph_synced_at`); los dos secrets de Vault de `prod` (con su URL y su key; los carga el usuario); `rls-check` contra `prod`; ver una corrida buena de la tarea en `cron.job_run_details`.
 
+**En `prod` (2026-11-28)**: las dos migraciones aplicadas, `glucose-latest` desplegada con `--no-verify-jwt`, los dos secrets de Vault cargados por el usuario, `rls-check` pasa contra `prod` (con los usuarios de prueba que ya había), y una corrida a mano de la tarea respondió `{"ok":true}` y guardó las lecturas; la tarea `glucose-sync` está activa. En `dev` el usuario probó la pantalla en el iPhone (versión de prueba, en el navegador): anda bien; la leyenda queda debajo del borde en el navegador, y se confirma en la app instalada después del merge. La tarea `glucose-sync` de `dev` quedó apagada (2026-11-28, decisión del usuario): en `dev` no queda nada leyendo la cuenta de LibreLink.
+
 **Terminada cuando**:
-- [ ] El gráfico muestra las últimas 24 h en el iPhone sobre `dev`, sin huecos aunque la app haya estado cerrada más de 12 h.
-- [ ] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.
-- [ ] Spec y `docs/decisiones.md` al día.
+- [ ] El gráfico muestra las últimas 24 h en el iPhone, sin huecos aunque la app haya estado cerrada más de 12 h. Se comprueba en `prod`, con la app instalada, al día siguiente del merge (en `dev` se confirmó el guardado de 12 h, y la tarea quedó apagada para no leer la cuenta real; se prende con `cron.alter_job(..., active := true)`).
+- [x] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.
+- [x] Spec y `docs/decisiones.md` al día.
 - [ ] Migración, función y tarea en `prod` antes de mergear, con `rls-check` contra `prod`; se confirmó en el iPhone.
