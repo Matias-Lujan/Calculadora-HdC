@@ -1,11 +1,13 @@
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GlucoseError, UnauthorizedError } from '../../lib/errors.ts'
 import {
   MEALS_PAGE_SIZE,
   RECENT_MEALS_LIMIT,
   createMeal,
   deleteMeal,
+  fetchDayMealTimes,
+  fetchGlucoseDay,
   fetchLatestGlucose,
   fetchMeal,
   fetchMealsPage,
@@ -45,6 +47,7 @@ const fake = vi.hoisted(() => {
       'update',
       'eq',
       'is',
+      'gte',
       'order',
       'range',
       'limit',
@@ -1358,5 +1361,89 @@ describe('fetchLatestGlucose', () => {
     const error = new FunctionsFetchError(new TypeError('Failed to fetch'))
     fake.state.invokeResult = { data: null, error }
     await expect(fetchLatestGlucose()).rejects.toBe(error)
+  })
+})
+
+// The 24-hour chart (spec §6.10). Invented readings and times.
+describe('the reads of the 24-hour chart', () => {
+  const NOW = '2026-11-27T15:20:00.000Z'
+  const DAY_START = '2026-11-26T15:20:00.000Z'
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(NOW))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  describe('fetchGlucoseDay', () => {
+    const rows = [
+      { measured_at: '2026-11-27T14:45:00+00:00', mgdl: 112 },
+      { measured_at: '2026-11-27T15:00:00+00:00', mgdl: 118 },
+    ]
+
+    it('reads the readings of the last 24 hours, oldest first', async () => {
+      fake.state.results = [{ data: rows, error: null }]
+      await expect(fetchGlucoseDay()).resolves.toEqual(rows)
+      expect(fake.state.chains[0]?.table).toBe('glucose_readings')
+      expect(methods(0)).toEqual(['select', 'gte', 'order'])
+      expect(argsOf(0, 'select')).toEqual(['measured_at, mgdl'])
+      expect(argsOf(0, 'gte')).toEqual(['measured_at', DAY_START])
+      expect(argsOf(0, 'order')).toEqual(['measured_at', { ascending: true }])
+    })
+
+    it('an invalid row throws', async () => {
+      fake.state.results = [
+        { data: [{ measured_at: 'yesterday', mgdl: 112 }], error: null },
+      ]
+      await expect(fetchGlucoseDay()).rejects.toThrow()
+      fake.state.results = [
+        { data: [{ measured_at: rows[0]?.measured_at }], error: null },
+      ]
+      await expect(fetchGlucoseDay()).rejects.toThrow()
+    })
+
+    it('throws the Supabase error as is', async () => {
+      const error = { message: 'JWT expired', code: 'PGRST301' }
+      fake.state.results = [{ data: null, error }]
+      await expect(fetchGlucoseDay()).rejects.toBe(error)
+    })
+  })
+
+  describe('fetchDayMealTimes', () => {
+    it('reads when each meal of the last 24 hours was eaten, without deleted ones', async () => {
+      fake.state.results = [
+        {
+          data: [
+            { eaten_at: '2026-11-27T12:00:00+00:00' },
+            { eaten_at: '2026-11-27T15:05:00+00:00' },
+          ],
+          error: null,
+        },
+      ]
+      await expect(fetchDayMealTimes()).resolves.toEqual([
+        '2026-11-27T12:00:00+00:00',
+        '2026-11-27T15:05:00+00:00',
+      ])
+      expect(fake.state.chains[0]?.table).toBe('meals')
+      expect(methods(0)).toEqual(['select', 'is', 'gte', 'order'])
+      // Only the time: the chart shows neither carbs nor doses.
+      expect(argsOf(0, 'select')).toEqual(['eaten_at'])
+      expect(argsOf(0, 'is')).toEqual(['deleted_at', null])
+      expect(argsOf(0, 'gte')).toEqual(['eaten_at', DAY_START])
+      expect(argsOf(0, 'order')).toEqual(['eaten_at', { ascending: true }])
+    })
+
+    it('an invalid row throws', async () => {
+      fake.state.results = [{ data: [{ eaten_at: null }], error: null }]
+      await expect(fetchDayMealTimes()).rejects.toThrow()
+    })
+
+    it('throws the Supabase error as is', async () => {
+      const error = { message: 'JWT expired', code: 'PGRST301' }
+      fake.state.results = [{ data: null, error }]
+      await expect(fetchDayMealTimes()).rejects.toBe(error)
+    })
   })
 })

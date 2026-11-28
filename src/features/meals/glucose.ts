@@ -68,3 +68,90 @@ export function glucoseRetryText(retryAt: string): string | null {
   if (Number.isNaN(time)) return null
   return `Se vuelve a probar a las ${retryClock.format(time)}`
 }
+
+// The screen of the glucose chart (spec §6.10).
+
+export const GLUCOSE_CHART_TITLE = 'Glucosa'
+
+/** The ⓘ of the chart: the band and the meals are in the legend (UX-34). */
+export const GLUCOSE_CHART_INFO =
+  'Las lecturas de tu sensor, para tenerlas a mano. No cambian la dosis.'
+
+export const GLUCOSE_CHART_EMPTY_TEXT = 'Todavía no hay lecturas guardadas.'
+
+/** Under the empty text, without readings in the 24 hours (UX-36). */
+export const GLUCOSE_CHART_EMPTY_HINT =
+  'Se guardan solas, aunque la app esté cerrada. Volvé en un rato.'
+
+/** When the 24 hours have readings but the chosen period does not. */
+export function chartPeriodEmptyText(hours: number): string {
+  return `No hay lecturas guardadas de las últimas ${hours} horas.`
+}
+
+/** Under chartPeriodEmptyText: the 24 hours do have readings. */
+export const GLUCOSE_CHART_PERIOD_EMPTY_HINT = 'Probá con un período más largo.'
+
+/** A period of the selector (UX-31): what it shows and what is heard. */
+export function chartPeriodText(hours: number): {
+  short: string
+  spoken: string
+} {
+  return { short: `${hours} h`, spoken: `${hours} horas` }
+}
+
+/** The name of the selector, for screen readers. */
+export const GLUCOSE_CHART_PERIODS_LABEL = 'Horas a mostrar'
+
+/** Above the chart, while no reading is picked (UX-29). */
+export const GLUCOSE_CHART_HINT = 'Tocá la línea para ver cada lectura.'
+
+/** The legend under the chart (UX-34). */
+export const GLUCOSE_CHART_BAND_LEGEND = 'De 70 a 180 mg/dL'
+export const GLUCOSE_CHART_MEAL_LEGEND = 'Comida guardada'
+
+/** The name of the chart for screen readers (it is adjustable, UX-29). */
+export const GLUCOSE_CHART_LABEL = 'Lecturas de glucosa'
+
+const clock = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  numberingSystem: 'latn',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
+/** "16:40", in Buenos Aires time. */
+export function clockText(time: number): string {
+  return clock.format(time)
+}
+
+/** "a las 16:40", after the value picked on the chart. */
+export function chartAtText(time: number): string {
+  return `a las ${clockText(time)}`
+}
+
+/**
+ * A tap in a gap: "Sin lecturas entre las 10:15 y las 12:20", or only one
+ * end at the start or the end of the period.
+ */
+export function chartGapText(
+  before: number | null,
+  after: number | null,
+): string {
+  if (before !== null && after !== null) {
+    return `Sin lecturas entre las ${clockText(before)} y las ${clockText(after)}`
+  }
+  if (after !== null) return `Sin lecturas hasta las ${clockText(after)}`
+  if (before !== null) return `Sin lecturas desde las ${clockText(before)}`
+  return 'Sin lecturas'
+}
+
+/** A meal close to the picked time, without carbs nor dose (#102). */
+export function chartMealText(time: number): string {
+  return `Comiste a las ${clockText(time)}`
+}
+
+/** What a screen reader hears of a picked reading: "16:40, 132 mg/dL". */
+export function chartReadingValueText(time: number, mgdl: number): string {
+  return `${clockText(time)}, ${mgdl} mg/dL`
+}

@@ -14,6 +14,8 @@ import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
+  fetchDayMealTimes,
+  fetchGlucoseDay,
   fetchMeal,
   fetchLatestGlucose,
   fetchMealsPage,
@@ -30,6 +32,9 @@ export const mealsKeys = {
   detail: (id: string) => ['meals', 'detail', id] as const,
   // The last meals, for the shortcuts of an empty Inicio (spec §6.6).
   recent: ['meals', 'recent'] as const,
+  // The times of the meals of the last 24 hours, for the marks of the
+  // glucose chart (spec §6.10): saving or deleting a meal reads them again.
+  glucoseMarks: ['meals', 'glucose-marks'] as const,
 }
 
 // Outside mealsKeys.all on purpose: saving a meal invalidates that prefix,
@@ -118,7 +123,8 @@ export function useMeal(id: string) {
 // too (otherwise, going back would show it until the list is read again),
 // and the list is read again. The detail being shown is not invalidated: it
 // would show "No encontramos esta comida." before navigating to the list.
-// The shortcuts of Inicio are read again too.
+// The shortcuts of Inicio and the marks of the glucose chart are read
+// again too.
 export function useDeleteMeal() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -131,6 +137,7 @@ export function useDeleteMeal() {
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: mealsKeys.list }),
         queryClient.invalidateQueries({ queryKey: mealsKeys.recent }),
+        queryClient.invalidateQueries({ queryKey: mealsKeys.glucoseMarks }),
       ])
     },
   })
@@ -213,6 +220,9 @@ export const glucoseKeys = {
   // The last reading of the sensor (spec §6.9). Outside mealsKeys.all:
   // saving a meal does not change it.
   latest: ['glucose', 'latest'] as const,
+  // The saved readings of the last 24 hours, for the chart and the small
+  // curve of the glucose card on Home (spec §6.9 and §6.10).
+  day: ['glucose', 'day'] as const,
 }
 
 /** How often the glucose is read again while Inicio is in sight. */
@@ -244,5 +254,36 @@ export function useLatestGlucose() {
     refetchInterval: (query) => glucoseRefetchInterval(query.state.error),
     refetchIntervalInBackground: false,
     retry: false,
+  })
+}
+
+/** How often the saved readings are read again while Home or the chart is in sight. */
+export const GLUCOSE_DAY_REFETCH_MS = 5 * 60_000
+
+/**
+ * The saved readings of the last 24 hours (spec §6.9 and §6.10), used by the
+ * chart and by the small curve on Home (also for a user without glucose: it
+ * comes back empty). Read again every 5 min while either is in sight and
+ * when going back to it
+ * (refetchOnWindowFocus, on by default): they are saved every 15 min at
+ * most. A 401 goes to the login (global QueryCache).
+ */
+export function useGlucoseDay() {
+  return useQuery({
+    queryKey: glucoseKeys.day,
+    queryFn: fetchGlucoseDay,
+    refetchInterval: GLUCOSE_DAY_REFETCH_MS,
+    refetchIntervalInBackground: false,
+  })
+}
+
+/**
+ * The times of the meals of the last 24 hours, for the marks of the chart.
+ * Under the meals prefix: saving a meal reads them again.
+ */
+export function useMealMarks() {
+  return useQuery({
+    queryKey: mealsKeys.glucoseMarks,
+    queryFn: fetchDayMealTimes,
   })
 }

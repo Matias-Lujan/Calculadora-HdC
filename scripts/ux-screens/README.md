@@ -36,6 +36,8 @@ node --env-file=.env.local scripts/ux-screens/capture.ts [--device "<nombre>"] [
 
 Los números de las capturas no cambian entre corridas (un estado omitido o que falló no corre a los demás), así que se pueden comparar carpeta contra carpeta. Los estados nuevos se suman al final, después de los de `--sin-alerta`, para no correr los números de los que ya estaban. Desde la tanda 2 de M1 son tres, y ninguno guarda nada: Configuración con la confirmación de un ratio nuevo, Inicio con la dosis por encima de la alerta (el aviso en el visor) y un alimento que se cocina con un rinde fuera de lo habitual, con su confirmación abierta. Si se corrió con `--sin-alerta`, antes de esos tres le vuelve a poner la alerta al usuario de demo.
 
+Desde M10, los cuatro últimos son de la glucosa: `inicio-glucosa` (el recuadro de Inicio), `glucosa` (el gráfico de 24 horas) y `glucosa-toque` (el gráfico en 6 horas después de tocar la línea, revisión 2) responden la glucosa **en el navegador** con lecturas inventadas, porque el usuario de demo no tiene sensor (nada llega a la base); `glucosa-sin-lecturas` usa la respuesta real, sin lecturas.
+
 ## Lo que no puede imitar
 
 - **Es WebKit, no Safari de iOS**: cambian algunos detalles de dibujo y las fuentes pueden no ser las del iPhone.

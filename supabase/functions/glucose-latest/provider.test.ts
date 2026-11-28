@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   login,
+  readGraph,
   readLatest,
   type LibreConfig,
   type LibreSession,
@@ -315,6 +316,7 @@ describe('readLatest', () => {
         trend: 'steady',
         measured_at: '2026-11-27T15:05:12.000Z',
       },
+      patientId: null,
     })
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('https://api-eu.libreview.io/llu/connections')
@@ -404,14 +406,15 @@ describe('readLatest', () => {
   })
 
   it('una conexión sin lectura da reading null', async () => {
-    for (const body of [
-      { status: 0, data: [{ patientId: 'p1' }] },
-      { status: 0, data: [{ glucoseMeasurement: null }] },
-    ]) {
+    for (const [body, patientId] of [
+      [{ status: 0, data: [{ patientId: 'p1' }] }, 'p1'],
+      [{ status: 0, data: [{ glucoseMeasurement: null }] }, null],
+    ] as const) {
       const fetchMock = vi.fn<typeof fetch>(async () => answer(body))
       expect(await readLatest(SESSION, config(fetchMock))).toEqual({
         ok: true,
         reading: null,
+        patientId,
       })
     }
   })
@@ -456,4 +459,164 @@ describe('readLatest', () => {
       error: 'UNAVAILABLE',
     })
   })
+})
+
+describe('readLatest: patientId', () => {
+  it('devuelve el patientId de la primera conexión', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => connections(MEASUREMENT))
+    expect(await readLatest(SESSION, config(fetchMock))).toMatchObject({
+      ok: true,
+      patientId: 'p1',
+    })
+  })
+
+  it.each([undefined, null, 123, ''])(
+    'un patientId ausente o raro (%j) da null, sin error',
+    async (patientId) => {
+      const fetchMock = vi.fn<typeof fetch>(async () =>
+        answer({
+          status: 0,
+          data: [{ patientId, glucoseMeasurement: MEASUREMENT }],
+        }),
+      )
+      expect(await readLatest(SESSION, config(fetchMock))).toMatchObject({
+        ok: true,
+        reading: { mgdl: 123 },
+        patientId: null,
+      })
+    },
+  )
+})
+
+function graph(points: unknown): Response {
+  return answer({
+    status: 0,
+    data: { connection: {}, activeSensors: [], graphData: points },
+  })
+}
+
+const POINT = {
+  FactoryTimestamp: '11/27/2026 3:05:12 PM',
+  Timestamp: '11/27/2026 12:05:12 PM',
+  ValueInMgPerDl: 101,
+}
+
+describe('readGraph', () => {
+  it('devuelve los puntos válidos, saltea los inválidos y arma bien el pedido', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () =>
+      graph([
+        POINT,
+        {
+          ...POINT,
+          FactoryTimestamp: '11/27/2026 3:20:12 PM',
+          ValueInMgPerDl: 140,
+        },
+        {
+          ...POINT,
+          FactoryTimestamp: '11/27/2026 3:35:12 PM',
+          ValueInMgPerDl: 99.5,
+        },
+        { ...POINT, FactoryTimestamp: '2/30/2026 3:50:12 PM' },
+        {
+          ...POINT,
+          FactoryTimestamp: '11/27/2026 4:05:12 PM',
+          ValueInMgPerDl: 0,
+        },
+        'no es un punto',
+        {
+          ...POINT,
+          FactoryTimestamp: '11/27/2026 4:20:12 PM',
+          ValueInMgPerDl: 180,
+        },
+      ]),
+    )
+    expect(await readGraph(SESSION, 'p1', config(fetchMock))).toEqual({
+      ok: true,
+      readings: [
+        { measured_at: '2026-11-27T15:05:12.000Z', mgdl: 101 },
+        { measured_at: '2026-11-27T15:20:12.000Z', mgdl: 140 },
+        { measured_at: '2026-11-27T16:20:12.000Z', mgdl: 180 },
+      ],
+    })
+    const [url, init] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://api-eu.libreview.io/llu/connections/p1/graph')
+    expect(init?.method).toBe('GET')
+    const headers = new Headers(init?.headers)
+    expect(headers.get('authorization')).toBe('Bearer token-inventado')
+    expect(headers.get('account-id')).toBe('hash-inventado')
+    expect(headers.get('version')).toBe('4.16.0')
+    expect(init?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('codifica el patientId en la URL', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => graph([]))
+    await readGraph(SESSION, 'a/b?c d', config(fetchMock))
+    expect(fetchMock.mock.calls[0]![0]).toBe(
+      'https://api-eu.libreview.io/llu/connections/a%2Fb%3Fc%20d/graph',
+    )
+  })
+
+  it('sin puntos da una lista vacía', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => graph([]))
+    expect(await readGraph(SESSION, 'p1', config(fetchMock))).toEqual({
+      ok: true,
+      readings: [],
+    })
+  })
+
+  it('401 da SESSION_EXPIRED', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => answer({}, 401))
+    expect(await readGraph(SESSION, 'p1', config(fetchMock))).toEqual({
+      ok: false,
+      error: 'SESSION_EXPIRED',
+    })
+  })
+
+  it.each([
+    [() => answer({}, 429), 'LOCKED'],
+    [() => answer({}, 403), 'CLIENT_REJECTED'],
+    [() => answer({ status: 920 }), 'CLIENT_REJECTED'],
+    [() => answer({}, 500), 'UNAVAILABLE'],
+    [() => answer({}, 503), 'UNAVAILABLE'],
+    [() => answer({}, 404), 'BAD_RESPONSE'],
+    [() => answer('no json'), 'BAD_RESPONSE'],
+    [() => graph('x'), 'BAD_RESPONSE'],
+    [() => graph(undefined), 'BAD_RESPONSE'],
+    [() => answer({ status: 0, data: [] }), 'BAD_RESPONSE'],
+  ] as const)('el caso %# da %s', async (response, error) => {
+    const fetchMock = vi.fn<typeof fetch>(async () => response())
+    expect(await readGraph(SESSION, 'p1', config(fetchMock))).toEqual({
+      ok: false,
+      error,
+    })
+  })
+
+  it('un error de red da UNAVAILABLE', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      throw new TypeError('fetch failed')
+    })
+    expect(await readGraph(SESSION, 'p1', config(fetchMock))).toEqual({
+      ok: false,
+      error: 'UNAVAILABLE',
+    })
+  })
+
+  it('si no responde a tiempo da UNAVAILABLE', async () => {
+    expect(await readGraph(SESSION, 'p1', config(hangingFetch, 20))).toEqual({
+      ok: false,
+      error: 'UNAVAILABLE',
+    })
+  })
+})
+
+describe('readGraph: nunca entra', () => {
+  it.each([() => answer({}, 401), () => answer({}, 500), () => graph([POINT])])(
+    'hace un solo pedido, al gráfico, y nunca al login (caso %#)',
+    async (response) => {
+      const fetchMock = vi.fn<typeof fetch>(async () => response())
+      await readGraph(SESSION, 'p1', config(fetchMock))
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(String(fetchMock.mock.calls[0]![0])).toMatch(/\/graph$/)
+    },
+  )
 })

@@ -18,7 +18,7 @@ App web mobile-first para contar hidratos de carbono (HC) y calcular el bolo de 
 
 - **Solo calcula el bolo por hidratos.** No corrige por glucemia, no tiene en cuenta la insulina activa y usa un único ratio para todas las comidas.
 - No redondea la dosis al incremento de ninguna lapicera: muestra el valor exacto, y el usuario decide cuánto aplicarse.
-- La glucosa del sensor (FreeStyle Libre, vía LibreLinkUp) se muestra en Inicio solo como referencia: no entra al cálculo ni se guarda.
+- La glucosa del sensor (FreeStyle Libre, vía LibreLinkUp) se muestra en Inicio solo como referencia, con un gráfico de las últimas 24 horas: no entra al cálculo ni se guarda con la comida, y solo se conservan las lecturas de las últimas 24 horas.
 - No funciona sin conexión.
 
 ## Estado

@@ -44,12 +44,34 @@ import {
 } from './features/foods/labelForm.ts'
 import { formatDayTitle, formatMealDateTime } from './features/meals/eatenAt.ts'
 import {
+  GLUCOSE_CHART_BAND_LEGEND,
+  GLUCOSE_CHART_EMPTY_HINT,
+  GLUCOSE_CHART_EMPTY_TEXT,
+  GLUCOSE_CHART_HINT,
+  GLUCOSE_CHART_INFO,
+  GLUCOSE_CHART_LABEL,
+  GLUCOSE_CHART_MEAL_LEGEND,
+  GLUCOSE_CHART_PERIODS_LABEL,
+  GLUCOSE_CHART_PERIOD_EMPTY_HINT,
+  GLUCOSE_CHART_TITLE,
+  chartAtText,
+  chartGapText,
+  chartMealText,
+  chartPeriodEmptyText,
+  chartPeriodText,
+  chartReadingValueText,
   GLUCOSE_INFO,
   GLUCOSE_NO_READING_TEXT,
   GLUCOSE_STALE_TEXT,
   glucoseAgoText,
   trendLabel,
 } from './features/meals/glucose.ts'
+import {
+  CHART_PERIODS_MS,
+  HOUR_MS,
+  chartDescription,
+  chartHours,
+} from './features/meals/glucoseChart.ts'
 import {
   appliedDoseText,
   daySummaryText,
@@ -524,6 +546,40 @@ describe('plain words: every code, exhaustively', () => {
       ...(
         ['falling_fast', 'falling', 'steady', 'rising', 'rising_fast'] as const
       ).map(trendLabel),
+      GLUCOSE_CHART_TITLE,
+      GLUCOSE_CHART_INFO,
+      GLUCOSE_CHART_EMPTY_TEXT,
+      GLUCOSE_CHART_EMPTY_HINT,
+      GLUCOSE_CHART_HINT,
+      GLUCOSE_CHART_BAND_LEGEND,
+      GLUCOSE_CHART_MEAL_LEGEND,
+      GLUCOSE_CHART_LABEL,
+      GLUCOSE_CHART_PERIODS_LABEL,
+      chartPeriodEmptyText(3),
+      GLUCOSE_CHART_PERIOD_EMPTY_HINT,
+      ...[3, 24].flatMap((hours) => Object.values(chartPeriodText(hours))),
+      chartAtText(0),
+      chartGapText(0, 1),
+      chartGapText(null, 1),
+      chartGapText(0, null),
+      chartGapText(null, null),
+      chartMealText(0),
+      chartReadingValueText(0, 132),
+      chartDescription([], 0, HOUR_MS * 24),
+      chartDescription([{ time: 0, mgdl: 100 }], 1, HOUR_MS * 3),
+      chartDescription(
+        [
+          { time: 0, mgdl: 90 },
+          { time: 1, mgdl: 150 },
+        ],
+        3,
+        HOUR_MS * 6,
+      ),
+      ...CHART_PERIODS_MS.flatMap((windowMs) =>
+        chartHours(Date.parse('2026-11-27T15:20:00Z'), windowMs, 274).flatMap(
+          (hour) => (hour.label === null ? [] : [hour.label]),
+        ),
+      ),
     ])
   })
 

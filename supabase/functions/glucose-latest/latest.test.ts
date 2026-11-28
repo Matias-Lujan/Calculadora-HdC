@@ -34,6 +34,12 @@ const READING: GlucoseReading = {
   measured_at: '2026-11-27T14:59:00.000Z',
 }
 
+const READ_OK = {
+  ok: true,
+  reading: READING,
+  patientId: 'paciente-inventado',
+} as const
+
 const withSession: LibreState = {
   session: KEPT,
   loginAfter: null,
@@ -51,13 +57,14 @@ beforeEach(() => {
 
 describe('latestGlucose', () => {
   it('con una sesión vigente lee sin entrar y no cambia nada', async () => {
-    readMock.mockResolvedValue({ ok: true, reading: READING })
+    readMock.mockResolvedValue(READ_OK)
     const outcome = await run(withSession)
 
     expect(outcome).toEqual({
-      result: { ok: true, reading: READING },
+      result: READ_OK,
       state: withSession,
       changed: false,
+      loggedIn: false,
       events: [],
     })
     expect(loginMock).not.toHaveBeenCalled()
@@ -65,19 +72,24 @@ describe('latestGlucose', () => {
   })
 
   it('un sensor sin lectura (reading null) no es un error', async () => {
-    readMock.mockResolvedValue({ ok: true, reading: null })
-    expect((await run(withSession)).result).toEqual({ ok: true, reading: null })
+    readMock.mockResolvedValue({ ok: true, reading: null, patientId: null })
+    expect((await run(withSession)).result).toEqual({
+      ok: true,
+      reading: null,
+      patientId: null,
+    })
   })
 
   it('sin sesión entra, guarda la sesión y lee con ella', async () => {
     loginMock.mockResolvedValue({ ok: true, session: NEW })
-    readMock.mockResolvedValue({ ok: true, reading: READING })
+    readMock.mockResolvedValue(READ_OK)
     const outcome = await run(EMPTY_STATE)
 
     expect(outcome).toEqual({
-      result: { ok: true, reading: READING },
+      result: READ_OK,
       state: { session: NEW, loginAfter: null, loginError: null },
       changed: true,
+      loggedIn: true,
       events: ['LOGIN'],
     })
     expect(loginMock).toHaveBeenCalledWith(CREDENTIALS, CONFIG)
@@ -86,7 +98,7 @@ describe('latestGlucose', () => {
 
   it('una sesión vencida por fecha se descarta sin usarla', async () => {
     loginMock.mockResolvedValue({ ok: true, session: NEW })
-    readMock.mockResolvedValue({ ok: true, reading: READING })
+    readMock.mockResolvedValue(READ_OK)
     const outcome = await run({
       ...withSession,
       session: { ...KEPT, expiresAt: NOW },
@@ -101,14 +113,15 @@ describe('latestGlucose', () => {
   it('SESSION_EXPIRED descarta la sesión, entra una vez y vuelve a leer', async () => {
     readMock
       .mockResolvedValueOnce({ ok: false, error: 'SESSION_EXPIRED' })
-      .mockResolvedValueOnce({ ok: true, reading: READING })
+      .mockResolvedValueOnce(READ_OK)
     loginMock.mockResolvedValue({ ok: true, session: NEW })
     const outcome = await run(withSession)
 
     expect(outcome).toEqual({
-      result: { ok: true, reading: READING },
+      result: READ_OK,
       state: { session: NEW, loginAfter: null, loginError: null },
       changed: true,
+      loggedIn: true,
       events: ['READ_FAILED SESSION_EXPIRED', 'LOGIN'],
     })
     expect(loginMock).toHaveBeenCalledTimes(1)
@@ -131,6 +144,7 @@ describe('latestGlucose', () => {
         loginError: 'GLUCOSE_LOGIN_FAILED',
       },
       changed: true,
+      loggedIn: true,
       events: [
         'READ_FAILED SESSION_EXPIRED',
         'LOGIN',
@@ -142,7 +156,7 @@ describe('latestGlucose', () => {
   })
 
   it('una sesión que vence 1 ms después todavía se usa, sin entrar', async () => {
-    readMock.mockResolvedValue({ ok: true, reading: READING })
+    readMock.mockResolvedValue(READ_OK)
     const almost = { ...KEPT, expiresAt: NOW + 1 }
     const outcome = await run({ ...withSession, session: almost })
 
@@ -167,6 +181,7 @@ describe('latestGlucose', () => {
       loginError: 'GLUCOSE_UNAVAILABLE',
     })
     expect(outcome.changed).toBe(true)
+    expect(outcome.loggedIn).toBe(true)
     expect(loginMock).toHaveBeenCalledTimes(1)
     expect(readMock).toHaveBeenCalledTimes(2)
   })
@@ -187,6 +202,7 @@ describe('latestGlucose', () => {
         loginError: 'GLUCOSE_LOGIN_FAILED',
       },
       changed: true,
+      loggedIn: true,
       events: ['LOGIN', 'LOGIN_FAILED BAD_CREDENTIALS'],
     })
     expect(readMock).not.toHaveBeenCalled()
@@ -225,6 +241,7 @@ describe('latestGlucose', () => {
       result: { ok: false, code: 'GLUCOSE_LOGIN_FAILED', retryAt: NOW + 1 },
       state,
       changed: false,
+      loggedIn: false,
       events: [],
     })
     expect(loginMock).not.toHaveBeenCalled()
@@ -247,7 +264,7 @@ describe('latestGlucose', () => {
 
   it('al terminar la espera vuelve a entrar y la limpia', async () => {
     loginMock.mockResolvedValue({ ok: true, session: NEW })
-    readMock.mockResolvedValue({ ok: true, reading: READING })
+    readMock.mockResolvedValue(READ_OK)
     const outcome = await run({
       session: null,
       loginAfter: NOW,
@@ -299,6 +316,7 @@ describe('latestGlucose', () => {
         result: { ok: false, code: 'GLUCOSE_UNAVAILABLE' },
         state: withSession,
         changed: false,
+        loggedIn: false,
         events: [`READ_FAILED ${error}`],
       })
       expect(loginMock).not.toHaveBeenCalled()
@@ -324,6 +342,7 @@ describe('latestGlucose', () => {
       loginError: null,
     })
     expect(outcome.changed).toBe(true)
+    expect(outcome.loggedIn).toBe(true)
   })
 
   it('un error sin espera no dice cuándo vuelve a probar', async () => {
@@ -335,5 +354,43 @@ describe('latestGlucose', () => {
     readMock.mockResolvedValue({ ok: false, error: 'UNAVAILABLE' })
     const fresh = await run(EMPTY_STATE)
     expect(fresh.result).not.toHaveProperty('retryAt')
+  })
+})
+
+describe('loggedIn (si esa llamada entró, para no leer también el gráfico)', () => {
+  it('es false con una sesión vigente, aunque la lectura falle', async () => {
+    readMock.mockResolvedValue(READ_OK)
+    expect((await run(withSession)).loggedIn).toBe(false)
+
+    readMock.mockResolvedValue({ ok: false, error: 'UNAVAILABLE' })
+    expect((await run(withSession)).loggedIn).toBe(false)
+  })
+
+  it('es false dentro de la espera, sin llamar a nada', async () => {
+    const outcome = await run({
+      session: null,
+      loginAfter: NOW + 1,
+      loginError: 'GLUCOSE_UNAVAILABLE',
+    })
+    expect(outcome.loggedIn).toBe(false)
+  })
+
+  it('es true si entró, salga bien o mal el login', async () => {
+    loginMock.mockResolvedValue({ ok: true, session: NEW })
+    readMock.mockResolvedValue(READ_OK)
+    expect((await run(EMPTY_STATE)).loggedIn).toBe(true)
+
+    loginMock.mockResolvedValue({ ok: false, error: 'BAD_CREDENTIALS' })
+    expect((await run(EMPTY_STATE)).loggedIn).toBe(true)
+  })
+
+  it('es true si la sesión guardada fue rechazada y volvió a entrar', async () => {
+    readMock
+      .mockResolvedValueOnce({ ok: false, error: 'SESSION_EXPIRED' })
+      .mockResolvedValueOnce(READ_OK)
+    loginMock.mockResolvedValue({ ok: true, session: NEW })
+    const outcome = await run(withSession)
+    expect(outcome.loggedIn).toBe(true)
+    expect(outcome.result).toEqual(READ_OK)
   })
 })

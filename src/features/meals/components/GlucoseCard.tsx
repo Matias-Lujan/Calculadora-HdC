@@ -1,12 +1,6 @@
-import {
-  ArrowDown,
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUp,
-  ArrowUpRight,
-  type LucideIcon,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronRight } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { card } from '../../../components/styles.ts'
 import {
@@ -18,48 +12,51 @@ import {
 import {
   GLUCOSE_INFO,
   GLUCOSE_NO_READING_TEXT,
-  GLUCOSE_STALE_TEXT,
-  glucoseAgoText,
   glucoseRetryText,
-  isStaleReading,
-  minutesSince,
-  trendLabel,
 } from '../glucose.ts'
+import {
+  SPARKLINE_WINDOW_MS,
+  withLatest,
+  type ChartReading,
+} from '../glucoseChart.ts'
 import type { GlucoseReading } from '../types.ts'
+import { useNow } from '../useNow.ts'
+import { GlucoseNow } from './GlucoseNow.tsx'
+import { GlucoseSparkline } from './GlucoseSparkline.tsx'
 
-type Trend = NonNullable<GlucoseReading['trend']>
-
-const TREND_ICONS: Record<Trend, LucideIcon> = {
-  falling_fast: ArrowDown,
-  falling: ArrowDownRight,
-  steady: ArrowRight,
-  rising: ArrowUpRight,
-  rising_fast: ArrowUp,
-}
-
-/** How often "hace X min" is brought up to date. */
-const CLOCK_MS = 15_000
+type ShellProps = { children: ReactNode }
 
 /**
- * The time now, brought up to date every 15 s and when the app comes back
- * in sight, so "hace X min" does not stay behind while the reading does not
- * change.
+ * The box, in every state: all of it opens the 24-hour chart (spec §6.10).
+ * The link is the title, stretched over the box with an ::after; the ⓘ
+ * comes after it in the page and is positioned (InfoTip), so it is drawn
+ * over the link and still opens its explanation. Nothing else inside can
+ * be tapped.
  */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const tick = () => setNow(Date.now())
-    const timer = setInterval(tick, CLOCK_MS)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [])
-  return now
+function GlucoseCardShell({ children }: ShellProps) {
+  return (
+    <div
+      className={`${card} relative flex flex-col gap-1 pr-10 has-[a:active]:brightness-95`}
+    >
+      <div className="flex flex-wrap items-center gap-x-2">
+        <h2 className="text-sm font-medium text-ink-soft">
+          <Link
+            to="/glucose"
+            className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-accent"
+          >
+            Glucosa del sensor
+            <span className="sr-only">. Ver las últimas 24 horas</span>
+          </Link>
+        </h2>
+        <InfoTip text={GLUCOSE_INFO} />
+      </div>
+      {children}
+      <ChevronRight
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3 size-6 -translate-y-1/2 text-ink-soft"
+      />
+    </div>
+  )
 }
 
 type Props = {
@@ -67,15 +64,22 @@ type Props = {
   reading: GlucoseReading | null | undefined
   error: unknown
   isPending: boolean
+  /**
+   * The saved readings of the last 24 hours, for the small curve
+   * (UX-35); undefined while they never loaded or if they fail: Inicio
+   * does not wait for them, and the box goes without the curve.
+   */
+  readings: readonly ChartReading[] | undefined
 }
 
 /**
  * The glucose of the sensor on Inicio (spec §6.9), only as a reference: it
- * never goes into the calculation. Without range colors (red, amber and
- * green are for errors, warnings and saving). For a user without the
- * glucose set up, nothing is shown.
+ * never goes into the calculation. Without range colors on the value (red,
+ * amber and green are for errors, warnings and saving); beside it, the
+ * curve of the last 3 hours. For a user without the glucose set up,
+ * nothing is shown.
  */
-export function GlucoseCard({ reading, error, isPending }: Props) {
+export function GlucoseCard({ reading, error, isPending, readings }: Props) {
   const now = useNow()
   if (
     error instanceof GlucoseError &&
@@ -84,20 +88,12 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
     return null
   }
 
-  const title = (
-    <div className="flex flex-wrap items-center gap-x-2">
-      <h2 className="text-sm font-medium text-ink-soft">Glucosa del sensor</h2>
-      <InfoTip text={GLUCOSE_INFO} />
-    </div>
-  )
-
   // First load: a gray shape the size of the value and its time.
   if (isPending) {
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <div aria-hidden="true" className="h-16 rounded-lg bg-sunken" />
-      </div>
+      </GlucoseCardShell>
     )
   }
 
@@ -118,11 +114,10 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
         ? glucoseErrorMessage(error.code)
         : GLUCOSE_READ_ERROR_MESSAGE
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <p className="text-base text-ink-soft">{message}</p>
         {retry}
-      </div>
+      </GlucoseCardShell>
     )
   }
 
@@ -136,42 +131,28 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
 
   if (reading === null) {
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <p className="text-base text-ink-soft">{GLUCOSE_NO_READING_TEXT}</p>
         {updateFailed}
-      </div>
+      </GlucoseCardShell>
     )
   }
 
-  const minutes = minutesSince(reading.measured_at, now)
-  const stale = isStaleReading(minutes)
-  const Arrow =
-    !stale && reading.trend !== null ? TREND_ICONS[reading.trend] : null
-  const ago = glucoseAgoText(minutes)
-
   return (
-    <div className={`${card} flex flex-col gap-1`}>
-      {title}
-      <p
-        className={`flex items-center gap-2 ${stale ? 'text-ink-soft' : 'text-ink'}`}
-      >
-        <span className="font-display text-4xl leading-none font-bold tabular-nums">
-          {reading.mgdl}
-        </span>
-        <span className="text-base">mg/dL</span>
-        {Arrow !== null && reading.trend !== null ? (
-          <Arrow
-            role="img"
-            aria-label={trendLabel(reading.trend)}
-            className="size-7"
+    <GlucoseCardShell>
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <GlucoseNow reading={reading} now={now} />
+        </div>
+        {readings !== undefined ? (
+          <GlucoseSparkline
+            readings={withLatest(readings, reading, now)}
+            now={now}
+            windowMs={SPARKLINE_WINDOW_MS}
           />
         ) : null}
-      </p>
-      <p className="text-sm text-ink-soft">
-        {stale ? `${ago} · ${GLUCOSE_STALE_TEXT}` : ago}
-      </p>
+      </div>
       {updateFailed}
-    </div>
+    </GlucoseCardShell>
   )
 }

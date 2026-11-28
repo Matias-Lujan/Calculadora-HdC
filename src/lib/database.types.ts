@@ -105,11 +105,30 @@ export type Database = {
         }
         Relationships: []
       }
+      glucose_readings: {
+        Row: {
+          measured_at: string
+          mgdl: number
+          user_id: string
+        }
+        Insert: {
+          measured_at: string
+          mgdl: number
+          user_id: string
+        }
+        Update: {
+          measured_at?: string
+          mgdl?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       libre_sessions: {
         Row: {
           account_id_hash: string | null
           api_url: string | null
           expires_at: string | null
+          graph_synced_at: string | null
           login_after: string | null
           login_error: string | null
           token: string | null
@@ -120,6 +139,7 @@ export type Database = {
           account_id_hash?: string | null
           api_url?: string | null
           expires_at?: string | null
+          graph_synced_at?: string | null
           login_after?: string | null
           login_error?: string | null
           token?: string | null
@@ -130,6 +150,7 @@ export type Database = {
           account_id_hash?: string | null
           api_url?: string | null
           expires_at?: string | null
+          graph_synced_at?: string | null
           login_after?: string | null
           login_error?: string | null
           token?: string | null

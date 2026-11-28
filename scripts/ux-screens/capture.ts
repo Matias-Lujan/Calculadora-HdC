@@ -1430,7 +1430,108 @@ function buildStates(
         await page.evaluate('window.scrollTo(0, 0)')
       },
     },
+
+    // --- Added in M10 (the 24-hour glucose chart, spec §6.10), at the end
+    // so the numbers above do not move. The demo user has no sensor: the
+    // first two answer the glucose with invented readings, in the browser
+    // only (nothing is saved). ---
+    {
+      name: 'inicio-glucosa',
+      description:
+        'Inicio con el recuadro de la glucosa (lecturas inventadas, respondidas en el navegador): el valor, la curva de las últimas 3 horas y la flecha; todo el recuadro abre el gráfico.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await emptyMeal(page)
+        await page.getByRole('link', { name: /^Glucosa del sensor/ }).waitFor()
+      },
+    },
+    {
+      name: 'glucosa',
+      description:
+        'Gráfico de la glucosa de las últimas 24 horas (lecturas inventadas, con un hueco de dos horas sin lecturas): el valor actual arriba, el selector de horas, la franja verde de 70 a 180, las guías, el más bajo y el más alto, el punto de ahora y un ícono por cada comida guardada en esas horas.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await go(page, '/glucose')
+        await page
+          .getByRole('slider', { name: 'Lecturas de glucosa' })
+          .waitFor()
+      },
+    },
+    {
+      name: 'glucosa-sin-lecturas',
+      description:
+        'Gráfico de la glucosa sin lecturas guardadas (el usuario de demo no tiene sensor).',
+      run: async (page) => {
+        await realGlucose(page)
+        await go(page, '/glucose')
+        await page.getByText('Todavía no hay lecturas guardadas').waitFor()
+      },
+    },
+    // Added in the design batch of revision 2 (UX-29).
+    {
+      name: 'glucosa-toque',
+      description:
+        'Gráfico de la glucosa en 6 horas, después de tocar la línea a un poco más de la mitad: la línea vertical, el punto y arriba el valor con su hora.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await go(page, '/glucose')
+        await page.getByRole('button', { name: '6 horas' }).click()
+        const chart = page.getByRole('slider', { name: 'Lecturas de glucosa' })
+        await chart.waitFor()
+        const box = await chart.boundingBox()
+        if (box === null) throw new Error('El gráfico no está a la vista.')
+        await page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2)
+        await page
+          .getByText(/· a las \d{2}:\d{2}$/)
+          .first()
+          .waitFor()
+      },
+    },
   ]
+}
+
+// The glucose of the demo user, which has no sensor, answered in the
+// browser with invented readings: the last one in glucose-latest and one
+// every 15 min of the last 24 hours in glucose_readings, with a gap of two
+// hours so the cut line shows. Nothing reaches the base.
+const LATEST_GLUCOSE_ROUTE = '**/functions/v1/glucose-latest'
+const SAVED_GLUCOSE_ROUTE = '**/rest/v1/glucose_readings*'
+
+async function realGlucose(page: Page): Promise<void> {
+  await page.unroute(LATEST_GLUCOSE_ROUTE)
+  await page.unroute(SAVED_GLUCOSE_ROUTE)
+}
+
+async function fakeGlucose(page: Page): Promise<void> {
+  await realGlucose(page)
+  const end = Date.now() - 3 * 60_000
+  const readings: { measured_at: string; mgdl: number }[] = []
+  for (let i = 95; i >= 0; i--) {
+    // The gap: from 8 to 10 hours ago.
+    if (i >= 32 && i < 40) continue
+    const time = end - i * 15 * 60_000
+    const mgdl = Math.round(135 + 55 * Math.sin(i / 7) + 25 * Math.sin(i / 2.3))
+    readings.push({ measured_at: new Date(time).toISOString(), mgdl })
+  }
+  const last = readings.at(-1)
+  await page.route(LATEST_GLUCOSE_ROUTE, (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        reading:
+          last === undefined
+            ? null
+            : {
+                mgdl: last.mgdl,
+                trend: 'steady',
+                measured_at: last.measured_at,
+              },
+      },
+    }),
+  )
+  await page.route(SAVED_GLUCOSE_ROUTE, (route) =>
+    route.fulfill({ json: readings }),
+  )
 }
 
 async function signInThroughUi(page: Page, baseUrl: string) {
