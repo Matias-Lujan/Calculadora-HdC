@@ -39,9 +39,15 @@ export const CHART_BOTTOM_MGDL = 40
 /** The top of the scale when every reading is lower. */
 export const CHART_MIN_TOP_MGDL = 300
 
-/** The band, the same for everybody (spec §6.10). */
-export const BAND_LOW_MGDL = 70
-export const BAND_HIGH_MGDL = 180
+/** The band, the same for everybody (spec §6.10, #119). */
+export const BAND_LOW_MGDL = 80
+export const BAND_HIGH_MGDL = 170
+
+/**
+ * Under this the line goes red (#119, like LibreLink): a low, apart from
+ * the band.
+ */
+export const LOW_MGDL = 70
 
 /** A reading as the chart reads it: when it was measured (ISO) and mg/dL. */
 export type ChartReading = { measured_at: string; mgdl: number }

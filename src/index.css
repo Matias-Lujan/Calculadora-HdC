@@ -37,6 +37,10 @@
   --color-danger: #b3261e;
   --color-danger-soft: #fcedea;
   --color-on-danger: #ffffff;
+  /* The glucose line under 70 mg/dL (#119, like LibreLink): the only red
+     that is not an error, only in the charts of the glucose. 5:1 on
+     surface. */
+  --color-glucose-low: #d32f2f;
   --color-warning: #6b4200;
   --color-warning-soft: #fff0c2;
   --color-warning-line: #b87400;
@@ -193,6 +197,8 @@
       --color-danger: #ffb3a8;
       --color-danger-soft: #3d1512;
       --color-on-danger: #221b1f;
+      /* glucose-low 6.1:1 on surface. */
+      --color-glucose-low: #ff6b6b;
       --color-warning: #ffd27a;
       --color-warning-soft: #3a2a00;
       --color-warning-line: #c99a3a;

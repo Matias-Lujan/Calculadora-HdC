@@ -1,7 +1,9 @@
+import { useId } from 'react'
 import { isStaleReading } from '../glucose.ts'
 import {
   BAND_HIGH_MGDL,
   BAND_LOW_MGDL,
+  LOW_MGDL,
   chartPoints,
   chartSegments,
   chartX,
@@ -32,6 +34,7 @@ const PAD = 4
  * without readings.
  */
 export function GlucoseSparkline({ readings, now, windowMs }: Props) {
+  const clipId = useId()
   const points = chartPoints(readings, now, windowMs)
   const last = points.at(-1)
   if (last === undefined) return null
@@ -39,7 +42,17 @@ export function GlucoseSparkline({ readings, now, windowMs }: Props) {
   const x = (time: number) => PAD + chartX(time, now, WIDTH - 2 * PAD, windowMs)
   const y = (mgdl: number) => PAD + chartY(mgdl, top, HEIGHT - 2 * PAD, bottom)
   const stale = isStaleReading(Math.floor((now - last.time) / 60_000))
-  const stroke = stale ? 'stroke-ink-soft' : 'stroke-accent'
+  // Under 70 the line goes red (#119), unless the reading is old: drawn
+  // twice, each cut at 70.
+  const lowY = y(LOW_MGDL)
+  const stroke = (below: boolean) =>
+    stale ? 'stroke-ink-soft' : below ? 'stroke-glucose-low' : 'stroke-accent'
+  const fill = (mgdl: number) =>
+    stale
+      ? 'fill-ink-soft'
+      : mgdl < LOW_MGDL
+        ? 'fill-glucose-low'
+        : 'fill-accent'
 
   return (
     <svg
@@ -55,6 +68,41 @@ export function GlucoseSparkline({ readings, now, windowMs }: Props) {
         rx={2}
         className="fill-range"
       />
+      <defs>
+        <clipPath id={`${clipId}-above`}>
+          <rect x={0} y={0} width={WIDTH} height={lowY} />
+        </clipPath>
+        <clipPath id={`${clipId}-below`}>
+          <rect
+            x={0}
+            y={lowY}
+            width={WIDTH}
+            height={Math.max(0, HEIGHT - lowY)}
+          />
+        </clipPath>
+      </defs>
+      {[false, true].map((below) => (
+        <g
+          key={String(below)}
+          clipPath={`url(#${clipId}-${below ? 'below' : 'above'})`}
+        >
+          {chartSegments(points).map((segment) =>
+            segment.length < 2 ? null : (
+              <polyline
+                key={segment[0]?.time}
+                points={segment
+                  .map((point) => `${x(point.time)},${y(point.mgdl)}`)
+                  .join(' ')}
+                fill="none"
+                strokeWidth={2}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                className={stroke(below)}
+              />
+            ),
+          )}
+        </g>
+      ))}
       {chartSegments(points).map((segment) =>
         segment.length === 1 && segment[0] !== undefined ? (
           <circle
@@ -62,21 +110,9 @@ export function GlucoseSparkline({ readings, now, windowMs }: Props) {
             cx={x(segment[0].time)}
             cy={y(segment[0].mgdl)}
             r={1.5}
-            className={stale ? 'fill-ink-soft' : 'fill-accent'}
+            className={fill(segment[0].mgdl)}
           />
-        ) : (
-          <polyline
-            key={segment[0]?.time}
-            points={segment
-              .map((point) => `${x(point.time)},${y(point.mgdl)}`)
-              .join(' ')}
-            fill="none"
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            className={stroke}
-          />
-        ),
+        ) : null,
       )}
       <circle
         cx={x(last.time)}
@@ -84,7 +120,9 @@ export function GlucoseSparkline({ readings, now, windowMs }: Props) {
         r={3.5}
         strokeWidth={1.5}
         className={
-          stale ? 'fill-surface stroke-ink-soft' : 'fill-accent stroke-surface'
+          stale
+            ? 'fill-surface stroke-ink-soft'
+            : `${fill(last.mgdl)} stroke-surface`
         }
       />
     </svg>
