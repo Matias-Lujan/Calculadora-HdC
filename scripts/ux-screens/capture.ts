@@ -681,7 +681,7 @@ type Capture = {
   file: string
   route: string
   description: string
-  kind: 'viewport' | 'full' | 'frame'
+  kind: 'viewport' | 'full'
 }
 type Failure = {
   state: string
@@ -702,11 +702,6 @@ type State = {
   omitted?: string
   /** Takes the page to the state (from any screen). */
   run: (page: Page) => Promise<void>
-  /**
-   * An interaction in motion (a drag, an opening): instead of one screenshot,
-   * a series of frames, each taken when `frame` is called.
-   */
-  motion?: (page: Page, frame: () => Promise<void>) => Promise<void>
 }
 
 const index = {
@@ -738,25 +733,6 @@ async function settle(page: Page) {
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {})
   await page.evaluate('document.fonts.ready.then(() => true)')
   await page.waitForTimeout(200)
-}
-
-/**
- * The frames of a motion: what is on screen at each step, without waiting
- * for the page to settle, so a jump or a delay shows from one to the next.
- */
-async function shootMotion(
-  page: Page,
-  base: string,
-  motion: NonNullable<State['motion']>,
-): Promise<string[]> {
-  await settle(page)
-  const files: string[] = []
-  await motion(page, async () => {
-    const file = `${base}-cuadro-${String(files.length + 1).padStart(2, '0')}.png`
-    await page.screenshot({ path: path.join(outDir, file), scale: 'css' })
-    files.push(file)
-  })
-  return files
 }
 
 /** What is on screen and, if the page is longer, the whole page. */
@@ -1541,41 +1517,6 @@ function buildStates(
         await openInfo(page)
       },
     },
-    // Added after revision 2: the drag along the line, as frames, to see
-    // how the mark moves (not only how it looks when still).
-    {
-      name: 'glucosa-arrastre',
-      description:
-        'Gráfico de la glucosa en 6 horas mientras el dedo se arrastra sobre la línea de izquierda a derecha, en pasos chicos y parejos: cada cuadro es un paso. Muestra si la línea vertical, el punto y el globo siguen al dedo de forma continua o saltan de lectura en lectura.',
-      run: async (page) => {
-        await fakeGlucose(page)
-        await go(page, '/glucose')
-        await page.getByRole('button', { name: '6 horas' }).click()
-        await page
-          .getByRole('slider', { name: 'Lecturas de glucosa' })
-          .waitFor()
-      },
-      motion: async (page, frame) => {
-        const chart = page.getByRole('slider', { name: 'Lecturas de glucosa' })
-        const box = await chart.boundingBox()
-        if (box === null) throw new Error('El gráfico no está a la vista.')
-        const y = box.y + box.height / 2
-        const from = box.x + box.width * 0.3
-        const to = box.x + box.width * 0.5
-        const steps = 16
-        await page.mouse.move(from, y)
-        await page.mouse.down()
-        for (let i = 0; i <= steps; i += 1) {
-          await page.mouse.move(from + ((to - from) * i) / steps, y)
-          // Two browser frames, so the drawing catches up.
-          await page.evaluate(
-            'new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))',
-          )
-          await frame()
-        }
-        await page.mouse.up()
-      },
-    },
   ]
 }
 
@@ -1800,19 +1741,6 @@ try {
       if (blocked !== null && !state.anonymous) throw new Error(blocked)
       await state.run(page)
       const route = new URL(page.url()).pathname
-      if (state.motion !== undefined) {
-        const files = await shootMotion(page, base, state.motion)
-        for (const [i, file] of files.entries()) {
-          index.captures.push({
-            file,
-            route,
-            description: `${state.description} (Cuadro ${i + 1} de ${files.length}.)`,
-            kind: 'frame',
-          })
-        }
-        console.log(`✓ ${base} (${files.length} cuadros)`)
-        continue
-      }
       for (const kind of await shoot(page, base)) {
         index.captures.push({
           file: kind === 'full' ? `${base}-full.png` : `${base}.png`,

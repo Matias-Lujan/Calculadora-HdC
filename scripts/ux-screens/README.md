@@ -38,8 +38,6 @@ Los números de las capturas no cambian entre corridas (un estado omitido o que 
 
 Desde M10, los cuatro últimos son de la glucosa: `inicio-glucosa` (el recuadro de Inicio), `glucosa` (el gráfico de 24 horas) y `glucosa-toque` (el gráfico en 6 horas después de tocar la línea, revisión 2) responden la glucosa **en el navegador** con lecturas inventadas, porque el usuario de demo no tiene sensor (nada llega a la base); `glucosa-sin-lecturas` usa la respuesta real, sin lecturas.
 
-**Interacciones en movimiento.** Un estado puede sacar, en lugar de una captura, una serie de cuadros: `NN-estado-cuadro-01.png`, `-cuadro-02.png`…, de tipo `frame` en `index.json`, uno por paso de la interacción y sin esperar a que la pantalla se quede quieta, para ver si algo salta, tiembla o llega tarde. Hoy es `glucosa-arrastre`: el dedo se arrastra sobre la línea del gráfico de 6 horas en 16 pasos parejos. Para sumar otro, se le agrega a su estado una función `motion` que llama a `frame()` en cada paso.
-
 ## Lo que no puede imitar
 
 - **Es WebKit, no Safari de iOS**: cambian algunos detalles de dibujo y las fuentes pueden no ser las del iPhone.
