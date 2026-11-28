@@ -1,5 +1,12 @@
 import { Plus, Search } from 'lucide-react'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { Confirmation } from '../../../components/Confirmation.tsx'
@@ -111,6 +118,11 @@ type Props = {
    * they load (or if they could not be read): then they are not shown.
    */
   recentMeals: RecentMeal[] | undefined
+  /**
+   * The box of the glucose, on top only while the meal has no foods:
+   * entering one, the screen is for the meal.
+   */
+  glucose: ReactNode
 }
 
 /** The title of Inicio without foods (UX-23); with them, "Nueva comida". */
@@ -174,6 +186,7 @@ export function MealForm({
   referenceFoods,
   settings,
   recentMeals,
+  glucose,
 }: Props) {
   const tableFoods = useMemo(
     () => referenceFoods.map(tableFoodAsMealFood),
@@ -740,6 +753,7 @@ export function MealForm({
     // 13rem tall, and 5rem more leave the name of a food in grams (or the
     // "1 alfajor = 50 g" hint of one in units) in sight.
     <>
+      {items.length === 0 && glucose}
       <h1 className={pageTitle}>
         {correcting !== null
           ? 'Corregir comida'

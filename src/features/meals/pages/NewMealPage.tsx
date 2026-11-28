@@ -36,16 +36,19 @@ export function NewMealPage() {
     (query) => query.data === undefined && query.isError,
   )
 
+  const glucoseCard = (
+    <GlucoseCard
+      reading={glucose.data}
+      error={glucose.error}
+      isPending={glucose.isPending}
+      readings={glucoseDay.data}
+    />
+  )
+
   return (
     <section className="flex flex-col gap-4">
-      <GlucoseCard
-        reading={glucose.data}
-        error={glucose.error}
-        isPending={glucose.isPending}
-        readings={glucoseDay.data}
-      />
       {/* With the meal loaded, MealForm writes the title ("Corregir comida"
-          while correcting). */}
+          while correcting) and shows the glucose only without foods. */}
       {foods.data !== undefined &&
       referenceFoods.data !== undefined &&
       settings.data !== undefined ? (
@@ -54,26 +57,31 @@ export function NewMealPage() {
           referenceFoods={referenceFoods.data}
           settings={settings.data}
           recentMeals={recentMeals.data}
+          glucose={glucoseCard}
         />
       ) : failed.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
-          <Notice tone="error" role="alert">
-            <p>{LOAD_ERROR_MESSAGE}</p>
-          </Notice>
-          <button
-            type="button"
-            className={`${button.secondary} self-start`}
-            disabled={queries.some((query) => query.isFetching)}
-            onClick={() => {
-              for (const query of failed) void query.refetch()
-            }}
-          >
-            Reintentar
-          </button>
-        </div>
+        <>
+          {glucoseCard}
+          <div className="flex flex-col gap-3">
+            <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
+            <Notice tone="error" role="alert">
+              <p>{LOAD_ERROR_MESSAGE}</p>
+            </Notice>
+            <button
+              type="button"
+              className={`${button.secondary} self-start`}
+              disabled={queries.some((query) => query.isFetching)}
+              onClick={() => {
+                for (const query of failed) void query.refetch()
+              }}
+            >
+              Reintentar
+            </button>
+          </div>
+        </>
       ) : (
         <>
+          {glucoseCard}
           <h1 className={pageTitle}>{EMPTY_MEAL_TITLE}</h1>
           {/* The search field and the shortcuts of an empty Inicio. */}
           <LoadingShapes shapes={['h-12', 'h-24', 'h-24']} />
