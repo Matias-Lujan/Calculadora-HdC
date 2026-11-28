@@ -119,6 +119,74 @@ export function chartSegments(points: readonly ChartPoint[]): ChartPoint[][] {
   return segments
 }
 
+/** A place on the drawing, in px. */
+export type ChartXY = { x: number; y: number }
+
+/**
+ * The slope at an inner point (Fritsch–Carlson, as d3's curveMonotoneX):
+ * zero where the line turns or goes flat, and never steep enough to go
+ * over or under the readings at both sides.
+ */
+function innerSlope(a: ChartXY, b: ChartXY, c: ChartXY): number {
+  const h0 = b.x - a.x
+  const h1 = c.x - b.x
+  const s0 = (b.y - a.y) / (h0 !== 0 ? h0 : h1 < 0 ? -0 : 0)
+  const s1 = (c.y - b.y) / (h1 !== 0 ? h1 : h0 < 0 ? -0 : 0)
+  const p = (s0 * h1 + s1 * h0) / (h0 + h1)
+  const slope =
+    (Math.sign(s0) + Math.sign(s1)) *
+    Math.min(Math.abs(s0), Math.abs(s1), 0.5 * Math.abs(p))
+  return Number.isNaN(slope) ? 0 : slope
+}
+
+/** The slope at an end, from the one of the point next to it. */
+function endSlope(a: ChartXY, b: ChartXY, next: number): number {
+  const h = b.x - a.x
+  return h !== 0 ? ((3 * (b.y - a.y)) / h - next) / 2 : next
+}
+
+/**
+ * The `d` of a piece of the line, smooth but monotone (#116): between
+ * two readings it never goes over the higher nor under the lower. One point
+ * is only a move (it is drawn as a dot), two are a straight line. The points
+ * go left to right.
+ */
+export function monotonePath(points: readonly ChartXY[]): string {
+  const first = points[0]
+  if (first === undefined) return ''
+  const move = `M${first.x},${first.y}`
+  const second = points[1]
+  if (second === undefined) return move
+  if (points.length === 2) return `${move}L${second.x},${second.y}`
+  const slopes: number[] = []
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    const c = points[i + 1]
+    if (a !== undefined && b !== undefined && c !== undefined) {
+      slopes[i] = innerSlope(a, b, c)
+    }
+  }
+  const last = points.length - 1
+  const beforeLast = points[last - 1]
+  const lastPoint = points[last]
+  slopes[0] = endSlope(first, second, slopes[1] ?? 0)
+  if (beforeLast !== undefined && lastPoint !== undefined) {
+    slopes[last] = endSlope(beforeLast, lastPoint, slopes[last - 1] ?? 0)
+  }
+  let d = move
+  for (let i = 1; i <= last; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    if (a === undefined || b === undefined) continue
+    const dx = (b.x - a.x) / 3
+    const t0 = slopes[i - 1] ?? 0
+    const t1 = slopes[i] ?? 0
+    d += `C${a.x + dx},${a.y + dx * t0},${b.x - dx},${b.y - dx * t1},${b.x},${b.y}`
+  }
+  return d
+}
+
 /** A gap of the line long enough for a bridge: its two ends. */
 export type ChartBridge = { from: ChartPoint; to: ChartPoint }
 

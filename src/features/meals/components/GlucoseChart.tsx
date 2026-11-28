@@ -18,6 +18,7 @@ import {
   isStaleReading,
 } from '../glucose.ts'
 import {
+  CHART_MEAL_NEAR_MS,
   BAND_HIGH_MGDL,
   BAND_LOW_MGDL,
   chartBridges,
@@ -33,6 +34,7 @@ import {
   chartY,
   mealMarkTimes,
   mealNear,
+  monotonePath,
   nearestIndex,
   pickAt,
   spreadMarks,
@@ -78,6 +80,9 @@ const BUBBLE_BOTTOM = 36
 const LABEL_CLEARANCE = 24
 // The bubble keeps this far from the sides of the drawing.
 const BUBBLE_EDGE = 8
+// About half the width of the time of the picked reading ("16:40" in 13 px
+// semibold), to keep it inside the drawing.
+const PICK_HOUR_HALF = 18
 // A meal icon closer than this to the bubble is hidden while it shows.
 const BUBBLE_AIR = 4
 
@@ -141,13 +146,18 @@ const KEY_STEPS: Record<string, number> = {
  * 100 (UX-44); the line, cut where readings are missing; the point of now
  * and the lowest and highest values; and a mark with a fork and knife at
  * each meal, without carbs nor dose. Touching or dragging over it shows
- * the closest reading and its time in a bubble on top, joined to the
- * vertical line (UX-29, UX-46); for VoiceOver and the keyboard it is
- * adjustable, one reading at a time. It fills the width and the height of
+ * the closest reading: its value as text on top and its time under the
+ * axis while the finger is down (#116); for VoiceOver and the keyboard it
+ * is adjustable, one reading at a time, with the value and its time in a
+ * bubble on top, joined to the vertical line (UX-29, UX-46). It fills the width and the height of
  * its container (a flex column): made for a panel from edge to edge.
  */
 export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const [picked, setPicked] = useState<number | null>(null)
+  // Whether the pick comes from a finger still down: then the value goes
+  // as plain text on top and its time under the axis (#116); from the
+  // keyboard or VoiceOver, in the bubble.
+  const [dragging, setDragging] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const [boxRef, box] = useBoxSize<HTMLDivElement>(DEFAULT_SIZE)
   const plotW = box.width - LEFT - RIGHT
@@ -198,6 +208,18 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     pick === null ? null : pick.kind === 'reading' ? pick.point.time : picked
   const meal = pickTime === null ? null : mealNear(marks, pickTime)
   const pickX = pickTime === null ? null : x(pickTime)
+  const readout = pick !== null && dragging
+  // The time of the picked reading, in place of the hours of the axis.
+  const pickHour =
+    readout && pick.kind === 'reading'
+      ? {
+          x: Math.min(
+            LEFT + plotW - PICK_HOUR_HALF,
+            Math.max(AXIS_X + PICK_HOUR_HALF, x(pick.point.time)),
+          ),
+          label: clockText(pick.point.time),
+        }
+      : null
 
   // The bubble, centered on the line of the pick but inside the drawing.
   // Placed before the paint each time what it shows or where it goes
@@ -220,9 +242,9 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         ? current
         : { left, width },
     )
-    // `picked`, `meal` and `readings` change what the bubble says, so its
-    // width.
-  }, [pickX, box.width, picked, meal, readings])
+    // `picked`, `meal`, `readings` and `readout` change what the bubble
+    // says, so its width.
+  }, [pickX, box.width, picked, meal, readings, readout])
   const span = pick !== null ? bubbleSpan : null
   // An icon too close to the bubble is not drawn: half covered, it reads
   // as a broken drawing. Its dashed line stays, from under the bubble.
@@ -242,6 +264,11 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     return chartTime(across, now, plotW, windowMs)
   }
 
+  const letGo = () => {
+    setDragging(false)
+    setPicked(null)
+  }
+
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const count = points.length
     if (count === 0) return
@@ -254,6 +281,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     else if (step !== undefined) next = current + step
     else return
     event.preventDefault()
+    setDragging(false)
     const point = points[Math.min(count - 1, Math.max(0, next))]
     if (point !== undefined) setPicked(point.time)
   }
@@ -303,6 +331,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         className="relative max-h-[520px] min-h-[260px] flex-1 cursor-crosshair touch-pan-y rounded-control select-none"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId)
+          setDragging(true)
           setPicked(timeAt(event))
         }}
         onPointerMove={(event) => {
@@ -310,8 +339,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             setPicked(timeAt(event))
           }
         }}
-        onPointerUp={() => setPicked(null)}
-        onPointerCancel={() => setPicked(null)}
+        onPointerUp={letGo}
+        onPointerCancel={letGo}
         onKeyDown={onKeyDown}
       >
         <svg
@@ -388,7 +417,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                   strokeWidth={1}
                   className="stroke-line"
                 />
-                {hour.label !== null ? (
+                {hour.label !== null && pickHour === null ? (
                   <text
                     x={at}
                     y={box.height - 7}
@@ -402,16 +431,29 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               </g>
             )
           })}
-          {/* The time of now (UX-45): "ahora" is already said above. */}
-          <text
-            x={LEFT + plotW}
-            y={box.height - 7}
-            fontSize={FONT}
-            textAnchor="end"
-            className="fill-ink-soft tabular-nums"
-          >
-            {clockText(now)}
-          </text>
+          {/* The time of now (UX-45): "ahora" is already said above. While
+              a finger is down, only the time of the picked reading (#116). */}
+          {pickHour === null ? (
+            <text
+              x={LEFT + plotW}
+              y={box.height - 7}
+              fontSize={FONT}
+              textAnchor="end"
+              className="fill-ink-soft tabular-nums"
+            >
+              {clockText(now)}
+            </text>
+          ) : (
+            <text
+              x={pickHour.x}
+              y={box.height - 7}
+              fontSize={FONT}
+              textAnchor="middle"
+              className="fill-ink font-semibold tabular-nums"
+            >
+              {pickHour.label}
+            </text>
+          )}
           <line
             x1={LEFT}
             x2={LEFT + plotW}
@@ -421,18 +463,24 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             className="stroke-line-strong"
           />
 
-          {marks.map((time, index) => (
-            <line
-              key={`${time}-${index}`}
-              x1={x(time)}
-              x2={x(time)}
-              y1={hiddenIcons[index] === true ? BUBBLE_BOTTOM : ICON_Y + ICON_R}
-              y2={TOP + plotH}
-              strokeWidth={1}
-              strokeDasharray="3 3"
-              className="stroke-line-strong"
-            />
-          ))}
+          {marks.map((time, index) =>
+            // Meals near the finger lose their dashed line: it would double the finger's.
+            pickTime !== null &&
+            Math.abs(time - pickTime) <= CHART_MEAL_NEAR_MS ? null : (
+              <line
+                key={`${time}-${index}`}
+                x1={x(time)}
+                x2={x(time)}
+                y1={
+                  hiddenIcons[index] === true ? BUBBLE_BOTTOM : ICON_Y + ICON_R
+                }
+                y2={TOP + plotH}
+                strokeWidth={1}
+                strokeDasharray="3 3"
+                className="stroke-line-strong"
+              />
+            ),
+          )}
           {icons.map((at, index) =>
             hiddenIcons[index] === true ? null : (
               <g key={`${marks[index]}-${index}`}>
@@ -477,13 +525,16 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 className="fill-accent"
               />
             ) : (
-              <polyline
+              <path
                 key={segment[0]?.time}
-                points={segment
-                  .map((point) => `${x(point.time)},${y(point.mgdl)}`)
-                  .join(' ')}
+                d={monotonePath(
+                  segment.map((point) => ({
+                    x: x(point.time),
+                    y: y(point.mgdl),
+                  })),
+                )}
                 fill="none"
-                strokeWidth={2.5}
+                strokeWidth={3}
                 strokeLinejoin="round"
                 strokeLinecap="round"
                 className="stroke-accent"
@@ -544,7 +595,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 x2={pickX}
                 y1={BUBBLE_BOTTOM}
                 y2={TOP + plotH}
-                strokeWidth={1.5}
+                strokeWidth={1}
                 className="stroke-ink"
               />
               {pick.kind === 'reading' ? (
@@ -559,9 +610,11 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             </g>
           ) : null}
         </svg>
-        {pick !== null ? (
+        {pick === null ? null : readout ? (
+          <PickedReadout ref={bubbleRef} pick={pick} meal={meal} />
+        ) : (
           <PickedBubble ref={bubbleRef} pick={pick} meal={meal} />
-        ) : null}
+        )}
       </div>
       <p id={descriptionId} className="sr-only">
         {description}
@@ -647,6 +700,46 @@ function PickedBubble({ ref, pick, meal }: PickedBubbleProps) {
       )}
       {meal !== null ? (
         <span className="text-xs tabular-nums">
+          ·{' '}
+          <Utensils
+            aria-hidden="true"
+            className="inline size-3.5 align-[-2px]"
+          />{' '}
+          {clockText(meal)}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * The picked reading while a finger is down (#116): the value as plain
+ * text on top of the drawing, the number big, centered on the vertical
+ * line (its time goes under the axis). A gap and a meal close to it are
+ * told in small. Hidden from VoiceOver, like the bubble.
+ */
+function PickedReadout({ ref, pick, meal }: PickedBubbleProps) {
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      data-testid="chart-readout"
+      className="pointer-events-none absolute top-1.5 z-10 flex w-max max-w-[calc(100%-16px)] flex-wrap items-baseline gap-x-1 leading-none"
+    >
+      {pick.kind === 'reading' ? (
+        <>
+          <span className="font-display text-2xl font-semibold text-ink tabular-nums">
+            {pick.point.mgdl}
+          </span>
+          <span className="text-xs text-ink-soft">mg/dL</span>
+        </>
+      ) : (
+        <span className="text-xs font-semibold text-ink">
+          {chartGapText(pick.before?.time ?? null, pick.after?.time ?? null)}
+        </span>
+      )}
+      {meal !== null ? (
+        <span className="ml-1 text-xs text-ink-soft tabular-nums">
           ·{' '}
           <Utensils
             aria-hidden="true"
