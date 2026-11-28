@@ -18,7 +18,6 @@ import {
   isStaleReading,
 } from '../glucose.ts'
 import {
-  CHART_MEAL_NEAR_MS,
   BAND_HIGH_MGDL,
   BAND_LOW_MGDL,
   chartBridges,
@@ -35,6 +34,7 @@ import {
   mealMarkTimes,
   mealNear,
   monotonePath,
+  monotoneY,
   nearestIndex,
   pickAt,
   spreadMarks,
@@ -70,6 +70,11 @@ const FONT = 13
 // The numbers of the lowest and the highest, a step down so they do not
 // compete with the line.
 const EXTREME_FONT = 12
+// 70 and 180, smaller and lighter than the other numbers of the axis (#116).
+// The light ink at 70 % keeps about 3.4:1 on the light panel and 4.5:1 on
+// the dark one.
+const BAND_FONT = 11
+const BAND_OPACITY = 0.7
 const ICON_Y = 20
 const ICON_R = 11
 const ICON_SIZE = 14
@@ -147,7 +152,8 @@ const KEY_STEPS: Record<string, number> = {
  * and the lowest and highest values; and a mark with a fork and knife at
  * each meal, without carbs nor dose. Touching or dragging over it shows
  * the closest reading: its value as text on top and its time under the
- * axis while the finger is down (#116); for VoiceOver and the keyboard it
+ * axis while the finger is down, with the vertical line and the point
+ * following the finger along the curve (#116); for VoiceOver and the keyboard it
  * is adjustable, one reading at a time, with the value and its time in a
  * bubble on top, joined to the vertical line (UX-29, UX-46). It fills the width and the height of
  * its container (a flex column): made for a panel from edge to edge.
@@ -164,10 +170,12 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const plotH = box.height - TOP - BOTTOM
   const descriptionId = useId()
 
+  // Only whether there is a pick: a drag changes it every frame.
+  const hasPick = picked !== null
   // Letting go takes the mark away (pointerup and pointercancel); the one
   // of the keyboard or VoiceOver stays until a tap outside the chart.
   useEffect(() => {
-    if (picked === null) return
+    if (!hasPick) return
     const onPointerDown = (event: globalThis.PointerEvent) => {
       const root = rootRef.current
       if (
@@ -180,7 +188,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [picked])
+  }, [hasPick])
 
   const points = chartPoints(readings, now, windowMs)
   const segments = chartSegments(points)
@@ -207,15 +215,40 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const pickTime =
     pick === null ? null : pick.kind === 'reading' ? pick.point.time : picked
   const meal = pickTime === null ? null : mealNear(marks, pickTime)
-  const pickX = pickTime === null ? null : x(pickTime)
+  // The vertical line and the point follow the finger (#116), not the
+  // reading: on a reading, the line stays between the first and the last
+  // reading of its piece and the point goes on the drawn curve; in a gap,
+  // the line follows the finger and there is no point.
+  const pickSegment =
+    pick?.kind === 'reading'
+      ? segments.find((segment) => segment.includes(pick.point))
+      : undefined
+  const lineTime =
+    picked === null
+      ? null
+      : pickSegment === undefined
+        ? picked
+        : Math.min(
+            pickSegment.at(-1)?.time ?? picked,
+            Math.max(pickSegment[0]?.time ?? picked, picked),
+          )
+  const pickX = pick === null || lineTime === null ? null : x(lineTime)
+  const pickY =
+    pickSegment === undefined || pickX === null
+      ? null
+      : monotoneY(
+          pickSegment.map((point) => ({ x: x(point.time), y: y(point.mgdl) })),
+          pickX,
+        )
   const readout = pick !== null && dragging
-  // The time of the picked reading, in place of the hours of the axis.
+  // The time of the picked reading, in place of the hours of the axis,
+  // under the vertical line.
   const pickHour =
-    readout && pick.kind === 'reading'
+    readout && pick.kind === 'reading' && pickX !== null
       ? {
           x: Math.min(
             LEFT + plotW - PICK_HOUR_HALF,
-            Math.max(AXIS_X + PICK_HOUR_HALF, x(pick.point.time)),
+            Math.max(AXIS_X + PICK_HOUR_HALF, pickX),
           ),
           label: clockText(pick.point.time),
         }
@@ -253,7 +286,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     cx + ICON_R > span.left - BUBBLE_AIR &&
     cx - ICON_R < span.left + span.width + BUBBLE_AIR
   const hiddenIcons = icons.map(underBubble)
-  const unitHidden = span !== null && span.left < LEFT
+  // While a finger is down, "mg/dL" of the axis goes away (#116).
+  const unitHidden = dragging || (span !== null && span.left < LEFT)
 
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
     // In px of the drawing: the viewBox is the measured box, so the scale
@@ -264,7 +298,26 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     return chartTime(across, now, plotW, windowMs)
   }
 
+  // A drag renders at most once a frame (#116): the last place of the
+  // finger waits for the next frame.
+  const frameRef = useRef<number | null>(null)
+  const nextTimeRef = useRef<number | null>(null)
+  const cancelFrame = () => {
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    frameRef.current = null
+  }
+  useEffect(() => cancelFrame, [])
+  const pickOnNextFrame = (time: number) => {
+    nextTimeRef.current = time
+    if (frameRef.current !== null) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null
+      setPicked(nextTimeRef.current)
+    })
+  }
+
   const letGo = () => {
+    cancelFrame()
     setDragging(false)
     setPicked(null)
   }
@@ -331,12 +384,13 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         className="relative max-h-[520px] min-h-[260px] flex-1 cursor-crosshair touch-pan-y rounded-control select-none"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId)
+          cancelFrame()
           setDragging(true)
           setPicked(timeAt(event))
         }}
         onPointerMove={(event) => {
           if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-            setPicked(timeAt(event))
+            pickOnNextFrame(timeAt(event))
           }
         }}
         onPointerUp={letGo}
@@ -400,8 +454,12 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               </g>
             )
           })}
-          <AxisLabel y={bandTop}>{BAND_HIGH_MGDL}</AxisLabel>
-          <AxisLabel y={bandBottom}>{BAND_LOW_MGDL}</AxisLabel>
+          <AxisLabel soft y={bandTop}>
+            {BAND_HIGH_MGDL}
+          </AxisLabel>
+          <AxisLabel soft y={bandBottom}>
+            {BAND_LOW_MGDL}
+          </AxisLabel>
 
           {hours.map((hour) => {
             const at = x(hour.time)
@@ -464,9 +522,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
           />
 
           {marks.map((time, index) =>
-            // Meals near the finger lose their dashed line: it would double the finger's.
-            pickTime !== null &&
-            Math.abs(time - pickTime) <= CHART_MEAL_NEAR_MS ? null : (
+            // A meal line closer than 32 px to the finger's would read as a double line.
+            pickX !== null && Math.abs(x(time) - pickX) < 32 ? null : (
               <line
                 key={`${time}-${index}`}
                 x1={x(time)}
@@ -598,10 +655,10 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 strokeWidth={1}
                 className="stroke-ink"
               />
-              {pick.kind === 'reading' ? (
+              {pickY !== null ? (
                 <circle
-                  cx={x(pick.point.time)}
-                  cy={y(pick.point.mgdl)}
+                  cx={pickX}
+                  cy={pickY}
                   r={7}
                   strokeWidth={2}
                   className="fill-accent stroke-surface"
@@ -644,15 +701,19 @@ function valueText(
     : chartReadingValueText(last.time, last.mgdl)
 }
 
-type AxisLabelProps = { y: number; children: number }
+type AxisLabelProps = { y: number; children: number; soft?: boolean }
 
-/** A value on the left of the chart, left-aligned with "mg/dL". */
-function AxisLabel({ y, children }: AxisLabelProps) {
+/**
+ * A value on the left of the chart, left-aligned with "mg/dL". `soft`, for
+ * 70 and 180 (#116): smaller and lighter, so the band does not shout.
+ */
+function AxisLabel({ y, children, soft = false }: AxisLabelProps) {
   return (
     <text
       x={AXIS_X}
       y={y}
-      fontSize={FONT}
+      fontSize={soft ? BAND_FONT : FONT}
+      fillOpacity={soft ? BAND_OPACITY : undefined}
       textAnchor="start"
       dominantBaseline="middle"
       className="fill-ink-soft tabular-nums"

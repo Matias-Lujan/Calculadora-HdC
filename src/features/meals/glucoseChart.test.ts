@@ -18,6 +18,7 @@ import {
   mealMarkTimes,
   mealNear,
   monotonePath,
+  monotoneY,
   nearestIndex,
   pickAt,
   sparklineScale,
@@ -582,5 +583,78 @@ describe('monotonePath', () => {
     ])
     expect(d).not.toContain('NaN')
     expect(d).not.toContain('Infinity')
+  })
+})
+
+describe('monotoneY', () => {
+  // In px: a smaller y is higher. Uneven steps, as the readings come.
+  const points = [
+    { x: 0, y: 200 },
+    { x: 12, y: 180 },
+    { x: 20, y: 60 },
+    { x: 35, y: 60 },
+    { x: 40, y: 62 },
+    { x: 55, y: 60 },
+    { x: 60, y: 190 },
+    { x: 90, y: 200 },
+  ]
+
+  it('is null without points and outside the piece', () => {
+    expect(monotoneY([], 0)).toBeNull()
+    expect(monotoneY(points, -0.5)).toBeNull()
+    expect(monotoneY(points, 90.5)).toBeNull()
+    expect(monotoneY([{ x: 10, y: 20 }], 11)).toBeNull()
+  })
+
+  it('is the reading with one point', () => {
+    expect(monotoneY([{ x: 10, y: 20 }], 10)).toBe(20)
+  })
+
+  it('matches the readings at their places', () => {
+    points.forEach((p) => {
+      expect(monotoneY(points, p.x)).toBeCloseTo(p.y, 9)
+    })
+  })
+
+  it('is on the drawn curve, between the two readings at its sides', () => {
+    const curves = cubics(monotonePath(points))
+    curves.forEach((curve, i) => {
+      const from = points[i] as ChartXY
+      const to = points[i + 1] as ChartXY
+      for (let step = 0; step <= 20; step++) {
+        const drawn = at(curve, step / 20)
+        const y = monotoneY(points, drawn.x)
+        expect(y).not.toBeNull()
+        expect(y).toBeCloseTo(drawn.y, 9)
+        expect(y).toBeGreaterThanOrEqual(Math.min(from.y, to.y) - 1e-9)
+        expect(y).toBeLessThanOrEqual(Math.max(from.y, to.y) + 1e-9)
+      }
+    })
+  })
+
+  it('is the straight line with two points, never out of it', () => {
+    const two = [
+      { x: 0, y: 100 },
+      { x: 30, y: 40 },
+    ]
+    expect(monotoneY(two, 15)).toBeCloseTo(70, 9)
+    for (let x = 0; x <= 30; x += 0.5) {
+      const y = monotoneY(two, x)
+      expect(y).toBeGreaterThanOrEqual(40)
+      expect(y).toBeLessThanOrEqual(100)
+    }
+  })
+
+  it('has no NaN with two readings at the same time', () => {
+    const y = monotoneY(
+      [
+        { x: 0, y: 100 },
+        { x: 10, y: 80 },
+        { x: 10, y: 80 },
+        { x: 20, y: 90 },
+      ],
+      10,
+    )
+    expect(y).toBe(80)
   })
 })
