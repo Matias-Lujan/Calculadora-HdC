@@ -14,6 +14,7 @@ import {
   type LibreSession,
 } from './provider.ts'
 import {
+  coveredByGraph,
   cutoffIso,
   isTaskRequest,
   latestToKeep,
@@ -156,7 +157,44 @@ function toRow(userId: string, state: LibreState) {
   }
 }
 
-/** Saves the graph of LibreLinkUp and deletes what is older than 24 h. */
+const savedTimesSchema = z.array(z.object({ measured_at: z.string() }))
+
+/**
+ * Deletes the saved live readings that the graph just saved now covers
+ * (#115), so the chart does not mix smoothed and instant readings. False
+ * if the read or the delete fails.
+ */
+async function deleteCovered(
+  admin: SupabaseClient,
+  userId: string,
+  readings: readonly GraphReading[],
+): Promise<boolean> {
+  const times = readings.map((reading) => Date.parse(reading.measured_at))
+  const { data, error } = await admin
+    .from('glucose_readings')
+    .select('measured_at')
+    .eq('user_id', userId)
+    .gt('measured_at', new Date(Math.min(...times)).toISOString())
+    .lt('measured_at', new Date(Math.max(...times)).toISOString())
+  const saved = savedTimesSchema.safeParse(data)
+  if (error !== null || !saved.success) return false
+  const covered = coveredByGraph(
+    saved.data.map((row) => row.measured_at),
+    readings,
+  )
+  if (covered.length === 0) return true
+  const { error: deleteError } = await admin
+    .from('glucose_readings')
+    .delete()
+    .eq('user_id', userId)
+    .in('measured_at', covered)
+  return deleteError === null
+}
+
+/**
+ * Saves the graph of LibreLinkUp, deletes the live readings it covers and
+ * what is older than 24 h.
+ */
 async function syncGraph(
   admin: SupabaseClient,
   userId: string,
@@ -181,6 +219,10 @@ async function syncGraph(
       { onConflict: 'user_id,measured_at', ignoreDuplicates: true },
     )
     if (error !== null) {
+      console.error('glucose-latest: GRAPH_SAVE_FAILED')
+      return
+    }
+    if (!(await deleteCovered(admin, userId, readings))) {
       console.error('glucose-latest: GRAPH_SAVE_FAILED')
       return
     }

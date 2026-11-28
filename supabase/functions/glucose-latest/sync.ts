@@ -99,6 +99,41 @@ export function shouldSaveLatest(
   )
 }
 
+/**
+ * Two consecutive points of the graph at most this far apart cover the
+ * saved readings between them (docs/decisiones.md #115).
+ */
+export const COVER_MS = 20 * 60 * 1000
+
+/**
+ * The saved times (as given, to delete them with the same strings) that the
+ * graph now covers: not the time of a graph point, and between two
+ * consecutive graph points COVER_MS or less apart. The graph is smoothed
+ * and the live readings are not, so mixing them draws a saw. A real gap of
+ * the graph, or what is newer than its last point, keeps the live readings.
+ */
+export function coveredByGraph(
+  savedTimes: readonly string[],
+  graph: readonly GraphReading[],
+): string[] {
+  const points = graph
+    .map((reading) => Date.parse(reading.measured_at))
+    .filter((ms) => !Number.isNaN(ms))
+    .sort((a, b) => a - b)
+  const pointSet = new Set(points)
+  return savedTimes.filter((iso) => {
+    const ms = Date.parse(iso)
+    if (Number.isNaN(ms) || pointSet.has(ms)) return false
+    const next = points.findIndex((point) => point > ms)
+    if (next <= 0) return false
+    const before = points[next - 1]
+    const after = points[next]
+    return (
+      before !== undefined && after !== undefined && after - before <= COVER_MS
+    )
+  })
+}
+
 /** Readings measured before this time (ISO) are deleted. */
 export function cutoffIso(now: number): string {
   return new Date(now - KEEP_MS).toISOString()
