@@ -351,7 +351,8 @@ Desde el cierre de la etapa 7 la app está publicada sobre `prod`. Lo que sigue 
 | M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | ✅ PR #27 |
 | M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
 | M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | En `prod` (PR #30 a #37); falta confirmar 24 h sin huecos |
-| M11 | Repensar la app: cómo se navega y dónde va cada cosa (Inicio, glucosa, gráfico, historial), pensando en la "todo en uno". Puede mover el gráfico de M10 | Pedido del usuario al acordar M10 (2026-11-28) | Pendiente |
+| M11 | Repensar la app: un análisis de producto a fondo de cómo era la app antes de la glucosa y cómo es ahora, y qué hay que cambiar. Cómo se navega y dónde va cada cosa (Inicio, glucosa, gráfico, historial), pensando en la "todo en uno". Puede mover el gráfico de M10 | Pedido del usuario al acordar M10 (2026-11-28); ampliado el 2026-11-28 | Pendiente |
+| M12 | Rango de glucosa configurable: cada usuario elige en Configuración la franja verde (hoy fija en 80-170) y el límite debajo del cual la línea va en rojo (hoy fijo en 70), decisiones #119 | Pedido del usuario al pedir la línea roja (2026-11-28) | Pendiente |
 
 ### M1 — Revisión de UI/UX
 
