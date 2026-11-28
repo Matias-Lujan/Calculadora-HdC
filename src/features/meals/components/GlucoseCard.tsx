@@ -4,9 +4,11 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpRight,
+  ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
+import { Link } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { card } from '../../../components/styles.ts'
 import {
@@ -26,6 +28,7 @@ import {
   trendLabel,
 } from '../glucose.ts'
 import type { GlucoseReading } from '../types.ts'
+import { useNow } from '../useNow.ts'
 
 type Trend = NonNullable<GlucoseReading['trend']>
 
@@ -37,29 +40,39 @@ const TREND_ICONS: Record<Trend, LucideIcon> = {
   rising_fast: ArrowUp,
 }
 
-/** How often "hace X min" is brought up to date. */
-const CLOCK_MS = 15_000
+type ShellProps = { children: ReactNode }
 
 /**
- * The time now, brought up to date every 15 s and when the app comes back
- * in sight, so "hace X min" does not stay behind while the reading does not
- * change.
+ * The box, in every state: all of it opens the 24-hour chart (spec §6.10).
+ * The link is the title, stretched over the box with an ::after; the ⓘ
+ * comes after it in the page and is positioned (InfoTip), so it is drawn
+ * over the link and still opens its explanation. Nothing else inside can
+ * be tapped.
  */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const tick = () => setNow(Date.now())
-    const timer = setInterval(tick, CLOCK_MS)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisible)
-    }
-  }, [])
-  return now
+function GlucoseCardShell({ children }: ShellProps) {
+  return (
+    <div
+      className={`${card} relative flex flex-col gap-1 pr-10 has-[a:active]:brightness-95`}
+    >
+      <div className="flex flex-wrap items-center gap-x-2">
+        <h2 className="text-sm font-medium text-ink-soft">
+          <Link
+            to="/glucose"
+            className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-accent"
+          >
+            Glucosa del sensor
+            <span className="sr-only">. Ver las últimas 24 horas</span>
+          </Link>
+        </h2>
+        <InfoTip text={GLUCOSE_INFO} />
+      </div>
+      {children}
+      <ChevronRight
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 right-3 size-6 -translate-y-1/2 text-ink-soft"
+      />
+    </div>
+  )
 }
 
 type Props = {
@@ -84,20 +97,12 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
     return null
   }
 
-  const title = (
-    <div className="flex flex-wrap items-center gap-x-2">
-      <h2 className="text-sm font-medium text-ink-soft">Glucosa del sensor</h2>
-      <InfoTip text={GLUCOSE_INFO} />
-    </div>
-  )
-
   // First load: a gray shape the size of the value and its time.
   if (isPending) {
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <div aria-hidden="true" className="h-16 rounded-lg bg-sunken" />
-      </div>
+      </GlucoseCardShell>
     )
   }
 
@@ -118,11 +123,10 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
         ? glucoseErrorMessage(error.code)
         : GLUCOSE_READ_ERROR_MESSAGE
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <p className="text-base text-ink-soft">{message}</p>
         {retry}
-      </div>
+      </GlucoseCardShell>
     )
   }
 
@@ -136,11 +140,10 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
 
   if (reading === null) {
     return (
-      <div className={`${card} flex flex-col gap-1`}>
-        {title}
+      <GlucoseCardShell>
         <p className="text-base text-ink-soft">{GLUCOSE_NO_READING_TEXT}</p>
         {updateFailed}
-      </div>
+      </GlucoseCardShell>
     )
   }
 
@@ -151,8 +154,7 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
   const ago = glucoseAgoText(minutes)
 
   return (
-    <div className={`${card} flex flex-col gap-1`}>
-      {title}
+    <GlucoseCardShell>
       <p
         className={`flex items-center gap-2 ${stale ? 'text-ink-soft' : 'text-ink'}`}
       >
@@ -172,6 +174,6 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
         {stale ? `${ago} · ${GLUCOSE_STALE_TEXT}` : ago}
       </p>
       {updateFailed}
-    </div>
+    </GlucoseCardShell>
   )
 }

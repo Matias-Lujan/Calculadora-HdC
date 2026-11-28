@@ -1430,7 +1430,88 @@ function buildStates(
         await page.evaluate('window.scrollTo(0, 0)')
       },
     },
+
+    // --- Added in M10 (the 24-hour glucose chart, spec §6.10), at the end
+    // so the numbers above do not move. The demo user has no sensor: the
+    // first two answer the glucose with invented readings, in the browser
+    // only (nothing is saved). ---
+    {
+      name: 'inicio-glucosa',
+      description:
+        'Inicio con el recuadro de la glucosa (lecturas inventadas, respondidas en el navegador): todo el recuadro abre el gráfico, con la flecha a la derecha.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await emptyMeal(page)
+        await page.getByRole('link', { name: /^Glucosa del sensor/ }).waitFor()
+      },
+    },
+    {
+      name: 'glucosa',
+      description:
+        'Gráfico de la glucosa de las últimas 24 horas (lecturas inventadas, con un hueco de dos horas sin lecturas): la franja gris de 70 a 180, las horas cada 6 y una marca por cada comida guardada en esas horas.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await go(page, '/glucose')
+        await page
+          .getByRole('img', { name: /^Glucosa de las últimas/ })
+          .waitFor()
+      },
+    },
+    {
+      name: 'glucosa-sin-lecturas',
+      description:
+        'Gráfico de la glucosa sin lecturas guardadas (el usuario de demo no tiene sensor).',
+      run: async (page) => {
+        await realGlucose(page)
+        await go(page, '/glucose')
+        await page.getByText('Todavía no hay lecturas guardadas').waitFor()
+      },
+    },
   ]
+}
+
+// The glucose of the demo user, which has no sensor, answered in the
+// browser with invented readings: the last one in glucose-latest and one
+// every 15 min of the last 24 hours in glucose_readings, with a gap of two
+// hours so the cut line shows. Nothing reaches the base.
+const LATEST_GLUCOSE_ROUTE = '**/functions/v1/glucose-latest'
+const SAVED_GLUCOSE_ROUTE = '**/rest/v1/glucose_readings*'
+
+async function realGlucose(page: Page): Promise<void> {
+  await page.unroute(LATEST_GLUCOSE_ROUTE)
+  await page.unroute(SAVED_GLUCOSE_ROUTE)
+}
+
+async function fakeGlucose(page: Page): Promise<void> {
+  await realGlucose(page)
+  const end = Date.now() - 3 * 60_000
+  const readings: { measured_at: string; mgdl: number }[] = []
+  for (let i = 95; i >= 0; i--) {
+    // The gap: from 8 to 10 hours ago.
+    if (i >= 32 && i < 40) continue
+    const time = end - i * 15 * 60_000
+    const mgdl = Math.round(135 + 55 * Math.sin(i / 7) + 25 * Math.sin(i / 2.3))
+    readings.push({ measured_at: new Date(time).toISOString(), mgdl })
+  }
+  const last = readings.at(-1)
+  await page.route(LATEST_GLUCOSE_ROUTE, (route) =>
+    route.fulfill({
+      json: {
+        ok: true,
+        reading:
+          last === undefined
+            ? null
+            : {
+                mgdl: last.mgdl,
+                trend: 'steady',
+                measured_at: last.measured_at,
+              },
+      },
+    }),
+  )
+  await page.route(SAVED_GLUCOSE_ROUTE, (route) =>
+    route.fulfill({ json: readings }),
+  )
 }
 
 async function signInThroughUi(page: Page, baseUrl: string) {

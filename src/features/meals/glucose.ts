@@ -68,3 +68,14 @@ export function glucoseRetryText(retryAt: string): string | null {
   if (Number.isNaN(time)) return null
   return `Se vuelve a probar a las ${retryClock.format(time)}`
 }
+
+// The screen of the 24-hour chart (spec §6.10).
+
+export const GLUCOSE_CHART_TITLE = 'Glucosa de las últimas 24 horas'
+
+/** The ⓘ of the chart. */
+export const GLUCOSE_CHART_INFO =
+  'Las lecturas de tu sensor de las últimas 24 horas. La franja gris va de 70 a 180 mg/dL y cada marca es una comida que guardaste. No cambia la dosis.'
+
+export const GLUCOSE_CHART_EMPTY_TEXT =
+  'Todavía no hay lecturas guardadas de las últimas 24 horas.'

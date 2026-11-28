@@ -107,7 +107,7 @@ npx supabase db push --remote                               # sin --remote, la C
 npx supabase migration list --remote                        # qué migraciones están aplicadas
 npx supabase gen types typescript --project-id xyolhiklqqoejkapqbxt > src/lib/database.types.ts
 npx supabase functions deploy transcribe-label --use-api
-npx supabase functions deploy glucose-latest --use-api
+npx supabase functions deploy glucose-latest --use-api --no-verify-jwt
 npx supabase secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
 ```
 
@@ -118,7 +118,7 @@ npx supabase link --project-ref zoxlvutjqolwfjcsbtog        # vincular prod (si 
 npx supabase migration list --remote                        # confirmar el proyecto y qué falta aplicar
 npx supabase db push --remote
 npx supabase functions deploy transcribe-label --use-api   # solo si cambió la función
-npx supabase functions deploy glucose-latest --use-api     # solo si cambió la función
+npx supabase functions deploy glucose-latest --use-api --no-verify-jwt   # solo si cambió la función
 npx supabase link --project-ref xyolhiklqqoejkapqbxt        # volver a dev
 node --env-file=.env.prod.local scripts/rls-check/check.ts  # si cambió una tabla o RLS; usuarios descartables de prod
 ```

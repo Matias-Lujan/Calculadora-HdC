@@ -13,12 +13,15 @@ import { foodsKeys } from '../../lib/foods.ts'
 import { clearMealDraftOf } from '../../lib/mealDraftStorage.ts'
 import {
   deleteMeal,
+  fetchDayMealTimes,
+  fetchGlucoseDay,
   fetchLatestGlucose,
   fetchRecentMeals,
   fetchReferenceFoods,
   saveMeal,
 } from './api.ts'
 import {
+  GLUCOSE_DAY_REFETCH_MS,
   GLUCOSE_REFETCH_MS,
   glucoseKeys,
   glucoseRefetchInterval,
@@ -30,7 +33,9 @@ import {
   referenceFoodsOptions,
   useCreateMeal,
   useDeleteMeal,
+  useGlucoseDay,
   useLatestGlucose,
+  useMealMarks,
   useMealList,
   useRecentMeals,
   useReferenceFoods,
@@ -180,7 +185,7 @@ describe('useRecentMeals', () => {
 })
 
 describe('useDeleteMeal', () => {
-  it('after deleting, reads again the list and the shortcuts of Inicio, not the detail', async () => {
+  it('after deleting, reads again the list, the shortcuts of Inicio and the marks of the chart, not the detail', async () => {
     const client = new QueryClient()
     const invalidate = vi
       .spyOn(client, 'invalidateQueries')
@@ -200,6 +205,7 @@ describe('useDeleteMeal', () => {
     expect(invalidate.mock.calls.map((call) => call[0])).toEqual([
       { queryKey: mealsKeys.list },
       { queryKey: mealsKeys.recent },
+      { queryKey: mealsKeys.glucoseMarks },
     ])
   })
 })
@@ -349,5 +355,33 @@ describe('useLatestGlucose', () => {
       retry: false,
     })
     expect(typeof options?.refetchInterval).toBe('function')
+  })
+})
+
+describe('useGlucoseDay', () => {
+  it('reads the saved readings every 5 minutes only in sight, outside the meals prefix', () => {
+    expect(GLUCOSE_DAY_REFETCH_MS).toBe(5 * MINUTE)
+    expect(glucoseKeys.day).not.toEqual(glucoseKeys.latest)
+    expect(glucoseKeys.day[0]).not.toBe(mealsKeys.all[0])
+    vi.mocked(useQuery).mockClear()
+    useGlucoseDay()
+    expect(vi.mocked(useQuery).mock.calls[0]?.[0]).toEqual({
+      queryKey: glucoseKeys.day,
+      queryFn: fetchGlucoseDay,
+      refetchInterval: GLUCOSE_DAY_REFETCH_MS,
+      refetchIntervalInBackground: false,
+    })
+  })
+})
+
+describe('useMealMarks', () => {
+  it('reads the times of the meals under the meals prefix, so saving reads them again', () => {
+    expect(mealsKeys.glucoseMarks[0]).toBe(mealsKeys.all[0])
+    vi.mocked(useQuery).mockClear()
+    useMealMarks()
+    expect(vi.mocked(useQuery).mock.calls[0]?.[0]).toEqual({
+      queryKey: mealsKeys.glucoseMarks,
+      queryFn: fetchDayMealTimes,
+    })
   })
 })

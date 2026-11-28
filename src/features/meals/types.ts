@@ -300,6 +300,22 @@ export type RecentMeal = z.infer<typeof recentMealSchema>
 export type { GlucoseReading } from '../../../supabase/functions/glucose-latest/contract.ts'
 
 /**
+ * A saved reading of the last 24 hours (spec §6.10, §7.1), for the chart.
+ * Only shown: never in the calculation nor in a meal (CLAUDE.md, rule 7).
+ */
+export const savedGlucoseReadingSchema = z.object({
+  measured_at: z.iso.datetime({ offset: true }),
+  mgdl: z.number(),
+}) satisfies z.ZodType<Pick<Tables<'glucose_readings'>, 'measured_at' | 'mgdl'>>
+
+export type SavedGlucoseReading = z.infer<typeof savedGlucoseReadingSchema>
+
+/** When a saved meal was eaten, for its mark on the chart (spec §6.10). */
+export const mealTimeSchema = z.object({
+  eaten_at: z.iso.datetime({ offset: true }),
+}) satisfies z.ZodType<Pick<Tables<'meals'>, 'eaten_at'>>
+
+/**
  * The body of an expected error of glucose-latest. A code the app does not
  * know (INTERNAL_ERROR included) does not match: it is an unexpected error.
  */

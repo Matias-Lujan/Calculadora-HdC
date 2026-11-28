@@ -524,6 +524,69 @@ console.log('\nlibre_sessions: ningún usuario la lee ni la escribe')
   check('libre_sessions: A no puede borrar', remove.error !== null)
 }
 
+// --- glucose_readings: the user reads their own; only the function writes ----
+// Only glucose-latest inserts rows, so the table may be empty for A: B
+// reading A's rows must give none without error, and every write of A must
+// fail (authenticated only has select).
+
+console.log('\nglucose_readings: cada uno lee las suyas y nadie escribe')
+{
+  const readA = await a.supabase
+    .from('glucose_readings')
+    .select('*')
+    .eq('user_id', a.id)
+  check(
+    'glucose_readings: A lee las suyas sin error',
+    readA.error === null,
+    readA.error?.message,
+  )
+  const readB = await b.supabase
+    .from('glucose_readings')
+    .select('*')
+    .eq('user_id', a.id)
+  check(
+    'glucose_readings: B no ve las de A',
+    readB.error === null && readB.data.length === 0,
+    readB.error?.message ?? `${readB.data?.length} filas`,
+  )
+  const insert = await a.supabase.from('glucose_readings').insert({
+    user_id: a.id,
+    measured_at: new Date().toISOString(),
+    mgdl: 100,
+  })
+  check('glucose_readings: A no puede insertar', insert.error !== null)
+  const update = await a.supabase
+    .from('glucose_readings')
+    .update({ mgdl: 101 })
+    .eq('user_id', a.id)
+    .select()
+  check('glucose_readings: A no puede actualizar', update.error !== null)
+  const remove = await a.supabase
+    .from('glucose_readings')
+    .delete()
+    .eq('user_id', a.id)
+    .select()
+  check('glucose_readings: A no puede borrar', remove.error !== null)
+}
+
+// --- glucose-latest without a user --------------------------------------------
+// It is deployed without the platform's JWT check (spec §9.8): only the
+// secret key is the scheduled sync, so the publishable key alone gets a 401.
+
+console.log('\nglucose-latest: sin usuario')
+{
+  const response = await fetch(`${url}/functions/v1/glucose-latest`, {
+    method: 'POST',
+    headers: { apikey: key, 'content-type': 'application/json' },
+    body: '{}',
+  })
+  check(
+    'glucose-latest: con la key publicable y sin sesión da 401',
+    response.status === 401,
+    `HTTP ${response.status}`,
+  )
+}
+
 // --- Anonymous access -----------------------------------------------------------
 
 console.log('\nSin sesión')
@@ -535,6 +598,7 @@ for (const table of [
   'meal_items',
   'vision_requests',
   'libre_sessions',
+  'glucose_readings',
 ]) {
   const { data, error } = await anon.from(table).select('*').limit(1)
   check(

@@ -44,12 +44,16 @@ import {
 } from './features/foods/labelForm.ts'
 import { formatDayTitle, formatMealDateTime } from './features/meals/eatenAt.ts'
 import {
+  GLUCOSE_CHART_EMPTY_TEXT,
+  GLUCOSE_CHART_INFO,
+  GLUCOSE_CHART_TITLE,
   GLUCOSE_INFO,
   GLUCOSE_NO_READING_TEXT,
   GLUCOSE_STALE_TEXT,
   glucoseAgoText,
   trendLabel,
 } from './features/meals/glucose.ts'
+import { chartDescription, chartHours } from './features/meals/glucoseChart.ts'
 import {
   appliedDoseText,
   daySummaryText,
@@ -524,6 +528,21 @@ describe('plain words: every code, exhaustively', () => {
       ...(
         ['falling_fast', 'falling', 'steady', 'rising', 'rising_fast'] as const
       ).map(trendLabel),
+      GLUCOSE_CHART_TITLE,
+      GLUCOSE_CHART_INFO,
+      GLUCOSE_CHART_EMPTY_TEXT,
+      chartDescription([], 0),
+      chartDescription([{ time: 0, mgdl: 100 }], 1),
+      chartDescription(
+        [
+          { time: 0, mgdl: 90 },
+          { time: 1, mgdl: 150 },
+        ],
+        3,
+      ),
+      ...chartHours(Date.parse('2026-11-27T15:20:00Z')).map(
+        (hour) => hour.label,
+      ),
     ])
   })
 

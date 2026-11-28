@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) terminada, PR #27. Próxima: M10 (gráfico de 24 horas). M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-28.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) terminada, PR #27. M10 (gráfico de 24 horas) en curso, rama `mejora-grafico-glucosa`. M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-28.
 
 ---
 
@@ -350,7 +350,8 @@ Desde el cierre de la etapa 7 la app está publicada sobre `prod`. Lo que sigue 
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 | M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | ✅ PR #27 |
 | M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
-| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | Próxima |
+| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | En curso (`mejora-grafico-glucosa`) |
+| M11 | Repensar la app: cómo se navega y dónde va cada cosa (Inicio, glucosa, gráfico, historial), pensando en la "todo en uno". Puede mover el gráfico de M10 | Pedido del usuario al acordar M10 (2026-11-28) | Pendiente |
 
 ### M1 — Revisión de UI/UX
 
@@ -486,7 +487,7 @@ Hecho por el implementer (#87 a #93): la migración `20261127040533_libre_sessio
 
 ### M10 — Gráfico de glucosa de 24 horas
 
-Rama: a crear desde `main` (`mejora-grafico-glucosa`). Alcance a confirmar con el usuario al empezar la sesión; lo que sigue es lo conversado el 2026-11-28.
+Rama: `mejora-grafico-glucosa` (alcance acordado con el usuario, 2026-11-28).
 
 **Objetivo**: ver en un gráfico cómo transcurrió la glucosa en las últimas 24 horas, de un vistazo. Como M8, es solo referencia: **no entra al cálculo** (regla 7).
 
@@ -499,9 +500,17 @@ Incluye (a planificar):
 1. Migración: tabla de lecturas por usuario (`user_id`, hora de la lectura, mg/dL; única por usuario y hora), con RLS: el usuario lee solo las suyas; escribe solo la función con la key secreta. Casos en `scripts/rls-check/`.
 2. Función: guardar las lecturas de las 12 horas (la misma `glucose-latest` o una aparte; decide el planner) y una forma segura de que la llame la tarea programada sin un usuario logueado.
 3. Tarea programada en `dev` y en `prod` (por migración si se puede, regla 6).
-4. Gráfico de 24 h (dónde va: Inicio debajo del recuadro o pantalla aparte; librería o SVG a mano; sin colores de rango salvo que el usuario decida otra cosa, por la regla de tokens). Decisiones para el planner y el usuario.
+4. **Gráfico de 24 h, en una pantalla aparte** que se abre tocando el recuadro de glucosa de Inicio. Dónde va cada cosa en la app se repiensa en M11; por eso el gráfico es un componente que se puede mover sin rehacerlo. Lleva una **franja gris de 70 a 180 mg/dL**, fija e igual para todos (sin rojo, ámbar ni verde), y **una marca en la hora de cada comida guardada** en esas 24 h, sin mostrar HC ni dosis. Librería o SVG a mano: decide el planner (preferible sin dependencias nuevas). Decidido por el usuario (2026-11-28).
 
-Ciclo: planner (hay decisiones abiertas: dónde va, librería, cómo llama la tarea), implementer, tester (hay migración) y reviewer.
+Ciclo: planner (decisiones abiertas: misma función o aparte, cómo llama la tarea sin usuario, librería), implementer, tester (hay migración) y reviewer.
+
+Hecho por el implementer, parte 1 (base y función, #95 a #99): las migraciones `20261127234822_glucose_readings.sql` (la tabla con RLS y `libre_sessions.graph_synced_at`) y `20261127234824_glucose_sync_schedule.sql` (`pg_cron` y `pg_net`, la tarea `glucose-sync` cada 3 h, que lee la URL y la key de Vault); en `glucose-latest`, el modo tarea (key secreta en `apikey`), la lectura del gráfico en `provider.ts`, `sync.ts` (cuándo toca y qué se guarda) y el guardado en `index.ts`, con tests; `verify_jwt = false` en `supabase/config.toml`; los casos de `glucose_readings` y del 401 sin usuario en `scripts/rls-check/`. Spec §7.1, §7.3, §7.5, §9.8, §11, §12.1, §12.2 y §13. El tester sumó casos (`readGraph` nunca entra; `loggedIn` cuando la sesión recién dada se rechaza) y el reviewer pidió sacar a `sync.ts` la condición que decide si se lee el gráfico (`shouldSyncGraph`), con tests.
+
+Hecho por el implementer, parte 2 (pantalla y gráfico, #100 a #104): `glucoseChart.ts` (ventana, escala, cortes, marcas, horas y la descripción para lectores de pantalla, con tests), `components/GlucoseChart.tsx` (SVG a mano, solo props), `pages/GlucoseChartPage.tsx` en `/glucose`, `useNow.ts` (sacado del recuadro), el recuadro de Inicio como link al gráfico, `fetchGlucoseDay` y `fetchDayMealTimes` en `api.ts`, `useGlucoseDay` y `useMealMarks` en `queries.ts` (borrar una comida relee las marcas), con tests; los textos nuevos en `plainWords.test.ts`; tres estados nuevos en `scripts/ux-screens/` (`inicio-glucosa` y `glucosa`, con lecturas inventadas respondidas en el navegador, y `glucosa-sin-lecturas`). Spec §6.9, §6.10 (nueva), §12.2 y §13.
+
+**En `dev` (2026-11-28)**: las dos migraciones aplicadas, `database.types.ts` regenerado, `glucose-latest` desplegada con `--no-verify-jwt` y `rls-check` pasa (con los casos de `glucose_readings` y el 401 sin usuario). Falta en `dev`: los dos secrets de Vault (los carga el usuario, spec §12.1), una corrida de la tarea a mano y ver en los logs que `GRAPH` aparece como mucho cada 15 min y nunca junto a `LOGIN`; probar el gráfico en el iPhone.
+
+**En `prod`, antes de mergear y en este orden**: `db push` de las dos migraciones; deploy de `glucose-latest` con `--no-verify-jwt` (después de la migración: la función nueva lee `graph_synced_at`); los dos secrets de Vault de `prod` (con su URL y su key; los carga el usuario); `rls-check` contra `prod`; ver una corrida buena de la tarea en `cron.job_run_details`.
 
 **Terminada cuando**:
 - [ ] El gráfico muestra las últimas 24 h en el iPhone sobre `dev`, sin huecos aunque la app haya estado cerrada más de 12 h.

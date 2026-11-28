@@ -7,7 +7,10 @@ import {
   glucoseErrorSchema,
   type GlucoseReading,
   listedMealSchema,
+  mealTimeSchema,
   recentMealSchema,
+  savedGlucoseReadingSchema,
+  type SavedGlucoseReading,
   referenceFoodSchema,
   savedMealSchema,
   type CreateMealPayload,
@@ -281,4 +284,46 @@ export async function fetchLatestGlucose(): Promise<GlucoseReading | null> {
   })
   if (error) throw await glucoseFailure(error)
   return glucoseSuccessSchema.parse(data as unknown).reading
+}
+
+/** The chart covers the last 24 hours (spec §6.10). */
+const GLUCOSE_DAY_MS = 24 * 60 * 60 * 1000
+
+/** The start of the last 24 hours, as the filters of the chart use it. */
+function dayStart(): string {
+  return new Date(Date.now() - GLUCOSE_DAY_MS).toISOString()
+}
+
+/**
+ * The saved readings of the last 24 hours (spec §6.10, §7.1), oldest
+ * first. RLS lets each user read only their own. One every ~15 min is
+ * about 96 rows, far from the 1000 a response is cut at.
+ */
+export async function fetchGlucoseDay(): Promise<SavedGlucoseReading[]> {
+  const { data, error } = await supabase
+    .from('glucose_readings')
+    .select('measured_at, mgdl')
+    .gte('measured_at', dayStart())
+    .order('measured_at', { ascending: true })
+  if (error) throw error
+  return z.array(savedGlucoseReadingSchema).parse(data as unknown)
+}
+
+/**
+ * When each meal of the last 24 hours was eaten (not deleted), oldest
+ * first, for the marks of the chart (spec §6.10). Only the time: the chart
+ * shows neither carbs nor doses.
+ */
+export async function fetchDayMealTimes(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select('eaten_at')
+    .is('deleted_at', null)
+    .gte('eaten_at', dayStart())
+    .order('eaten_at', { ascending: true })
+  if (error) throw error
+  return z
+    .array(mealTimeSchema)
+    .parse(data as unknown)
+    .map((meal) => meal.eaten_at)
 }

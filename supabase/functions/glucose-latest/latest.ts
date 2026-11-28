@@ -38,7 +38,8 @@ export interface LibreState {
 }
 
 export type LatestResult =
-  | { ok: true; reading: GlucoseReading | null }
+  /** patientId: the connection, to read its graph (null if none). */
+  | { ok: true; reading: GlucoseReading | null; patientId: string | null }
   /** retryAt: while waiting after a failed login, when it logs in again. */
   | { ok: false; code: LatestErrorCode; retryAt?: number }
 
@@ -47,6 +48,11 @@ export interface LatestOutcome {
   /** The state to keep; it only has to be saved if `changed`. */
   state: LibreState
   changed: boolean
+  /**
+   * True if this call tried to log in (whether it worked or not): it already
+   * made its extra calls to LibreLinkUp, so it does not read the graph.
+   */
+  loggedIn: boolean
   /** Technical events for the logs: codes only, never values nor secrets. */
   events: string[]
 }
@@ -109,7 +115,7 @@ export async function latestGlucose(
   if (session !== null) {
     const read = await readLatest(session, config)
     if (read.ok) {
-      return { result: read, state, changed: false, events }
+      return { result: read, state, changed: false, loggedIn: false, events }
     }
     events.push(`READ_FAILED ${read.error}`)
     // Any other error keeps the session: it may be momentary.
@@ -118,6 +124,7 @@ export async function latestGlucose(
         result: { ok: false, code: errorCode(read.error) },
         state,
         changed: false,
+        loggedIn: false,
         events,
       }
     }
@@ -131,6 +138,7 @@ export async function latestGlucose(
       },
       state,
       changed: false,
+      loggedIn: false,
       events,
     }
   }
@@ -143,6 +151,7 @@ export async function latestGlucose(
     return {
       ...waiting(now, code, logged.retryAfterSeconds),
       changed: true,
+      loggedIn: true,
       events,
     }
   }
@@ -153,7 +162,9 @@ export async function latestGlucose(
     loginError: null,
   }
   const read = await readLatest(logged.session, config)
-  if (read.ok) return { result: read, state: fresh, changed: true, events }
+  if (read.ok) {
+    return { result: read, state: fresh, changed: true, loggedIn: true, events }
+  }
   events.push(`READ_FAILED ${read.error}`)
   if (read.error === 'SESSION_EXPIRED') {
     // A session just given is rejected: logging in again on every call
@@ -161,6 +172,7 @@ export async function latestGlucose(
     return {
       ...waiting(now, 'GLUCOSE_UNAVAILABLE'),
       changed: true,
+      loggedIn: true,
       events,
     }
   }
@@ -168,6 +180,7 @@ export async function latestGlucose(
     result: { ok: false, code: errorCode(read.error) },
     state: fresh,
     changed: true,
+    loggedIn: true,
     events,
   }
 }

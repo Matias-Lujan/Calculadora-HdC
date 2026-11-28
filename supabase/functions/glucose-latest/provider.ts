@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { GlucoseReading, GlucoseTrend } from './contract.ts'
 
 // The ONLY file that knows the glucose comes from LibreLinkUp, Abbott's
-// unofficial API (docs/spec.md §9.8). It does not read secrets nor log
+// unofficial API (docs/spec.md §9.8): login, last reading and graph. It does not read secrets nor log
 // anything: the credentials, the session and fetch come as parameters, so it
 // can be tested with Vitest and a fake fetch.
 
@@ -41,9 +41,22 @@ export type LoginResult =
   | { ok: true; session: LibreSession }
   | { ok: false; error: ProviderError; retryAfterSeconds?: number }
 
+/**
+ * patientId: the id of the connection, needed to read its graph; null if
+ * LibreLinkUp does not give one (not an error).
+ */
 export type ReadResult =
-  | { ok: true; reading: GlucoseReading | null }
+  | { ok: true; reading: GlucoseReading | null; patientId: string | null }
   | { ok: false; error: ProviderError }
+
+/** A point of the graph: when it was measured (ISO, UTC) and mg/dL. */
+export interface GraphReading {
+  measured_at: string
+  mgdl: number
+}
+
+export type GraphResult =
+  { ok: true; readings: GraphReading[] } | { ok: false; error: ProviderError }
 
 const DEFAULT_API_URL = 'https://api.libreview.io'
 
@@ -274,6 +287,8 @@ const connectionsSchema = z.object({
     z.object({
       // Missing or null when the sensor has no reading right now.
       glucoseMeasurement: z.unknown().optional(),
+      // Read loosely: a missing or odd id only means there is no graph.
+      patientId: z.unknown().optional(),
     }),
   ),
 })
@@ -312,6 +327,30 @@ function parseFactoryTimestamp(text: string): string | null {
   return date.toISOString()
 }
 
+/** The headers of every read: the base ones, the token and the account. */
+function readHeaders(session: LibreSession): Record<string, string> {
+  return {
+    ...BASE_HEADERS,
+    authorization: `Bearer ${session.token}`,
+    'account-id': session.accountIdHash,
+  }
+}
+
+/**
+ * The errors of a read told before its shape: 401, the HTTP status and
+ * status 920. Returns null if the body has to be read.
+ */
+function readError(
+  answer: Extract<HttpAnswer, { ok: true }>,
+): ProviderError | null {
+  if (answer.status === 401) return 'SESSION_EXPIRED'
+  const failed = httpError(answer)
+  if (failed !== null) return failed.error
+  const status = statusSchema.safeParse(answer.body)
+  if (status.success && status.data.status === 920) return 'CLIENT_REJECTED'
+  return null
+}
+
 /**
  * Reads the last reading of the first connection (the account the user
  * follows; with the main account following itself, its own sensor).
@@ -322,34 +361,26 @@ export async function readLatest(
 ): Promise<ReadResult> {
   const answer = await call(
     `${session.apiUrl}/llu/connections`,
-    {
-      method: 'GET',
-      headers: {
-        ...BASE_HEADERS,
-        authorization: `Bearer ${session.token}`,
-        'account-id': session.accountIdHash,
-      },
-    },
+    { method: 'GET', headers: readHeaders(session) },
     config,
   )
   if (!answer.ok) return { ok: false, error: 'UNAVAILABLE' }
-  if (answer.status === 401) return { ok: false, error: 'SESSION_EXPIRED' }
-  const failed = httpError(answer)
-  if (failed !== null) return { ok: false, error: failed.error }
+  const failed = readError(answer)
+  if (failed !== null) return { ok: false, error: failed }
 
-  const status = statusSchema.safeParse(answer.body)
-  if (status.success && status.data.status === 920) {
-    return { ok: false, error: 'CLIENT_REJECTED' }
-  }
   const connections = connectionsSchema.safeParse(answer.body)
   if (!connections.success) return { ok: false, error: 'BAD_RESPONSE' }
   const first = connections.data.data[0]
   if (first === undefined) return { ok: false, error: 'NO_CONNECTION' }
+  const patientId =
+    typeof first.patientId === 'string' && first.patientId !== ''
+      ? first.patientId
+      : null
   if (
     first.glucoseMeasurement === undefined ||
     first.glucoseMeasurement === null
   ) {
-    return { ok: true, reading: null }
+    return { ok: true, reading: null, patientId }
   }
 
   const measurement = measurementSchema.safeParse(first.glucoseMeasurement)
@@ -364,5 +395,47 @@ export async function readLatest(
       trend: typeof arrow === 'number' ? (TRENDS[arrow] ?? null) : null,
       measured_at: measuredAt,
     },
+    patientId,
   }
+}
+
+const graphSchema = z.object({
+  data: z.object({ graphData: z.array(z.unknown()) }),
+})
+
+const graphPointSchema = z.object({
+  ValueInMgPerDl: z.number().int().positive(),
+  FactoryTimestamp: z.string(),
+})
+
+/**
+ * Reads the graph of a connection: its readings of the last ~12 hours, one
+ * every ~15 min. A point with an invalid value or time is skipped, without
+ * rounding; an answer of another shape is BAD_RESPONSE.
+ */
+export async function readGraph(
+  session: LibreSession,
+  patientId: string,
+  config: LibreConfig,
+): Promise<GraphResult> {
+  const answer = await call(
+    `${session.apiUrl}/llu/connections/${encodeURIComponent(patientId)}/graph`,
+    { method: 'GET', headers: readHeaders(session) },
+    config,
+  )
+  if (!answer.ok) return { ok: false, error: 'UNAVAILABLE' }
+  const failed = readError(answer)
+  if (failed !== null) return { ok: false, error: failed }
+
+  const graph = graphSchema.safeParse(answer.body)
+  if (!graph.success) return { ok: false, error: 'BAD_RESPONSE' }
+  const readings: GraphReading[] = []
+  for (const item of graph.data.data.graphData) {
+    const point = graphPointSchema.safeParse(item)
+    if (!point.success) continue
+    const measuredAt = parseFactoryTimestamp(point.data.FactoryTimestamp)
+    if (measuredAt === null) continue
+    readings.push({ measured_at: measuredAt, mgdl: point.data.ValueInMgPerDl })
+  }
+  return { ok: true, readings }
 }
