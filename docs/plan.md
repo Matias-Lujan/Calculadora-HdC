@@ -518,6 +518,8 @@ Hecho por el implementer, parte 2 (pantalla y gráfico, #100 a #104): `glucoseCh
 
 **Revisión del espacio (rama `mejora-grafico-glucosa-espacio`, 2026-11-28)**: el gráfico se veía chico en la app instalada, con espacio vacío abajo, y en Safari tapaba la leyenda. El `ux-designer` lo comparó con otras apps (`docs/ux/revision-2.md`, "Revisión del espacio") y propuso UX-37 a UX-40, con la decisión delegada por el usuario. Hecho: la página ocupa el alto visible y solo crece el dibujo (260 a 520 px, medido y dibujado en px reales), el panel de borde a borde, el encabezado en un renglón y la pestaña Inicio marcada en `/glucose`. Spec §6.10; decisiones #108 (en px) y #109. Falta probarlo en el iPhone (lista en la revisión, R.7).
 
+**Lectura actual guardada (misma rama, 2026-11-28)**: en `prod` se vio que el gráfico de LibreLinkUp llega con 15 a 30 min de atraso y el último tramo nunca quedaba guardado. `glucose-latest` guarda también la lectura actual, como mucho una cada 15 min (`sync.ts`, con tests; #110, spec §9.8). Falta desplegar la función en `dev` y en `prod` antes de mergear (sin migración).
+
 **Terminada cuando**:
 - [ ] El gráfico muestra las últimas 24 h en el iPhone, sin huecos aunque la app haya estado cerrada más de 12 h. Se comprueba en `prod`, con la app instalada, al día siguiente del merge (en `dev` se confirmó el guardado de 12 h, y la tarea quedó apagada para no leer la cuenta real; se prende con `cron.alter_job(..., active := true)`).
 - [x] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.

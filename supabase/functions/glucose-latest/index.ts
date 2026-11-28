@@ -9,13 +9,16 @@ import {
 } from './latest.ts'
 import {
   readGraph,
+  type GraphReading,
   type LibreCredentials,
   type LibreSession,
 } from './provider.ts'
 import {
   cutoffIso,
   isTaskRequest,
+  latestToKeep,
   readingsToKeep,
+  shouldSaveLatest,
   shouldSyncGraph,
 } from './sync.ts'
 
@@ -23,7 +26,7 @@ import {
 // uses Deno; the logic it calls is tested with Vitest. Logs carry technical
 // codes only: never the email, the password, the token nor a glucose value.
 // Two modes: the app (the user's JWT) and the scheduled sync (the secret
-// key in the apikey header), which only saves the graph.
+// key in the apikey header), which only saves the readings.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -200,10 +203,56 @@ async function syncGraph(
   if (markError !== null) console.error('glucose-latest: GRAPH_SAVE_FAILED')
 }
 
+const newestSchema = z.object({ measured_at: z.string() }).nullable()
+
+/**
+ * Saves the live reading if the newest saved one is 15 min or more older
+ * (#110), and deletes what is older than 24 hours, as the graph does
+ * (#98). It uses what was already read: no call to LibreLinkUp.
+ */
+async function saveLatest(
+  admin: SupabaseClient,
+  userId: string,
+  reading: GraphReading,
+  now: number,
+): Promise<void> {
+  const { data, error } = await admin
+    .from('glucose_readings')
+    .select('measured_at')
+    .eq('user_id', userId)
+    .order('measured_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const newest = newestSchema.safeParse(data)
+  if (error !== null || !newest.success) {
+    console.error('glucose-latest: LATEST_SAVE_FAILED')
+    return
+  }
+  const newestMs = toMs(newest.data?.measured_at ?? null)
+  if (!shouldSaveLatest(Date.parse(reading.measured_at), newestMs)) return
+  const { error: saveError } = await admin
+    .from('glucose_readings')
+    .upsert(
+      { user_id: userId, ...reading },
+      { onConflict: 'user_id,measured_at', ignoreDuplicates: true },
+    )
+  if (saveError !== null) {
+    console.error('glucose-latest: LATEST_SAVE_FAILED')
+    return
+  }
+  const { error: deleteError } = await admin
+    .from('glucose_readings')
+    .delete()
+    .eq('user_id', userId)
+    .lt('measured_at', cutoffIso(now))
+  if (deleteError !== null) console.error('glucose-latest: LATEST_SAVE_FAILED')
+}
+
 /**
  * What both modes do: reads libre_sessions, gets the last reading (logging
- * in if needed), saves the session and, every 15 min, the graph. A Response
- * is an internal error to answer as is.
+ * in if needed), saves the session, every 15 min the graph, and the live
+ * reading when the newest saved one is 15 min older. A Response is an
+ * internal error to answer as is.
  */
 async function loadAndRun(
   admin: SupabaseClient,
@@ -245,6 +294,12 @@ async function loadAndRun(
   if (graph !== null) {
     await syncGraph(admin, userId, graph.session, graph.patientId, now)
   }
+
+  // The live reading too, because the graph comes 15 to 30 min late (#110).
+  // Also in a call that logged in: it makes no call to LibreLinkUp. After
+  // the graph, so the newest saved one includes its points.
+  const latest = latestToKeep(outcome.result, now)
+  if (latest !== null) await saveLatest(admin, userId, latest, now)
   return outcome.result
 }
 

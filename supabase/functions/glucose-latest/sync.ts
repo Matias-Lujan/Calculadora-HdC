@@ -1,4 +1,4 @@
-import type { LatestOutcome } from './latest.ts'
+import type { LatestOutcome, LatestResult } from './latest.ts'
 import type { GraphReading, LibreSession } from './provider.ts'
 
 // When glucose-latest saves the graph of LibreLinkUp in glucose_readings and
@@ -60,6 +60,35 @@ export function readingsToKeep(
     kept.push(reading)
   }
   return kept
+}
+
+/**
+ * The live reading of a good read, as a reading to save, or null: none, or
+ * outside the readings kept (24 h back, 5 min ahead). The graph of
+ * LibreLinkUp comes 15 to 30 min late, so without it the last stretch of
+ * the chart would be missing (docs/decisiones.md #110).
+ */
+export function latestToKeep(
+  result: LatestResult,
+  now: number,
+): GraphReading | null {
+  if (!result.ok || result.reading === null) return null
+  const { measured_at, mgdl } = result.reading
+  return readingsToKeep([{ measured_at, mgdl }], now)[0] ?? null
+}
+
+/**
+ * True if the live reading has to be saved: no saved reading of the user,
+ * or the newest one 15 min or more before it. At most one every 15 min, so
+ * the app open all day does not save one a minute.
+ */
+export function shouldSaveLatest(
+  latestMeasuredAt: number,
+  newestSavedAt: number | null,
+): boolean {
+  return (
+    newestSavedAt === null || latestMeasuredAt - newestSavedAt >= GRAPH_SYNC_MS
+  )
 }
 
 /** Readings measured before this time (ISO) are deleted. */
