@@ -108,7 +108,10 @@ export function GlucoseChartPage() {
     // taken out, and -mb-8 eats the 32 px of margin <main> leaves under the
     // page, only here. svh, so the chart does not change size while Safari
     // hides or shows its bars.
-    <section className="-mb-8 flex min-h-[calc(100svh-88px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3">
+    <section
+      data-fixed-screen
+      className="-mb-8 flex min-h-[calc(100svh-88px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3"
+    >
       {/* One row on top (UX-39): back, and the title small, centered on
           the screen (UX-41: without an ⓘ, the box of Inicio has it). */}
       <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center gap-x-2">
