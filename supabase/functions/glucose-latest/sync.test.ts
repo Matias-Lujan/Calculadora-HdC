@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FUTURE_MS,
   GRAPH_SYNC_MS,
+  LATEST_SAVE_MS,
   KEEP_MS,
   cutoffIso,
   isGraphDue,
@@ -181,12 +182,12 @@ describe('shouldSaveLatest', () => {
     expect(shouldSaveLatest(NOW, null)).toBe(true)
   })
 
-  it('la más nueva guardada, exactamente 15 min antes: guarda', () => {
-    expect(shouldSaveLatest(NOW, NOW - 15 * MIN)).toBe(true)
+  it('la más nueva guardada, exactamente 5 min antes: guarda', () => {
+    expect(shouldSaveLatest(NOW, NOW - 5 * MIN)).toBe(true)
   })
 
-  it('la más nueva guardada, a menos de 15 min: no guarda', () => {
-    expect(shouldSaveLatest(NOW, NOW - 15 * MIN + 1)).toBe(false)
+  it('la más nueva guardada, a menos de 5 min: no guarda', () => {
+    expect(shouldSaveLatest(NOW, NOW - 5 * MIN + 1)).toBe(false)
     expect(shouldSaveLatest(NOW, NOW - MIN)).toBe(false)
   })
 
@@ -286,12 +287,12 @@ describe('lectura actual con la app consultando cada minuto', () => {
     return live
   }
 
-  it('3 horas de lecturas nuevas: una cada 15 min como mucho', () => {
+  it('3 horas de lecturas nuevas: una cada 5 min como mucho', () => {
     const live = simulate(180, (_minute, now) => now - MIN)
     expect(live.length).toBeGreaterThan(0)
-    expect(live.length).toBeLessThanOrEqual(180 / 15 + 1)
+    expect(live.length).toBeLessThanOrEqual(180 / 5 + 1)
     for (let i = 1; i < live.length; i += 1) {
-      expect(live[i]! - live[i - 1]!).toBeGreaterThanOrEqual(GRAPH_SYNC_MS)
+      expect(live[i]! - live[i - 1]!).toBeGreaterThanOrEqual(LATEST_SAVE_MS)
     }
   })
 

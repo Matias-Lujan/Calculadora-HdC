@@ -8,6 +8,14 @@ import type { GraphReading, LibreSession } from './provider.ts'
 /** The graph is saved at most once every 15 min. */
 export const GRAPH_SYNC_MS = 15 * 60 * 1000
 
+/**
+ * The live reading is saved at most once every 5 min (docs/decisiones.md
+ * #110): real readings of the sensor, so the chart does not lose any while
+ * the graph comes late. With the app open all day, about 288 rows plus the
+ * ~96 of the graph.
+ */
+export const LATEST_SAVE_MS = 5 * 60 * 1000
+
 /** Only the last 24 hours are kept. */
 export const KEEP_MS = 24 * 60 * 60 * 1000
 
@@ -79,15 +87,15 @@ export function latestToKeep(
 
 /**
  * True if the live reading has to be saved: no saved reading of the user,
- * or the newest one 15 min or more before it. At most one every 15 min, so
- * the app open all day does not save one a minute.
+ * or the newest one LATEST_SAVE_MS or more before it. At most one every
+ * 5 min, so the app open all day does not save one a minute.
  */
 export function shouldSaveLatest(
   latestMeasuredAt: number,
   newestSavedAt: number | null,
 ): boolean {
   return (
-    newestSavedAt === null || latestMeasuredAt - newestSavedAt >= GRAPH_SYNC_MS
+    newestSavedAt === null || latestMeasuredAt - newestSavedAt >= LATEST_SAVE_MS
   )
 }
 

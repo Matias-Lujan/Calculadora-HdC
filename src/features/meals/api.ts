@@ -297,8 +297,8 @@ function dayStart(): string {
 /**
  * The saved readings of the last 24 hours (spec §6.10, §7.1), oldest
  * first. RLS lets each user read only their own. About 96 graph points
- * plus at most one live reading every 15 min: under 200 rows, far from
- * the 1000 a response is cut at.
+ * plus at most one live reading every 5 min (about 288): under 400 rows,
+ * far from the 1000 a response is cut at.
  */
 export async function fetchGlucoseDay(): Promise<SavedGlucoseReading[]> {
   const { data, error } = await supabase
