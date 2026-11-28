@@ -55,15 +55,19 @@ type Props = {
 // The drawing, in real px (UX-37): its box grows with the free height of
 // the screen, between 260 and 520 px, and the viewBox is what it measures,
 // so the text never stretches. Edge to edge (UX-38): the axis labels and
-// "mg/dL" end at 52, right-aligned (UX-43), so "mg/dL" (about 36 px wide
-// at 13 px) starts about where the text of the page does, and the plot
-// ends 16 px before the edge. The row on top (40 px, UX-46) holds "mg/dL",
+// "mg/dL" start at 16, left-aligned in one column (about where the text of
+// the page does; "mg/dL" is about 36 px wide at 13 px, so it ends before
+// the plot), and the plot ends 16 px before the edge. The row on top (40 px, UX-46) holds "mg/dL",
 // the meal icons and, after a tap, the bubble of the picked reading.
 const LEFT = 58
+const AXIS_X = 16
 const RIGHT = 16
 const TOP = 40
 const BOTTOM = 26
 const FONT = 13
+// The numbers of the lowest and the highest, a step down so they do not
+// compete with the line.
+const EXTREME_FONT = 12
 const ICON_Y = 20
 const ICON_R = 11
 const ICON_SIZE = 14
@@ -150,7 +154,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const plotH = box.height - TOP - BOTTOM
   const descriptionId = useId()
 
-  // The mark stays after letting go; a tap outside the chart takes it away.
+  // Letting go takes the mark away (pointerup and pointercancel); the one
+  // of the keyboard or VoiceOver stays until a tap outside the chart.
   useEffect(() => {
     if (picked === null) return
     const onPointerDown = (event: globalThis.PointerEvent) => {
@@ -305,6 +310,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             setPicked(timeAt(event))
           }
         }}
+        onPointerUp={() => setPicked(null)}
+        onPointerCancel={() => setPicked(null)}
         onKeyDown={onKeyDown}
       >
         <svg
@@ -326,18 +333,18 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               x2={LEFT + plotW}
               y1={at}
               y2={at}
-              strokeWidth={1}
+              strokeWidth={1.5}
               className="stroke-range-line"
             />
           ))}
 
-          {/* The label of the column of numbers, right-aligned with them. */}
+          {/* The label of the column of numbers, left-aligned with them. */}
           {unitHidden ? null : (
             <text
-              x={LEFT - 6}
+              x={AXIS_X}
               y={ICON_Y}
               fontSize={FONT}
-              textAnchor="end"
+              textAnchor="start"
               dominantBaseline="middle"
               className="fill-ink-soft"
             >
@@ -364,12 +371,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               </g>
             )
           })}
-          <AxisLabel y={bandTop} strong>
-            {BAND_HIGH_MGDL}
-          </AxisLabel>
-          <AxisLabel y={bandBottom} strong>
-            {BAND_LOW_MGDL}
-          </AxisLabel>
+          <AxisLabel y={bandTop}>{BAND_HIGH_MGDL}</AxisLabel>
+          <AxisLabel y={bandBottom}>{BAND_LOW_MGDL}</AxisLabel>
 
           {hours.map((hour) => {
             const at = x(hour.time)
@@ -500,7 +503,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 <circle
                   cx={x(point.time)}
                   cy={at}
-                  r={3.5}
+                  r={2.5}
                   className="fill-accent"
                 />
                 <text
@@ -509,9 +512,9 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                     Math.max(LEFT + 12, x(point.time)),
                   )}
                   y={labelAbove ? at - 8 : at + 18}
-                  fontSize={FONT}
+                  fontSize={EXTREME_FONT}
                   textAnchor="middle"
-                  className="fill-ink font-semibold tabular-nums"
+                  className="fill-ink-soft tabular-nums"
                 >
                   {point.mgdl}
                 </text>
@@ -588,18 +591,18 @@ function valueText(
     : chartReadingValueText(last.time, last.mgdl)
 }
 
-type AxisLabelProps = { y: number; strong?: boolean; children: number }
+type AxisLabelProps = { y: number; children: number }
 
-/** A value on the left of the chart; 70 and 180 in semibold. */
-function AxisLabel({ y, strong = false, children }: AxisLabelProps) {
+/** A value on the left of the chart, left-aligned with "mg/dL". */
+function AxisLabel({ y, children }: AxisLabelProps) {
   return (
     <text
-      x={LEFT - 6}
+      x={AXIS_X}
       y={y}
       fontSize={FONT}
-      textAnchor="end"
+      textAnchor="start"
       dominantBaseline="middle"
-      className={`fill-ink-soft tabular-nums ${strong ? 'font-semibold' : ''}`}
+      className="fill-ink-soft tabular-nums"
     >
       {children}
     </text>
