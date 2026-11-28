@@ -187,7 +187,8 @@ describe('mealMarkTimes', () => {
 })
 
 describe('chartHours', () => {
-  // The width of the plot of the chart.
+  // A narrow plot, in px (a screen of about 334 px; the chart draws in real
+  // px, so any width works).
   const WIDTH = 274
   const AT = (iso: string) => Date.parse(iso)
   const labels = (now: number, windowMs: number) =>

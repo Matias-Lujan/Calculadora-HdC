@@ -4,13 +4,7 @@ import { Link } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
 import { LoadingShapes } from '../../../components/LoadingShapes.tsx'
 import { Notice } from '../../../components/Notice.tsx'
-import {
-  backLink,
-  button,
-  card,
-  pageTitle,
-  segmented,
-} from '../../../components/styles.ts'
+import { backLink, button, segmented } from '../../../components/styles.ts'
 import { LOAD_ERROR_MESSAGE } from '../../../lib/errors.ts'
 import { GlucoseChart } from '../components/GlucoseChart.tsx'
 import { GlucoseNow } from '../components/GlucoseNow.tsx'
@@ -77,7 +71,7 @@ export function GlucoseChartPage() {
       body = (
         // A new period draws the chart again, with a short fade, and takes
         // the picked reading away.
-        <div key={windowMs} className={`${card} motion-safe:animate-fade`}>
+        <div key={windowMs} className={`${panel} motion-safe:animate-fade`}>
           <GlucoseChart
             readings={readings}
             mealTimes={marks.data}
@@ -106,18 +100,25 @@ export function GlucoseChartPage() {
       </div>
     )
   } else {
-    // The chart, in its card.
-    body = <LoadingShapes shapes={['h-96']} />
+    // The chart, in its panel.
+    body = <LoadingShapes shapes={['min-h-86']} />
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <Link to="/" className={backLink}>
-        <ChevronLeft aria-hidden="true" className="shrink-0" />
-        Inicio
-      </Link>
-      <div className="flex flex-wrap items-center gap-x-2">
-        <h1 className={pageTitle}>{GLUCOSE_CHART_TITLE}</h1>
+    // Just the visible height (UX-37): the 24 and 96 px that <main> leaves
+    // above and below, and the safe areas, are taken out. svh, so the chart
+    // does not change size while Safari hides or shows its bars.
+    <section className="flex min-h-[calc(100svh-120px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] flex-col gap-3">
+      {/* One row on top (UX-39): back, and the title small in the middle,
+          with its ⓘ; the explanation of the ⓘ takes the whole row below. */}
+      <div className="grid min-h-11 grid-cols-[1fr_auto_auto_1fr] items-center gap-x-2 [&>p]:col-span-full">
+        <Link to="/" className={`${backLink} justify-self-start`}>
+          <ChevronLeft aria-hidden="true" className="shrink-0" />
+          Inicio
+        </Link>
+        <h1 className="text-center font-display text-base font-semibold">
+          {GLUCOSE_CHART_TITLE}
+        </h1>
         <InfoTip text={GLUCOSE_CHART_INFO} />
       </div>
       {/* The current value never changes while a reading is picked. */}
@@ -150,19 +151,27 @@ export function GlucoseChartPage() {
   )
 }
 
+/**
+ * The block of the chart (UX-38): from edge to edge of the screen, without
+ * the sides of a card, on surface (the contrasts of the band were measured
+ * on it); it grows to the bottom of the page (UX-37).
+ */
+const panel =
+  '-mx-4 flex flex-1 flex-col border-y border-line bg-surface pt-1 pb-3'
+
 type EmptyChartProps = { text: string; hint: string }
 
 /**
- * Without readings (UX-36): what happens and what to do, inside a card
- * about as high as the chart, so the screen keeps its shape.
+ * Without readings (UX-36): what happens and what to do, inside the panel
+ * of the chart and as high as it, so the screen keeps its shape.
  */
 function EmptyChart({ text, hint }: EmptyChartProps) {
   return (
     <div
-      className={`${card} flex min-h-96 flex-col items-center justify-center gap-2 text-center`}
+      className={`${panel} min-h-86 items-center justify-center gap-2 px-4 text-center`}
     >
       <p className="text-base text-ink">{text}</p>
-      <p className="text-sm text-ink-soft">{hint}</p>
+      <p className="text-sm text-balance text-ink-soft">{hint}</p>
     </div>
   )
 }
