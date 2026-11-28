@@ -2,7 +2,7 @@
 
 Este documento ordenó la construcción del MVP descrito en [spec.md](spec.md), por etapas, y ahora lleva las **mejoras** que siguen. El spec define **qué** hace la app; este plan define **en qué orden** se construye y **cómo se sabe que cada parte está terminada**. Se actualiza a medida que se avanza.
 
-**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) terminada, PR #27. M10 (gráfico de 24 horas) en curso, rama `mejora-grafico-glucosa`. M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-28.
+**Estado: MVP terminado (etapas 0 a 7, PR #1 a #4, #7, #8 y #10 a #15). La app está publicada sobre `prod`. Ahora se trabaja por mejoras: ver [Después del MVP](#después-del-mvp). M1 (revisión de UI/UX) terminada, PR #17. M7 (aviso de uso) terminada, PR #20. M2 (sesión que el servidor no reconoce) terminada, PR #22. M6 (pendientes del spec §15) descartada. M3, M4 y M5 (comida que no se guarda dos veces y fotos sueltas) terminadas, PR #25. M8 (glucosa del sensor en vivo) terminada, PR #27. M10 (gráfico de 24 horas) en `prod` (PR #30 a #33); falta confirmar 24 h sin huecos. Próximo: revisar la definición del agente `ux-designer` (más nivel de detalle) y seguir con el diseño del gráfico, cada cosa en una sesión nueva. M9 (cada usuario con su cuenta de LibreLink) es imprescindible antes de abrir el registro.** Última actualización: 2026-11-28.
 
 ---
 
@@ -350,7 +350,7 @@ Desde el cierre de la etapa 7 la app está publicada sobre `prod`. Lo que sigue 
 | M7 | Aviso de uso aceptado por usuario: una ventana la primera vez que entra cada usuario, y la aceptación guardada en su configuración | Pedido del usuario, por si otra persona usa la app (2026-11-18) | Terminada (PR #20) |
 | M8 | Glucosa del sensor en vivo en Inicio (FreeStyle Libre, vía LibreLinkUp), solo como referencia: no entra al cálculo ni se guarda | Pedido del usuario (2026-11-27); spec §2.2 y §13 | ✅ PR #27 |
 | M9 | **Imprescindible antes de abrir el registro**: cada usuario carga su propia cuenta de LibreLink en Ajustes (guardada cifrada en la base) y ve solo su glucosa. Reemplaza los secrets de un solo usuario de M8 | Pedido del usuario al acordar M8 (2026-11-27) | Pendiente |
-| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | En curso (`mejora-grafico-glucosa`) |
+| M10 | Gráfico de glucosa de las últimas 24 horas, para ver de un vistazo cómo viene el día. Las lecturas se guardan (solo 24 h) cuando la app consulta y con una tarea programada de respaldo | Pedido del usuario al probar M8 (2026-11-28) | En `prod` (PR #30 a #33); falta confirmar 24 h sin huecos |
 | M11 | Repensar la app: cómo se navega y dónde va cada cosa (Inicio, glucosa, gráfico, historial), pensando en la "todo en uno". Puede mover el gráfico de M10 | Pedido del usuario al acordar M10 (2026-11-28) | Pendiente |
 
 ### M1 — Revisión de UI/UX
