@@ -1471,7 +1471,7 @@ function buildStates(
     {
       name: 'glucosa-toque',
       description:
-        'Gráfico de la glucosa en 6 horas, con el dedo apoyado sobre la línea a un poco más de la mitad: la línea vertical, el punto y, en un globo arriba, el valor con su hora (UX-46).',
+        'Gráfico de la glucosa en 6 horas, con el dedo apoyado sobre la línea a un poco más de la mitad: la línea vertical, el punto, el valor arriba como texto y su hora abajo, en lugar de las horas del eje (#116).',
       run: async (page) => {
         await fakeGlucose(page)
         await go(page, '/glucose')
@@ -1483,10 +1483,7 @@ function buildStates(
         // Held down: letting go takes the mark away (#114).
         await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2)
         await page.mouse.down()
-        await page
-          .getByText(/^· \d{2}:\d{2}$/)
-          .first()
-          .waitFor()
+        await page.getByTestId('chart-readout').waitFor()
       },
     },
     // Added in the detail batch of revision 2 (UX-42): the ⓘ opens a

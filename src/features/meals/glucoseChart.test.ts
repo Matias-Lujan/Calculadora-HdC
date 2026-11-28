@@ -17,12 +17,14 @@ import {
   chartY,
   mealMarkTimes,
   mealNear,
+  monotonePath,
   nearestIndex,
   pickAt,
   sparklineScale,
   spreadMarks,
   withLatest,
   type ChartPoint,
+  type ChartXY,
 } from './glucoseChart.ts'
 
 // Invented readings. 15:20 UTC is 12:20 in Argentina.
@@ -479,5 +481,106 @@ describe('chartDescription', () => {
     expect(chartDescription([], 0, 3 * HOUR_MS)).toBe(
       'Glucosa de las últimas 3 horas: sin lecturas, sin comidas guardadas.',
     )
+  })
+})
+
+/** The cubic pieces of a path: start, two controls and end of each one. */
+function cubics(d: string): ChartXY[][] {
+  const numbers = (text: string) => text.split(',').map(Number)
+  const [move, ...rest] = d.split('C')
+  const [sx = NaN, sy = NaN] = numbers((move ?? '').slice(1))
+  let start: ChartXY = { x: sx, y: sy }
+  return rest.map((piece) => {
+    const [ax, ay, bx, by, ex, ey] = numbers(piece)
+    const curve = [
+      start,
+      { x: ax ?? NaN, y: ay ?? NaN },
+      { x: bx ?? NaN, y: by ?? NaN },
+      { x: ex ?? NaN, y: ey ?? NaN },
+    ]
+    start = curve[3] ?? start
+    return curve
+  })
+}
+
+/** Where a cubic piece is at t, from 0 to 1. */
+function at(curve: ChartXY[], t: number): ChartXY {
+  const [p0, p1, p2, p3] = curve as [ChartXY, ChartXY, ChartXY, ChartXY]
+  const u = 1 - t
+  const mix = (a: number, b: number, c: number, e: number) =>
+    u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * e
+  return { x: mix(p0.x, p1.x, p2.x, p3.x), y: mix(p0.y, p1.y, p2.y, p3.y) }
+}
+
+describe('monotonePath', () => {
+  it('is empty without points and only a move with one', () => {
+    expect(monotonePath([])).toBe('')
+    expect(monotonePath([{ x: 10, y: 20 }])).toBe('M10,20')
+  })
+
+  it('is a straight line with two points', () => {
+    expect(
+      monotonePath([
+        { x: 0, y: 100 },
+        { x: 30, y: 40 },
+      ]),
+    ).toBe('M0,100L30,40')
+  })
+
+  it('goes through every point, left to right', () => {
+    const points = [
+      { x: 0, y: 200 },
+      { x: 10, y: 150 },
+      { x: 20, y: 160 },
+      { x: 30, y: 90 },
+    ]
+    const curves = cubics(monotonePath(points))
+    expect(curves).toHaveLength(3)
+    curves.forEach((curve, i) => {
+      expect(curve[0]).toEqual(points[i])
+      expect(curve[3]).toEqual(points[i + 1])
+    })
+  })
+
+  it('never goes over nor under the readings in a rise, a plateau and a fall', () => {
+    // In px: a smaller y is higher. Uneven steps, as the readings come.
+    const points = [
+      { x: 0, y: 200 },
+      { x: 12, y: 180 },
+      { x: 20, y: 60 },
+      { x: 35, y: 60 },
+      { x: 40, y: 62 },
+      { x: 55, y: 60 },
+      { x: 60, y: 190 },
+      { x: 90, y: 200 },
+    ]
+    const curves = cubics(monotonePath(points))
+    expect(curves).toHaveLength(points.length - 1)
+    curves.forEach((curve) => {
+      const [from, , , to] = curve as [ChartXY, ChartXY, ChartXY, ChartXY]
+      const low = Math.min(from.y, to.y)
+      const high = Math.max(from.y, to.y)
+      for (let step = 0; step <= 50; step++) {
+        const point = at(curve, step / 50)
+        expect(point.y).toBeGreaterThanOrEqual(low - 1e-9)
+        expect(point.y).toBeLessThanOrEqual(high + 1e-9)
+        expect(point.x).toBeGreaterThanOrEqual(from.x - 1e-9)
+        expect(point.x).toBeLessThanOrEqual(to.x + 1e-9)
+      }
+    })
+    // Flat between two equal readings.
+    const plateau = curves[2] as ChartXY[]
+    expect(plateau.every((point) => point.y === 60)).toBe(true)
+  })
+
+  it('has no NaN with two readings at the same time', () => {
+    const d = monotonePath([
+      { x: 0, y: 100 },
+      { x: 10, y: 80 },
+      { x: 10, y: 80 },
+      { x: 20, y: 90 },
+    ])
+    expect(d).not.toContain('NaN')
+    expect(d).not.toContain('Infinity')
   })
 })
