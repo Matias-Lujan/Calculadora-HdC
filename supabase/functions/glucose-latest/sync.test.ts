@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  COVER_MS,
   FUTURE_MS,
   GRAPH_SYNC_MS,
   LATEST_SAVE_MS,
   KEEP_MS,
+  coveredByGraph,
   cutoffIso,
   isGraphDue,
   isTaskRequest,
@@ -299,5 +301,56 @@ describe('lectura actual con la app consultando cada minuto', () => {
   it('el sensor no actualiza (misma hora en cada llamada): una sola vez', () => {
     const live = simulate(60, () => NOW - 2 * MIN)
     expect(live).toEqual([NOW - 2 * MIN])
+  })
+})
+
+describe('coveredByGraph', () => {
+  const MIN = 60_000
+  const point = (ms: number) => ({ measured_at: at(ms), mgdl: 120 })
+  const graph = [point(NOW), point(NOW + 15 * MIN), point(NOW + 30 * MIN)]
+
+  it('deletes the live readings between close graph points', () => {
+    const saved = [at(NOW + 5 * MIN), at(NOW + 10 * MIN), at(NOW + 20 * MIN)]
+    expect(coveredByGraph(saved, graph)).toEqual(saved)
+  })
+
+  it('keeps a reading at the time of a graph point', () => {
+    // Another format of the same time, as the database gives it.
+    const saved = [at(NOW + 15 * MIN), at(NOW).replace('.000Z', '+00:00')]
+    expect(coveredByGraph(saved, graph)).toEqual([])
+  })
+
+  it('returns the strings as given', () => {
+    const saved = [at(NOW + 5 * MIN).replace('.000Z', '+00:00')]
+    expect(coveredByGraph(saved, graph)).toEqual(saved)
+  })
+
+  it('deletes between points exactly COVER_MS apart', () => {
+    const wide = [point(NOW), point(NOW + COVER_MS)]
+    expect(coveredByGraph([at(NOW + 5 * MIN)], wide)).toEqual([
+      at(NOW + 5 * MIN),
+    ])
+  })
+
+  it('keeps the readings of a gap of COVER_MS + 1 ms', () => {
+    const gap = [point(NOW), point(NOW + COVER_MS + 1)]
+    expect(coveredByGraph([at(NOW + 5 * MIN)], gap)).toEqual([])
+  })
+
+  it('keeps the readings after the last point and before the first', () => {
+    const saved = [at(NOW + 31 * MIN), at(NOW - 1)]
+    expect(coveredByGraph(saved, graph)).toEqual([])
+  })
+
+  it('judges by consecutive points, in any order', () => {
+    const unordered = [point(NOW + 60 * MIN), point(NOW), point(NOW + 15 * MIN)]
+    const saved = [at(NOW + 5 * MIN), at(NOW + 40 * MIN)]
+    expect(coveredByGraph(saved, unordered)).toEqual([at(NOW + 5 * MIN)])
+  })
+
+  it('keeps everything with empty lists or bad times', () => {
+    expect(coveredByGraph([], graph)).toEqual([])
+    expect(coveredByGraph([at(NOW + 5 * MIN)], [])).toEqual([])
+    expect(coveredByGraph(['no-es-hora'], graph)).toEqual([])
   })
 })
