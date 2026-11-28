@@ -1,12 +1,4 @@
-import {
-  ArrowDown,
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUp,
-  ArrowUpRight,
-  ChevronRight,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { InfoTip } from '../../../components/InfoTip.tsx'
@@ -20,25 +12,17 @@ import {
 import {
   GLUCOSE_INFO,
   GLUCOSE_NO_READING_TEXT,
-  GLUCOSE_STALE_TEXT,
-  glucoseAgoText,
   glucoseRetryText,
-  isStaleReading,
-  minutesSince,
-  trendLabel,
 } from '../glucose.ts'
+import {
+  SPARKLINE_WINDOW_MS,
+  withLatest,
+  type ChartReading,
+} from '../glucoseChart.ts'
 import type { GlucoseReading } from '../types.ts'
 import { useNow } from '../useNow.ts'
-
-type Trend = NonNullable<GlucoseReading['trend']>
-
-const TREND_ICONS: Record<Trend, LucideIcon> = {
-  falling_fast: ArrowDown,
-  falling: ArrowDownRight,
-  steady: ArrowRight,
-  rising: ArrowUpRight,
-  rising_fast: ArrowUp,
-}
+import { GlucoseNow } from './GlucoseNow.tsx'
+import { GlucoseSparkline } from './GlucoseSparkline.tsx'
 
 type ShellProps = { children: ReactNode }
 
@@ -80,15 +64,22 @@ type Props = {
   reading: GlucoseReading | null | undefined
   error: unknown
   isPending: boolean
+  /**
+   * The saved readings of the last 24 hours, for the small curve
+   * (UX-35); undefined while they never loaded or if they fail: Inicio
+   * does not wait for them, and the box goes without the curve.
+   */
+  readings: readonly ChartReading[] | undefined
 }
 
 /**
  * The glucose of the sensor on Inicio (spec §6.9), only as a reference: it
- * never goes into the calculation. Without range colors (red, amber and
- * green are for errors, warnings and saving). For a user without the
- * glucose set up, nothing is shown.
+ * never goes into the calculation. Without range colors on the value (red,
+ * amber and green are for errors, warnings and saving); beside it, the
+ * curve of the last 3 hours. For a user without the glucose set up,
+ * nothing is shown.
  */
-export function GlucoseCard({ reading, error, isPending }: Props) {
+export function GlucoseCard({ reading, error, isPending, readings }: Props) {
   const now = useNow()
   if (
     error instanceof GlucoseError &&
@@ -147,32 +138,20 @@ export function GlucoseCard({ reading, error, isPending }: Props) {
     )
   }
 
-  const minutes = minutesSince(reading.measured_at, now)
-  const stale = isStaleReading(minutes)
-  const Arrow =
-    !stale && reading.trend !== null ? TREND_ICONS[reading.trend] : null
-  const ago = glucoseAgoText(minutes)
-
   return (
     <GlucoseCardShell>
-      <p
-        className={`flex items-center gap-2 ${stale ? 'text-ink-soft' : 'text-ink'}`}
-      >
-        <span className="font-display text-4xl leading-none font-bold tabular-nums">
-          {reading.mgdl}
-        </span>
-        <span className="text-base">mg/dL</span>
-        {Arrow !== null && reading.trend !== null ? (
-          <Arrow
-            role="img"
-            aria-label={trendLabel(reading.trend)}
-            className="size-7"
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <GlucoseNow reading={reading} now={now} />
+        </div>
+        {readings !== undefined ? (
+          <GlucoseSparkline
+            readings={withLatest(readings, reading, now)}
+            now={now}
+            windowMs={SPARKLINE_WINDOW_MS}
           />
         ) : null}
-      </p>
-      <p className="text-sm text-ink-soft">
-        {stale ? `${ago} · ${GLUCOSE_STALE_TEXT}` : ago}
-      </p>
+      </div>
       {updateFailed}
     </GlucoseCardShell>
   )

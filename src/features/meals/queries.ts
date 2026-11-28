@@ -220,7 +220,8 @@ export const glucoseKeys = {
   // The last reading of the sensor (spec §6.9). Outside mealsKeys.all:
   // saving a meal does not change it.
   latest: ['glucose', 'latest'] as const,
-  // The saved readings of the last 24 hours, for the chart (spec §6.10).
+  // The saved readings of the last 24 hours, for the chart and the small
+  // curve of the glucose card on Home (spec §6.9 and §6.10).
   day: ['glucose', 'day'] as const,
 }
 
@@ -256,12 +257,14 @@ export function useLatestGlucose() {
   })
 }
 
-/** How often the saved readings are read again while the chart is in sight. */
+/** How often the saved readings are read again while Home or the chart is in sight. */
 export const GLUCOSE_DAY_REFETCH_MS = 5 * 60_000
 
 /**
- * The saved readings of the last 24 hours (spec §6.10), read again every
- * 5 min while the chart is in sight and when going back to it
+ * The saved readings of the last 24 hours (spec §6.9 and §6.10), used by the
+ * chart and by the small curve on Home (also for a user without glucose: it
+ * comes back empty). Read again every 5 min while either is in sight and
+ * when going back to it
  * (refetchOnWindowFocus, on by default): they are saved every 15 min at
  * most. A 401 goes to the login (global QueryCache).
  */

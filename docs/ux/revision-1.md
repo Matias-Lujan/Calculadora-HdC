@@ -92,10 +92,12 @@ Los contrastes de las tablas los calculé a mano con la fórmula de WCAG; convie
 | `on-display-warning` | `#FFD27A` | Advertencia dentro del visor | 11,3:1 sobre `display` |
 | `success` | `#1E6B3C` | Texto de "guardado" | 5,7:1 sobre `success-soft`; 6,1:1 sobre `paper` |
 | `success-soft` | `#E5F3E8` | Fondo de avisos de éxito | — |
+| `range` | `#D6ECD6` | Franja de 70 a 180 de los gráficos de glucosa (agregado en la revisión 2, UX-34) | 1,25:1 sobre `surface`; `accent` encima: 8,4:1 |
+| `range-line` | `#4E8A5A` | Bordes de esa franja | 4,1:1 sobre `surface` |
 
 Reglas de uso:
 
-- **Rojo, ámbar y verde significan siempre lo mismo** (error, advertencia, guardado) y no se usan para decorar. Por eso el color de la app es berenjena: no se confunde con ninguno de los tres.
+- **Rojo, ámbar y verde significan siempre lo mismo** (error, advertencia, guardado) y no se usan para decorar. La única excepción, decidida en la revisión 2 (UX-34), es la franja verde suave de 70 a 180 mg/dL de los gráficos de glucosa, con sus propios tokens (`range` y `range-line`). Por eso el color de la app es berenjena: no se confunde con ninguno de los tres.
 - Un aviso nunca depende solo del color: lleva ícono y texto (WCAG 1.4.1, "el color no es el único medio").
 - Si la berenjena no te convence, la alternativa es **petróleo** `#0F4C5C` (azul verdoso oscuro): 8,8:1 sobre `paper` y 9,5:1 con blanco encima. Todo lo demás queda igual.
 
@@ -116,6 +118,7 @@ Reglas de uso:
 | `danger` / `danger-soft` | `#FFB3A8` / `#3D1512` | 9,3:1 |
 | `warning` / `warning-soft` | `#FFD27A` / `#3A2A00` | 9,8:1 |
 | `success` / `success-soft` | `#9EDDB0` / `#12301C` | 9,2:1 |
+| `range` / `range-line` | `#203A28` / `#6AA877` | `range-line` 6,0:1 sobre `surface`; `accent` sobre `range`: 6,3:1 |
 
 ### 2.4 Tipografía
 

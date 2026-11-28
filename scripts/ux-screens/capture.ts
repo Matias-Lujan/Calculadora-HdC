@@ -1438,7 +1438,7 @@ function buildStates(
     {
       name: 'inicio-glucosa',
       description:
-        'Inicio con el recuadro de la glucosa (lecturas inventadas, respondidas en el navegador): todo el recuadro abre el gráfico, con la flecha a la derecha.',
+        'Inicio con el recuadro de la glucosa (lecturas inventadas, respondidas en el navegador): el valor, la curva de las últimas 3 horas y la flecha; todo el recuadro abre el gráfico.',
       run: async (page) => {
         await fakeGlucose(page)
         await emptyMeal(page)
@@ -1448,12 +1448,12 @@ function buildStates(
     {
       name: 'glucosa',
       description:
-        'Gráfico de la glucosa de las últimas 24 horas (lecturas inventadas, con un hueco de dos horas sin lecturas): la franja gris de 70 a 180, las horas cada 6 y una marca por cada comida guardada en esas horas.',
+        'Gráfico de la glucosa de las últimas 24 horas (lecturas inventadas, con un hueco de dos horas sin lecturas): el valor actual arriba, el selector de horas, la franja verde de 70 a 180, las guías, el más bajo y el más alto, el punto de ahora y un ícono por cada comida guardada en esas horas.',
       run: async (page) => {
         await fakeGlucose(page)
         await go(page, '/glucose')
         await page
-          .getByRole('img', { name: /^Glucosa de las últimas/ })
+          .getByRole('slider', { name: 'Lecturas de glucosa' })
           .waitFor()
       },
     },
@@ -1465,6 +1465,26 @@ function buildStates(
         await realGlucose(page)
         await go(page, '/glucose')
         await page.getByText('Todavía no hay lecturas guardadas').waitFor()
+      },
+    },
+    // Added in the design batch of revision 2 (UX-29).
+    {
+      name: 'glucosa-toque',
+      description:
+        'Gráfico de la glucosa en 6 horas, después de tocar la línea a un poco más de la mitad: la línea vertical, el punto y arriba el valor con su hora.',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await go(page, '/glucose')
+        await page.getByRole('button', { name: '6 horas' }).click()
+        const chart = page.getByRole('slider', { name: 'Lecturas de glucosa' })
+        await chart.waitFor()
+        const box = await chart.boundingBox()
+        if (box === null) throw new Error('El gráfico no está a la vista.')
+        await page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2)
+        await page
+          .getByText(/· a las \d{2}:\d{2}$/)
+          .first()
+          .waitFor()
       },
     },
   ]

@@ -7,6 +7,7 @@ import { useSettings } from '../../../lib/settings.ts'
 import { GlucoseCard } from '../components/GlucoseCard.tsx'
 import { EMPTY_MEAL_TITLE, MealForm } from '../components/MealForm.tsx'
 import {
+  useGlucoseDay,
   useLatestGlucose,
   useRecentMeals,
   useReferenceFoods,
@@ -23,6 +24,9 @@ export function NewMealPage() {
   // Only a reference, apart from the meal (spec §6.9): it never goes into
   // the calculation, and Inicio does not wait for it.
   const glucose = useLatestGlucose()
+  // The small curve of the box (UX-35): the same saved readings as the
+  // chart, every 5 minutes. Inicio does not wait for them either.
+  const glucoseDay = useGlucoseDay()
   const queries = [foods, referenceFoods, settings]
 
   // A query fails "without data" only if it never loaded. With data, a later
@@ -38,6 +42,7 @@ export function NewMealPage() {
         reading={glucose.data}
         error={glucose.error}
         isPending={glucose.isPending}
+        readings={glucoseDay.data}
       />
       {/* With the meal loaded, MealForm writes the title ("Corregir comida"
           while correcting). */}
