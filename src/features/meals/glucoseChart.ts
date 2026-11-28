@@ -146,6 +146,34 @@ function endSlope(a: ChartXY, b: ChartXY, next: number): number {
 }
 
 /**
+ * The slope of the line at each point of a piece of three or more points:
+ * the same for the drawing and for the point that follows the finger.
+ */
+function monotoneSlopes(points: readonly ChartXY[]): number[] {
+  const slopes: number[] = []
+  for (let i = 1; i < points.length - 1; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    const c = points[i + 1]
+    if (a !== undefined && b !== undefined && c !== undefined) {
+      slopes[i] = innerSlope(a, b, c)
+    }
+  }
+  const last = points.length - 1
+  const first = points[0]
+  const second = points[1]
+  const beforeLast = points[last - 1]
+  const lastPoint = points[last]
+  if (first !== undefined && second !== undefined) {
+    slopes[0] = endSlope(first, second, slopes[1] ?? 0)
+  }
+  if (beforeLast !== undefined && lastPoint !== undefined) {
+    slopes[last] = endSlope(beforeLast, lastPoint, slopes[last - 1] ?? 0)
+  }
+  return slopes
+}
+
+/**
  * The `d` of a piece of the line, smooth but monotone (#116): between
  * two readings it never goes over the higher nor under the lower. One point
  * is only a move (it is drawn as a dot), two are a straight line. The points
@@ -158,24 +186,9 @@ export function monotonePath(points: readonly ChartXY[]): string {
   const second = points[1]
   if (second === undefined) return move
   if (points.length === 2) return `${move}L${second.x},${second.y}`
-  const slopes: number[] = []
-  for (let i = 1; i < points.length - 1; i++) {
-    const a = points[i - 1]
-    const b = points[i]
-    const c = points[i + 1]
-    if (a !== undefined && b !== undefined && c !== undefined) {
-      slopes[i] = innerSlope(a, b, c)
-    }
-  }
-  const last = points.length - 1
-  const beforeLast = points[last - 1]
-  const lastPoint = points[last]
-  slopes[0] = endSlope(first, second, slopes[1] ?? 0)
-  if (beforeLast !== undefined && lastPoint !== undefined) {
-    slopes[last] = endSlope(beforeLast, lastPoint, slopes[last - 1] ?? 0)
-  }
+  const slopes = monotoneSlopes(points)
   let d = move
-  for (let i = 1; i <= last; i++) {
+  for (let i = 1; i < points.length; i++) {
     const a = points[i - 1]
     const b = points[i]
     if (a === undefined || b === undefined) continue
@@ -185,6 +198,45 @@ export function monotonePath(points: readonly ChartXY[]): string {
     d += `C${a.x + dx},${a.y + dx * t0},${b.x - dx},${b.y - dx * t1},${b.x},${b.y}`
   }
   return d
+}
+
+/**
+ * The y of the line of `monotonePath` at a place across (#116), for the
+ * point that follows the finger. null without points or outside the piece
+ * (before its first point or after its last). The control points of each
+ * curve are evenly spaced across, so the parameter of the curve is the
+ * share of the way between the two readings.
+ */
+export function monotoneY(
+  points: readonly ChartXY[],
+  x: number,
+): number | null {
+  const first = points[0]
+  const lastPoint = points.at(-1)
+  if (first === undefined || lastPoint === undefined) return null
+  if (x < first.x || x > lastPoint.x) return null
+  const slopes = points.length > 2 ? monotoneSlopes(points) : null
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]
+    const b = points[i]
+    if (a === undefined || b === undefined || x > b.x) continue
+    const h = b.x - a.x
+    if (h === 0) return b.y
+    const t = (x - a.x) / h
+    if (slopes === null) return a.y + t * (b.y - a.y)
+    const dx = h / 3
+    const c0 = a.y + dx * (slopes[i - 1] ?? 0)
+    const c1 = b.y - dx * (slopes[i] ?? 0)
+    const u = 1 - t
+    return (
+      u * u * u * a.y +
+      3 * u * u * t * c0 +
+      3 * u * t * t * c1 +
+      t * t * t * b.y
+    )
+  }
+  // One point, and x is on it.
+  return first.y
 }
 
 /** A gap of the line long enough for a bridge: its two ends. */
