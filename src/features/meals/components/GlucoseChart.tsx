@@ -2,6 +2,7 @@ import { Utensils } from 'lucide-react'
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
@@ -53,22 +54,62 @@ type Props = {
   windowMs: number
 }
 
-// The drawing, in units of the viewBox: it takes the whole width and keeps
-// its proportions (about 280 px high on an iPhone, so the hours and "ahora"
-// stay above the tab bar, UX-30). The row on top holds "mg/dL" and the meal
+// The drawing, in real px (UX-37): its box grows with the free height of
+// the screen, between 260 and 520 px, and the viewBox is what it measures,
+// so the text never stretches. Edge to edge (UX-38): the axis labels end at
+// 38, so "300" starts about where the text of the page does, and the plot
+// ends 16 px before the edge. The row on top holds "mg/dL" and the meal
 // icons.
-const WIDTH = 320
-const HEIGHT = 270
-const LEFT = 36
-const RIGHT = 10
+const LEFT = 44
+const RIGHT = 16
 const TOP = 30
-const BOTTOM = 24
-const PLOT_W = WIDTH - LEFT - RIGHT
-const PLOT_H = HEIGHT - TOP - BOTTOM
-const FONT = 13
+const BOTTOM = 26
+const FONT = 14
+const UNIT_X = 16
 const ICON_Y = 13
 const ICON_R = 11
 const ICON_SIZE = 14
+// The meal icons start after "mg/dL" (about 38 px wide), not over it.
+const ICON_MIN_X = UNIT_X + 42 + ICON_R
+
+type BoxSize = { width: number; height: number }
+
+// Until the box is measured (or where it cannot be, as in the tests), the
+// drawing takes this size.
+const DEFAULT_SIZE: BoxSize = { width: 360, height: 260 }
+
+/**
+ * The size of an element in px, kept up to date with a ResizeObserver. The
+ * first measure is taken before the first paint, so the drawing does not
+ * jump; without one (no ResizeObserver, or not laid out), the fallback.
+ */
+function useBoxSize<T extends HTMLElement>(fallback: BoxSize) {
+  const ref = useRef<T>(null)
+  const [size, setSize] = useState<BoxSize | null>(null)
+  useLayoutEffect(() => {
+    const element = ref.current
+    if (element === null) return
+    const update = (width: number, height: number) => {
+      if (width <= 0 || height <= 0) return
+      setSize((current) =>
+        current !== null && current.width === width && current.height === height
+          ? current
+          : { width, height },
+      )
+    }
+    const rect = element.getBoundingClientRect()
+    update(rect.width, rect.height)
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry !== undefined) {
+        update(entry.contentRect.width, entry.contentRect.height)
+      }
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, size ?? fallback] as const
+}
 
 /** The keys that move the picked reading, and by how many readings. */
 const KEY_STEPS: Record<string, number> = {
@@ -90,11 +131,16 @@ const KEY_STEPS: Record<string, number> = {
  * lowest and highest values; and a mark with a fork and knife at each
  * meal, without carbs nor dose. Touching or dragging over it shows the
  * closest reading and its time (UX-29); for VoiceOver and the keyboard it
- * is adjustable, one reading at a time.
+ * is adjustable, one reading at a time. It fills the width and the height
+ * of its container (a flex column): made for a panel from edge to edge, so
+ * the texts above and below take the 16 px of the page themselves.
  */
 export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const [picked, setPicked] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const [boxRef, box] = useBoxSize<HTMLDivElement>(DEFAULT_SIZE)
+  const plotW = box.width - LEFT - RIGHT
+  const plotH = box.height - TOP - BOTTOM
   const descriptionId = useId()
 
   // The mark stays after letting go; a tap outside the chart takes it away.
@@ -119,18 +165,18 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const bridges = chartBridges(points)
   const top = chartTop(points)
   const marks = mealMarkTimes(mealTimes, now, windowMs)
-  const hours = chartHours(now, windowMs, PLOT_W)
+  const hours = chartHours(now, windowMs, plotW)
   const extremes = chartExtremes(points)
   const last = points.at(-1)
-  const x = (time: number) => LEFT + chartX(time, now, PLOT_W, windowMs)
-  const y = (mgdl: number) => TOP + chartY(mgdl, top, PLOT_H)
+  const x = (time: number) => LEFT + chartX(time, now, plotW, windowMs)
+  const y = (mgdl: number) => TOP + chartY(mgdl, top, plotH)
   const bandTop = y(BAND_HIGH_MGDL)
   const bandBottom = y(BAND_LOW_MGDL)
   const icons = spreadMarks(
     marks.map(x),
     ICON_R + 1,
-    LEFT + ICON_R,
-    WIDTH - ICON_R,
+    ICON_MIN_X,
+    box.width - RIGHT,
   )
   const description = chartDescription(points, marks.length, windowMs)
 
@@ -140,9 +186,12 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const meal = pickTime === null ? null : mealNear(marks, pickTime)
 
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
+    // In px of the drawing: the viewBox is the measured box, so the scale
+    // is 1 (it only matters while the drawing has the fallback size).
     const rect = event.currentTarget.getBoundingClientRect()
-    const across = ((event.clientX - rect.left) / rect.width) * WIDTH - LEFT
-    return chartTime(across, now, PLOT_W, windowMs)
+    const scale = rect.width > 0 ? box.width / rect.width : 1
+    const across = (event.clientX - rect.left) * scale - LEFT
+    return chartTime(across, now, plotW, windowMs)
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -183,9 +232,11 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         )
 
   return (
-    <div ref={rootRef} className="flex flex-col gap-2">
+    <div ref={rootRef} className="flex flex-1 flex-col gap-2">
       <PickedReading pick={pick} meal={meal} />
+      {/* Only the drawing grows, between 260 and 520 px (UX-37). */}
       <div
+        ref={boxRef}
         role={points.length === 0 ? 'img' : 'slider'}
         tabIndex={points.length === 0 ? undefined : 0}
         aria-label={points.length === 0 ? description : GLUCOSE_CHART_LABEL}
@@ -202,7 +253,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 : points.length - 1
         }
         aria-valuetext={valueText(pick, meal, last)}
-        className="cursor-crosshair touch-pan-y rounded-control select-none"
+        className="relative max-h-[520px] min-h-[260px] flex-1 cursor-crosshair touch-pan-y rounded-control select-none"
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId)
           setPicked(timeAt(event))
@@ -215,14 +266,14 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         onKeyDown={onKeyDown}
       >
         <svg
-          viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          viewBox={`0 0 ${box.width} ${box.height}`}
           aria-hidden="true"
-          className="block h-auto w-full"
+          className="absolute inset-0 block size-full"
         >
           <rect
             x={LEFT}
             y={bandTop}
-            width={PLOT_W}
+            width={plotW}
             height={bandBottom - bandTop}
             className="fill-range"
           />
@@ -230,7 +281,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             <line
               key={at}
               x1={LEFT}
-              x2={LEFT + PLOT_W}
+              x2={LEFT + plotW}
               y1={at}
               y2={at}
               strokeWidth={1}
@@ -239,7 +290,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
           ))}
 
           <text
-            x={0}
+            x={UNIT_X}
             y={ICON_Y}
             fontSize={FONT}
             dominantBaseline="middle"
@@ -257,7 +308,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               <g key={mgdl}>
                 <line
                   x1={LEFT}
-                  x2={LEFT + PLOT_W}
+                  x2={LEFT + plotW}
                   y1={at}
                   y2={at}
                   strokeWidth={1}
@@ -284,14 +335,14 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                   x1={at}
                   x2={at}
                   y1={TOP}
-                  y2={TOP + PLOT_H}
+                  y2={TOP + plotH}
                   strokeWidth={1}
                   className="stroke-line"
                 />
                 {hour.label !== null ? (
                   <text
                     x={at}
-                    y={HEIGHT - 6}
+                    y={box.height - 7}
                     fontSize={FONT}
                     textAnchor={anchor}
                     className="fill-ink-soft tabular-nums"
@@ -303,8 +354,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             )
           })}
           <text
-            x={LEFT + PLOT_W}
-            y={HEIGHT - 6}
+            x={LEFT + plotW}
+            y={box.height - 7}
             fontSize={FONT}
             textAnchor="end"
             className="fill-ink-soft"
@@ -313,9 +364,9 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
           </text>
           <line
             x1={LEFT}
-            x2={LEFT + PLOT_W}
-            y1={TOP + PLOT_H}
-            y2={TOP + PLOT_H}
+            x2={LEFT + plotW}
+            y1={TOP + plotH}
+            y2={TOP + plotH}
             strokeWidth={1}
             className="stroke-line-strong"
           />
@@ -326,7 +377,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               x1={x(time)}
               x2={x(time)}
               y1={ICON_Y + ICON_R}
-              y2={TOP + PLOT_H}
+              y2={TOP + plotH}
               strokeWidth={1}
               strokeDasharray="3 3"
               className="stroke-line-strong"
@@ -394,18 +445,18 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             // out of the plot.
             const labelAbove = above
               ? at - 8 >= TOP + FONT
-              : at + 18 > TOP + PLOT_H
+              : at + 18 > TOP + plotH
             return (
               <g key={`${above}`}>
                 <circle
                   cx={x(point.time)}
                   cy={at}
-                  r={3}
+                  r={3.5}
                   className="fill-accent"
                 />
                 <text
                   x={Math.min(
-                    LEFT + PLOT_W - 12,
+                    LEFT + plotW - 12,
                     Math.max(LEFT + 12, x(point.time)),
                   )}
                   y={labelAbove ? at - 8 : at + 18}
@@ -423,8 +474,8 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             <circle
               cx={x(last.time)}
               cy={y(last.mgdl)}
-              r={5}
-              strokeWidth={2}
+              r={6}
+              strokeWidth={2.5}
               className={
                 lastStale
                   ? 'fill-surface stroke-ink-soft'
@@ -439,7 +490,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 x1={x(pickTime)}
                 x2={x(pickTime)}
                 y1={TOP}
-                y2={TOP + PLOT_H}
+                y2={TOP + plotH}
                 strokeWidth={1.5}
                 className="stroke-ink"
               />
@@ -447,7 +498,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 <circle
                   cx={x(pick.point.time)}
                   cy={y(pick.point.mgdl)}
-                  r={6}
+                  r={7}
                   strokeWidth={2}
                   className="fill-accent stroke-surface"
                 />
@@ -519,7 +570,7 @@ function PickedReading({ pick, meal }: PickedReadingProps) {
   return (
     <div
       aria-hidden="true"
-      className="flex min-h-11 flex-wrap items-baseline gap-x-2"
+      className="flex min-h-11 flex-wrap items-baseline gap-x-2 px-4"
     >
       {pick === null ? (
         <p className="self-center text-sm text-ink-soft">
@@ -551,7 +602,7 @@ function PickedReading({ pick, meal }: PickedReadingProps) {
 /** What the band and the icons are, in sight (UX-34). */
 function Legend() {
   return (
-    <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
+    <p className="flex flex-wrap gap-x-4 gap-y-1 px-4 text-xs text-ink-soft">
       <span className="flex items-center gap-1.5">
         <span
           aria-hidden="true"

@@ -360,10 +360,11 @@ function hourStep(windowMs: number): number {
 }
 
 /**
- * How close to the right edge the text of an hour can be, in units of the
- * width given to chartHours: "ahora" goes there, about 35 units wide, and
- * the text of an hour is centered on it, about 25 wide. Measured on the
- * chart (320 wide): at 45 the two texts touch.
+ * How close to the right edge the text of an hour can be, in px of the
+ * width given to chartHours: "ahora" goes there, about 36 px wide at 14 px,
+ * and the text of an hour is centered on it, about 27 wide: at about 50 the
+ * two texts touch. The chart is drawn in real px (UX-37), so it holds for
+ * any width.
  */
 export const CHART_HOUR_CLEARANCE = 52
 

@@ -19,6 +19,10 @@ export function AppLayout() {
   // The dot on Inicio (UX-20): a meal left half entered. Not on Inicio
   // itself, where the meal is in sight.
   const mealInProgress = pathname !== '/' && hasMealDraft()
+  // The chart of the glucose opens from Inicio and goes back to it, so
+  // Inicio stays marked there (UX-40), as a detail marks its tab.
+  const marked = (to: string, isActive: boolean) =>
+    isActive || (to === '/' && pathname.startsWith('/glucose'))
 
   return (
     <>
@@ -43,7 +47,7 @@ export function AppLayout() {
                 end={to === '/'}
                 className={({ isActive }) =>
                   `flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 text-[11px] leading-[13px] font-medium ${
-                    isActive ? 'text-ink' : 'text-ink-soft'
+                    marked(to, isActive) ? 'text-ink' : 'text-ink-soft'
                   }`
                 }
               >
@@ -51,7 +55,7 @@ export function AppLayout() {
                   <>
                     <span
                       className={`relative flex h-8 w-14 items-center justify-center rounded-full motion-safe:transition-colors motion-safe:duration-200 ${
-                        isActive ? 'bg-accent-soft text-accent' : ''
+                        marked(to, isActive) ? 'bg-accent-soft text-accent' : ''
                       }`}
                     >
                       <Icon aria-hidden="true" className="size-6" />

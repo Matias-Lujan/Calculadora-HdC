@@ -6,6 +6,7 @@
 - **Spec leído**: §6.9 y §6.10; decisiones #100 a #104.
 - **Referencias del usuario**: capturas de tres apps de seguimiento de glucosa de su teléfono. Tienen datos de salud reales, así que **no se copian al repo ni se citan valores, horas ni nombres**: acá se describen solo los patrones de diseño (sección 2.2).
 - **Estado**: decidido el 2026-11-27 e implementado en una tanda (ver "M10" en `docs/plan.md`, "Tanda de diseño (revisión 2)"). El usuario eligió las nueve propuestas; cada una termina con su "Decisión del usuario". Capturas de después: `scripts/ux-screens/out/rev2-despues-claro/` y `scripts/ux-screens/out/rev2-despues-oscuro/` (con un estado nuevo, `45-glucosa-toque`). Verificada con capturas el 2026-11-27: ocho cumplidas y una parcial, con dos ajustes pendientes (ver "Verificación de la tanda", al final).
+- **Revisión del espacio** (2026-11-28, rama `mejora-grafico-glucosa-espacio`): un análisis comparado de la pantalla con las tres apps de referencia, y las propuestas UX-37 a UX-40, decididas por el diseñador porque el usuario delegó la decisión. Está al final, después de la verificación.
 
 ## Cómo leer este informe
 
@@ -358,3 +359,220 @@ No empeoró nada fuera del gráfico: el recuadro de Inicio mantiene su alto y lo
 **A probar en el iPhone** (además de §5): con la app instalada, que con el alto nuevo se vean las horas, "ahora" y la leyenda sin desplazar; tocar y arrastrar en 24 h y en 6 h; la franja y los íconos al sol y en oscuro; y que la curva de Inicio se vea en la app instalada y desaparezca sin lecturas.
 
 **Correcciones después de la verificación (2026-11-28)**: los tres puntos se hicieron. El gráfico pasa a 270 de alto (las horas y "ahora" se ven sobre la barra de pestañas a 393×659); la hora que queda a menos de 52 unidades de "ahora" conserva su línea y pierde solo el texto, así que en 24 h vuelve "18 h" cuando hay lugar (decisiones #108); y un período sin lecturas, con lecturas en las 24 h, dice "Probá con un período más largo.". UX-30 queda cumplida; falta confirmarlo en el iPhone.
+
+---
+
+## Revisión del espacio (2026-11-28)
+
+- **Rama**: `mejora-grafico-glucosa-espacio`. **Alcance**: la pantalla del gráfico (`/glucose`: `GlucoseChartPage.tsx`, `components/GlucoseChart.tsx`, `glucoseChart.ts`) y, por un detalle de navegación, la barra de pestañas (`components/AppLayout.tsx`). Ya en producción con UX-28 a UX-36.
+- **Pedido**: el usuario ve, en la app instalada, el gráfico más chico que en otras apps y un espacio sin usar entre la tarjeta y la barra de pestañas. Pidió un análisis abierto contra las tres apps de referencia (no solo el espacio) y delegó la decisión: las propuestas que recomiendo llevan **"Decisión: se hace (delegada por el usuario)"**.
+- **Capturas propias**: `scripts/ux-screens/out/rev3-antes/` (iPhone 15, 393 × 659, claro) y `scripts/ux-screens/out/rev3-antes-max-oscuro/` (iPhone 15 Pro Max, 430 × 739, oscuro), estados `43-glucosa` y `45-glucosa-toque`; ninguno falló. Son Safari con sus barras, no la app instalada.
+- **Capturas del usuario**: cuatro, en la app instalada y en modo oscuro, en un iPhone de 402 × 874 pt (la imagen está a 3 px por punto): la nuestra y tres apps de seguimiento de glucosa, que acá llamo **A** (la app del sensor, en claro), **B** (la app del mismo fabricante para seguir a otra persona, en oscuro) y **C** (una tercera app de seguimiento, en oscuro). Tienen datos reales: **no se copian al repo ni se cita ningún valor, hora ni nombre**; acá van solo proporciones y patrones, medidas sobre las imágenes en puntos (pt, la unidad de iOS: 1 pt = 1 px de CSS).
+- **Puntos de iOS**: en ese iPhone, la barra de estado y la isla ocupan 62 pt arriba, y nuestra barra de pestañas, 98 pt abajo (64 más la zona de la barra de inicio, 34). Quedan **714 pt de alto útil**.
+
+### R.1 Lo que se mide
+
+La "zona de la línea" es el rectángulo donde se dibuja la curva: del borde de arriba del eje (la guía más alta) al eje de abajo, y del eje izquierdo al borde derecho.
+
+| En el iPhone del usuario (402 × 874 pt) | Nuestra app hoy | A | B | C |
+|---|---|---|---|---|
+| Alto de la zona de la línea | ~227 pt (26 % de la pantalla; 32 % del alto útil) | ~363 pt (42 %) | ~361 pt (41 %) | ~384 pt (44 %) |
+| Ancho de la zona de la línea | ~288 pt (72 % del ancho) | ~336 pt (84 %) | ~314 pt (78 %) | ~335 pt (83 %) |
+| Área de la zona, comparada con la nuestra | 1 | 1,9 | 1,7 | 2,0 |
+| Vacío entre el gráfico y la barra de abajo | ~77 pt (de esos, 32 son el margen que deja la página) | 0 (un botón y una barra de estado del sensor) | ~34 pt | 0 (botones) |
+| Lo que hay arriba del número | 2 renglones: "‹ Inicio" y el título "Glucosa ⓘ" de 28 px | 1 renglón (logo y menú) | 2 renglones (logo y un selector de persona) | 1 renglón (controles) |
+| ¿Tarjeta alrededor del gráfico? | Sí, con 16 pt de relleno y 16 de margen por lado | No | Sí, con unos 8 pt por lado | No; de borde a borde |
+
+Dónde van hoy los 874 pt de nuestra pantalla, de arriba abajo (medido en la captura del usuario y en el código): 62 de barra de estado, 24 de margen, 44 de "‹ Inicio", 12, ~33 de "Glucosa ⓘ", 12, ~40 del valor, 12, 52 del selector, 12; la tarjeta (~396: 17 de borde y relleno, 44 del renglón "Tocá la línea…", 8, ~284 del dibujo, 8, 20 de la leyenda y 17); 77 vacíos; 98 de barra de pestañas. **El dibujo es un tercio de la pantalla, y el encabezado, el relleno de la tarjeta y el vacío de abajo suman más que la zona de la línea.**
+
+La causa del vacío está en el código: el dibujo tiene una proporción fija (`viewBox` de 320 × 270, `GlucoseChart.tsx`), así que su alto depende solo del ancho; en la app instalada, con 215 pt más de alto que en Safari, no crece. En Safari pasa lo contrario: en `rev3-antes/43-glucosa.png` (393 × 659) la leyenda queda debajo de la barra de pestañas; en el Pro Max (`rev3-antes-max-oscuro/43-glucosa.png`) entra justo.
+
+### R.2 Las cuatro pantallas, comparadas
+
+**Jerarquía (qué se ve primero).**
+- A pone el número enorme, sobre un recuadro pintado del color de alarma y con un aviso en mayúsculas: imposible no verlo, pero la pantalla grita aunque la persona ya lo sepa. B hace lo mismo con más calma (un recuadro del color de la alarma, más chico). C, solo el número y la flecha, sin unidad.
+- La nuestra: el número a 36 px, la flecha, "mg/dL" y "hace 3 min". Es la única de las cuatro que dice **de cuándo es el dato** en la misma línea: lo más importante para no leer un valor viejo como actual. Pero el título "Glucosa" de 28 px compite con el número: dos cosas grandes, una arriba de la otra, y la que no informa nada está primero (Refactoring UI: lo secundario se baja de tamaño o de color para que lo principal se destaque).
+
+**Espacio y densidad.** Ver R.1. C aprovecha mejor la pantalla: sin tarjeta, de borde a borde, y los rótulos del eje van **adentro** de la zona, a la derecha. A y B, sin llegar a eso, tienen casi el doble de área de línea que la nuestra. Apple lo dice directo para pantallas angostas: "maximizar el ancho de la zona del gráfico", con rótulos del eje vertical lo más cortos posible ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)).
+
+**Lectura del dato (ejes, guías, franja).**
+- A y B: guías cada 50, parejas, fáciles de contar; el eje sube bastante por encima de los datos (A deja casi un quinto del alto vacío arriba). B dibuja la línea blanca sobre fondo oscuro: el mejor contraste de las cuatro.
+- C: solo dos rótulos (100 y 200) en gris tenue, a la derecha, sin unidad; la línea azul sobre una franja azul, del mismo tono: es la que peor se lee.
+- La nuestra: guías cada 100, con 70 y 180 en seminegrita, "mg/dL" escrito, el más bajo y el más alto con su número, la franja con borde y su leyenda. Es la más completa y la única con los extremos marcados. Su problema es de tamaño: con 227 pt de alto, "180" y "200" quedan casi pegados (se ve en la captura del usuario).
+
+**Eje de las horas.** A y B terminan con nombres de días cortados (en inglés y truncados); C pone horas sueltas sin "h". La nuestra termina en **"ahora"**: la mejor.
+
+**Interacción.** Las cuatro dejan tocar la línea; la nuestra además dice la hora del punto, la comida cercana y funciona con VoiceOver. El renglón "Tocá la línea para ver cada lectura." ocupa 44 pt fijos: es el lugar reservado para el valor que se toca (para que nada salte, UX-29), así que no lo saco.
+
+**Período.** A y B no tienen selector (una ventana fija). C tiene uno amplio (de 1 hora a una semana) y liviano, sin fondo, pero la última opción queda cortada en el borde y no se sabe que se puede deslizar. El nuestro (3 · 6 · 12 · 24 h) entra entero y es claro; es más alto (52 pt) porque usa el control de opciones de toda la app, y conviene que sea igual al resto.
+
+**Eventos.** A pone íconos de insulina arriba del gráfico; nosotros, cubiertos en cada comida con leyenda. B y C, nada. La nuestra está bien.
+
+**Navegación.** En las tres, la pestaña de la pantalla del gráfico está marcada abajo. En la nuestra, en `/glucose` **ninguna pestaña está marcada** (en la captura del usuario, las cuatro en gris): la pestaña Inicio usa `end` y solo se marca en `/`. Uno no sabe "dónde está" (primera heurística de Nielsen, visibilidad del estado del sistema).
+
+**Color y modo oscuro.** B es la referencia en oscuro: fondo neutro, línea clara, franja verde apagada, recuadros con poco brillo. La nuestra en oscuro se parece y está bien resuelta (línea `accent` sobre la franja, 6,3:1). C pierde la línea dentro de la franja. A en claro es muy legible, pero el naranja de alarma tiñe toda la pantalla.
+
+**Lo que le sobra a la nuestra**: un renglón de título grande que repite lo que dice el número; el relleno de la tarjeta (32 pt de ancho y 34 de alto); 77 pt vacíos abajo.
+**Lo que le falta**: alto (la zona de la línea tiene la mitad del área que en las otras) y la pestaña marcada.
+**Lo que tiene y las otras no, y no hay que perder**: "hace 3 min", "ahora" al final del eje, el más bajo y el más alto, las comidas con leyenda, el selector entero, la franja con borde y leyenda, la lectura tocada con su hora, VoiceOver.
+
+### R.3 Cuál está mejor resuelta
+
+**B.** Hace lo esencial con lo mínimo: el número grande y la curva **en el mismo bloque** (se leen como una sola cosa, por la ley de la región común: lo que comparte un área con borde se percibe como un grupo, [Laws of UX](https://lawsofux.com/law-of-common-region/)), el bloque llega casi hasta la barra de abajo, la línea tiene el mejor contraste en oscuro y no hay nada más compitiendo. Le restan los dos renglones de arriba (logo y selector de persona, que a ella le hacen falta), el final del eje con días cortados y la falta de período.
+
+C es la que mejor usa el espacio, pero lo paga en lectura: pocos rótulos, tenues, sin unidad, y la línea perdida en la franja. A es la más legible de un vistazo, pero alarma todo el tiempo.
+
+Qué tomo, sin copiar: de **B**, que el gráfico llegue hasta la barra de abajo; de **C**, el gráfico de borde a borde y el poco encabezado; de **A**, nada nuevo (el ícono del evento arriba ya lo tomamos en UX-33).
+
+### R.4 Propuestas
+
+| # | Propuesta | Prioridad | Esfuerzo | Decisión |
+|---|---|---|---|---|
+| UX-37 | El gráfico llena el alto que queda libre | Uso diario | M | Se hace. Hecha |
+| UX-38 | El gráfico de borde a borde, sin la tarjeta a los costados | Uso diario | S | Se hace. Hecha |
+| UX-39 | Un solo renglón arriba: "‹ Inicio", "Glucosa" y el ⓘ | Uso diario | S | Se hace. Hecha |
+| UX-40 | La pestaña Inicio marcada mientras se ve el gráfico | Pulido | S | Se hace. Hecha |
+
+Por prioridad: 0 de Seguridad, 3 de Uso diario, 0 de Identidad y 1 de Pulido. Ninguna toca el cálculo ni la dosis; la glucosa sigue sin entrar al cálculo (regla 7) y nada va en `src/domain/` (es dibujo). Se mantienen la franja con `range` y `range-line`, los 44 px de lo que se toca, los textos sin jerga y el gráfico como componente que recibe todo por props.
+
+#### UX-37 — El gráfico llena el alto que queda libre
+
+- **Pantallas y capturas**: `/glucose`. `scripts/ux-screens/out/rev3-antes/43-glucosa.png` (la leyenda, tapada), `scripts/ux-screens/out/rev3-antes-max-oscuro/43-glucosa.png` y la captura del usuario de la app instalada (77 pt vacíos).
+- **Qué se observa**: el dibujo tiene proporción fija (320 × 270): en Safari de un iPhone 15 se pasa por abajo y tapa la leyenda; en la app instalada, que tiene unos 200 pt más de alto, sobra espacio. El alto que resultó de la verificación (270) fue un arreglo para Safari que achicó la app instalada.
+- **Por qué importa**: el alto de una pantalla cambia con el modelo de iPhone y con la forma de abrir la app (Safari o instalada); Apple pide armar la pantalla según el espacio disponible, no según el modelo ([HIG, Layout](https://developer.apple.com/design/human-interface-guidelines/layout)). Y la zona de la línea es lo que la persona vino a mirar: cuanto más alta, más se separan 70, 100, 180 y 200, y más fácil es apuntar con el dedo.
+- **Propuesta**:
+  1. **La página ocupa justo el alto visible.** En `GlucoseChartPage.tsx`, la `<section>` pasa a `flex flex-col gap-3 min-h-[calc(100svh-120px-env(safe-area-inset-top)-env(safe-area-inset-bottom))]` (120 = los 24 px de arriba y los 96 de abajo que deja `<main>` en `AppLayout.tsx`). Se usa `svh` (el alto con las barras de Safari visibles) y no `dvh`, para que el gráfico no cambie de tamaño mientras Safari esconde o muestra sus barras al desplazar; en la app instalada `svh` es todo el alto.
+  2. **El bloque del gráfico crece.** El contenedor del gráfico (UX-38) lleva `flex flex-1 flex-col`. Dentro de `GlucoseChart`, la raíz pasa a `flex flex-1 flex-col` y el área táctil (`role="slider"`) a `relative flex-1 min-h-[260px] max-h-[520px]`. El renglón de la lectura tocada (44) y la leyenda quedan fijos; **solo crece el dibujo**.
+  3. **El dibujo se mide y se dibuja en px reales**, sin estirar el texto: un `ResizeObserver` sobre el área táctil (un hook local, `useBoxSize`, en el mismo archivo; no es una cuenta de dosis, no va en `domain`) da `width` y `height`, y el SVG usa `viewBox={`0 0 ${width} ${height}`}` con `className="absolute inset-0 size-full"`. Hasta tener la medida, el SVG no dibuja nada (el bloque ya tiene su alto, así que no salta). Las funciones de `glucoseChart.ts` ya reciben el ancho y el alto por parámetro (`chartX`, `chartY`, `chartHours`): no cambian. `timeAt` deja de escalar: `event.clientX - rect.left - LEFT`.
+  4. **Medidas, en px** (reemplazan a las del `viewBox` de 320): `LEFT = 44`, `RIGHT = 16` (ver UX-38), `TOP = 30` (el renglón de "mg/dL" y los cubiertos), `BOTTOM = 26`, `FONT = 14` (hoy los rótulos miden ~13,7 px en un iPhone 15 y ~15 en un Pro Max; quedan en 14 en todos), `ICON_R = 11`, `ICON_SIZE = 14`. El punto de ahora pasa de radio 5 a **6** con anillo de 2,5 (en un gráfico más grande, el de 5 queda chico); el más bajo y el más alto, de 3 a **3,5**. La distancia de #108 (la hora que queda cerca de "ahora" pierde el texto) se mantiene en **52 px**.
+  5. **Mínimo y máximo**: el dibujo nunca baja de **260 px** (si no entra, la pantalla se desplaza, como hoy en un iPhone SE con Safari) ni pasa de **520 px** (en un iPad o un teléfono acostado no se vuelve un afiche).
+  6. **Sin lecturas y cargando**: `EmptyChart` y la forma de carga (`LoadingShapes`) van en el mismo bloque con `flex-1 min-h-86` (344 px: 260 del dibujo, 44 del renglón y la leyenda), en lugar de `min-h-96` y `h-96`, así la pantalla tiene la misma forma en los tres casos.
+  7. Sigue igual: el fundido al cambiar de período (la `key={windowMs}`), la lectura tocada, el control ajustable, la leyenda.
+- **Cuánto da** (con UX-38 y UX-39; zona de la línea = dibujo − 56):
+
+  | Pantalla | Zona de la línea hoy (alto × ancho) | Con las propuestas | ¿Entra todo sin desplazar? |
+  |---|---|---|---|
+  | App instalada, 402 × 874 (el iPhone del usuario) | ~227 × 288 pt | **~340 × 342 pt** (+50 % de alto, +19 % de ancho; ~1,8 veces el área) | Sí, hoy también, pero con 77 pt vacíos |
+  | App instalada, iPhone Pro Max (430 × 932) | ~250 × 316 | ~400 × 370 | Sí |
+  | App instalada, iPhone SE (375 × 667) | ~220 × 270 | ~210 × 315 | Sí (dibujo de ~265) |
+  | Safari, iPhone 15 (393 × 659, `rev3-antes`) | ~221 × 280 | ~220 × 333 | **Sí, con la leyenda** (hoy queda tapada) |
+  | Safari, iPhone SE (~375 × 553) | ~205 × 270 | ~204 × 315 (mínimo de 260) | No: se desplaza unos 90 px, como hoy |
+
+  Con eso, la zona de la línea pasa a ser ~39 % del alto de la pantalla y ~85 % del ancho, a la par de las tres apps de referencia, sin sacar nada de lo que ellas no tienen.
+- **Prioridad**: Uso diario. **Esfuerzo**: M (el cambio a px toca todo el dibujo, aunque no la lógica).
+- **Depende de**: nada; rinde lo de la tabla junto con UX-38 y UX-39.
+- **Cambia**: spec §6.10 (el alto del gráfico: de "unos 280 px" a "llena el alto libre de la pantalla, entre 260 y 520 px") y una fila nueva en `docs/decisiones.md`. El punto 1 de "Para corregir" de la verificación (alto de 270) queda reemplazado.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-grafico-glucosa-espacio`).
+
+#### UX-38 — El gráfico de borde a borde, sin la tarjeta a los costados
+
+- **Pantallas y capturas**: `/glucose`. `scripts/ux-screens/out/rev3-antes/43-glucosa.png`, `scripts/ux-screens/out/rev3-antes-max-oscuro/43-glucosa.png`.
+- **Qué se observa**: entre el borde de la pantalla y el eje hay 16 de margen de la página, 1 de borde y 16 de relleno de la tarjeta, más los rótulos: la zona de la línea usa el 72 % del ancho. A y C llegan a ~84 %.
+- **Por qué importa**: "en pantallas angostas, maximizar el ancho de la zona del gráfico" ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)). Cada pt de ancho es más precisión del dedo: en 24 h, hoy ~12 pt por hora; con la propuesta, ~14.
+- **Propuesta**:
+  1. El contenedor del gráfico deja de usar `card` y pasa a un **panel de borde a borde**: `-mx-4 flex flex-1 flex-col border-y border-line bg-surface pt-1 pb-3` (sin bordes a los costados, sin esquinas redondeadas, sin sombra). El renglón de la lectura tocada y la leyenda llevan `px-4`, alineados con el resto de la página; el dibujo ocupa todo el ancho de la pantalla.
+  2. Dentro del dibujo, **`LEFT = 44`**: los rótulos del eje terminan en x = 38, así "300" empieza a ~16 px del borde, alineado con el margen de la página; **`RIGHT = 16`**: "ahora" y el punto de ahora terminan donde termina el texto de arriba.
+  3. **Se mantiene el fondo `surface`** (blanco en claro), no el `paper` de la página: los contrastes de la franja de UX-34 se calcularon sobre `surface`. Sobre `paper` claro (`#FAF6EF`), calculados con la fórmula de WCAG, el relleno `range` bajaría de 1,25:1 a **1,16:1** y los bordes `range-line`, de 4,1:1 a **3,8:1** (siguen sobre el 3:1 de [WCAG 1.4.11](https://www.w3.org/TR/WCAG22/#non-text-contrast), pero la franja se vería menos al sol). Con el panel en `surface`, ningún contraste cambia. En oscuro, el panel (`#221B21`) se separa de la página (`#171216`) como hoy la tarjeta; los bordes de arriba y abajo en `line` son decorativos.
+  4. Lo mismo para `EmptyChart` y la forma de carga (UX-37, punto 6).
+  5. Descarto los rótulos adentro y a la derecha, como C: ganan ~25 pt de ancho, pero quedan encima de la línea justo donde termina (lo más mirado), y el eje a la izquierda es lo que hacen A y B.
+- **Prioridad**: Uso diario. **Esfuerzo**: S (con UX-37 se hace en el mismo cambio).
+- **Depende de**: los px de `LEFT` y `RIGHT` suponen el dibujo en px de UX-37; sin UX-37, en unidades del `viewBox`: `LEFT = 40`, `RIGHT = 14`.
+- **Cambia**: spec §6.10 si dice "tarjeta"; nada más.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-grafico-glucosa-espacio`).
+
+#### UX-39 — Un solo renglón arriba: "‹ Inicio", "Glucosa" y el ⓘ
+
+- **Pantallas y capturas**: `/glucose`. `scripts/ux-screens/out/rev3-antes/43-glucosa.png` y la captura del usuario.
+- **Qué se observa**: "‹ Inicio" (44) y "Glucosa ⓘ" a 28 px (~33) ocupan, con sus espacios, unos 90 pt antes del número. El título no agrega nada que el número con "mg/dL" no diga, y compite con él por tamaño.
+- **Por qué importa**: cada elemento de más compite con lo importante ("diseño estético y minimalista", heurística 8 de [NN/g](https://www.nngroup.com/articles/ten-usability-heuristics/)); y en una pantalla de detalle, el título solo dice dónde estás, así que puede ir chico (Refactoring UI: jerarquía por tamaño y peso, no todo en grande). Lo usan A y C.
+- **Propuesta**:
+  1. Un renglón de 44 px (`grid min-h-11 grid-cols-[1fr_auto_1fr] items-center`): a la izquierda, el link **"‹ Inicio"** (`backLink`, igual que hoy); en el centro, **"Glucosa"** como `<h1>` en `font-display text-lg font-semibold` (17 px) con el **ⓘ** pegado (el mismo `InfoTip`, de 44 × 44); a la derecha, vacío.
+  2. Ahorra ~45 pt, que van al gráfico (UX-37).
+  3. Sigue habiendo un `<h1>` y es lo primero que lee VoiceOver después del link; el ⓘ sigue al lado de lo que explica.
+  4. Con la letra del iPhone agrandada, el título puede pasar a dos renglones dentro de su columna: el renglón crece (`min-h-11`, no `h-11`).
+  5. Solo en esta pantalla: las demás pantallas de detalle (alimento, comida) mantienen el título grande, porque ahí el título **es** el contenido (el nombre del alimento).
+- **Prioridad**: Uso diario. **Esfuerzo**: S.
+- **Depende de**: nada.
+- **Cambia**: el punto 1 de UX-28 ("Glucosa", 28 px, en su renglón) y spec §6.10 (encabezado).
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-grafico-glucosa-espacio`).
+
+#### UX-40 — La pestaña Inicio marcada mientras se ve el gráfico
+
+- **Pantallas y capturas**: la captura del usuario (las cuatro pestañas en gris) y `scripts/ux-screens/out/rev3-antes/43-glucosa.png`.
+- **Qué se observa**: en `/glucose` ninguna pestaña está marcada. El gráfico se abre desde Inicio y se vuelve con "‹ Inicio", pero la barra no lo dice. En el resto de la app, una pantalla de detalle marca su pestaña (un alimento marca Alimentos).
+- **Por qué importa**: la persona tiene que saber dónde está ("visibilidad del estado del sistema", [NN/g](https://www.nngroup.com/articles/ten-usability-heuristics/)); y que todas las pantallas de detalle hagan lo mismo (heurística 4, "consistencia").
+- **Propuesta**: en `AppLayout.tsx`, la pestaña Inicio se marca también cuando la ruta empieza con `/glucose`: con la misma píldora `bg-accent-soft text-accent` y el texto en `ink`. Al tocarla, vuelve a Inicio, como hoy. El punto de "comida sin guardar" sigue apareciendo ahí si hay una comida a medio cargar, como hoy fuera de Inicio.
+- **Prioridad**: Pulido. **Esfuerzo**: S.
+- **Depende de**: nada.
+- **Cambia**: nada del spec.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-grafico-glucosa-espacio`).
+
+#### Lo que consideré y no recomiendo
+
+- **Pintar el número del color de su rango** (A y B): el rojo y el ámbar de la app son error y advertencia, y la alarma es trabajo de la app del sensor. La regla de colores sigue (decisiones #106 hizo solo la excepción de la franja).
+- **El número y el gráfico en el mismo bloque** (B): pondría la lectura tocada justo debajo del valor actual, y UX-29 pidió que no se confundan nunca. La separación (selector en el medio, panel aparte) ayuda.
+- **Guías cada 50** (A y B): con el gráfico más alto se leería bien, pero suma cuatro rótulos a los de 70 y 180, y Apple recomienda menos guías cuando se puede tocar para ver el valor ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)). Si después de UX-37 cuesta estimar entre 200 y 300, se puede sumar una guía sin rótulo en 250 y 150.
+- **Sacar el renglón "Tocá la línea…"**: es el lugar reservado de la lectura tocada; sin él, la pantalla salta al tocar.
+- **Un selector liviano como el de C**: ganaría 8 pt, pero sería distinto del control de opciones del resto de la app.
+- **Lo que tienen otras apps y la nuestra no** (el porcentaje del tiempo dentro de la franja, ver varios días): es una función nueva, no un ajuste de esta pantalla; queda como idea para una mejora futura, si el usuario la quiere.
+
+### R.5 Recomendación, en orden
+
+1. **UX-37 + UX-38 juntas** (un solo cambio en `GlucoseChart.tsx` y `GlucoseChartPage.tsx`): el dibujo en px, el bloque que crece entre 260 y 520 px y el panel de borde a borde, con las medidas de arriba. Es lo que resuelve el pedido: en la app instalada del usuario, la zona de la línea pasa de ~227 × 288 a ~340 × 342 pt, y desaparecen los 77 pt vacíos; en Safari, la leyenda vuelve a entrar.
+2. **UX-39**: el encabezado en un renglón (suma ~45 pt al gráfico; las medidas de la tabla ya lo cuentan).
+3. **UX-40**: la pestaña Inicio marcada.
+
+Ciclo: son pantallas y dibujo, sin cálculo ni base: un implementer, sin tester ni reviewer. Tests: no hace falta ninguno nuevo; los de `glucoseChart.test.ts` siguen valiendo porque las funciones ya reciben el ancho y el alto. Después, verificación con `--solo glucosa,glucosa-toque,glucosa-sin-lecturas` en iPhone 15 (claro) y Pro Max (oscuro).
+
+### R.6 Flujos
+
+- **"¿Cómo me fue después de cenar?"**: hoy y con las propuestas, 1 toque (el recuadro de Inicio), 1 toque en "6 h" y 1 toque o arrastre sobre la línea: 3 toques, 1 pantalla. Lo que cambia es la precisión: en 6 h, de ~48 a ~57 pt por hora, y en 24 h, de ~12 a ~14; y en Safari ya no hay que desplazar para ver la leyenda.
+- **"¿Cómo vengo?"**: igual (el número arriba), con la línea casi el doble de grande debajo.
+
+### R.7 A probar en el iPhone
+
+1. **App instalada**: que el panel llegue hasta ~32 pt arriba de la barra de pestañas, sin desplazar y sin hueco; en el iPhone del usuario, que la zona de la línea mida más o menos lo mismo que en las apps de referencia.
+2. **Safari**: que al desplazar (y esconderse las barras) el gráfico **no cambie de tamaño** (por eso `svh`); y que la leyenda se vea sin desplazar en un iPhone 15.
+3. **Que no salte al abrir**: el SVG se dibuja después de medir; confirmar que no se ve un parpadeo.
+4. **Girar el teléfono**: el gráfico queda en 260 px de alto y la pantalla se desplaza; que se recalcule al volver a vertical.
+5. **Arrastrar sobre el gráfico** con el panel de borde a borde: que arrastrar desde el borde izquierdo de la pantalla no active el gesto de volver de iOS (en la app instalada no debería haberlo; en Safari, sí).
+6. **Letra agrandada**: el título del renglón de arriba en dos renglones, sin pisarse con "‹ Inicio".
+7. **Modo oscuro y al sol**: el panel en `surface` contra `paper`, y la franja.
+8. **La pestaña Inicio marcada** en el gráfico, y que al tocarla vuelva a Inicio.
+
+### R.8 Fuentes consultadas
+
+Leídas para esta sección el 2026-11-28:
+
+- **Apple Human Interface Guidelines**: [Charts](https://developer.apple.com/design/human-interface-guidelines/charts) ("in a compact environment, maximize the width of the plot area"; rótulos del eje vertical lo más cortos posible; menos guías y rótulos suaves cuando se puede tocar para ver cada valor; recorrer el gráfico con una línea vertical, como Bolsa) y [Layout](https://developer.apple.com/design/human-interface-guidelines/layout) (la zona segura; armar la pantalla según el espacio disponible, no según el modelo). Leídas en su versión JSON.
+- **WCAG 2.2**: [1.4.11, Non-text Contrast](https://www.w3.org/TR/WCAG22/#non-text-contrast) (3:1 para las partes de un gráfico que hacen falta para entenderlo).
+- **Laws of UX**: [Law of Common Region](https://lawsofux.com/law-of-common-region/).
+- Ya citadas en esta revisión y no releídas: [10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) de Nielsen Norman Group (1, visibilidad del estado; 4, consistencia; 8, diseño minimalista).
+- Citado como marco, sin leerlo: Adam Wathan y Steve Schoger, *Refactoring UI* (jerarquía por tamaño y peso).
+- **Capturas de referencia del usuario** (cuatro, en la app instalada): medidas solo en proporciones. No se copian ni se cita ningún dato.
+
+### R.9 Lo que no se pudo capturar
+
+- **La app instalada**: el script corre en Safari con sus barras. Las medidas de la app instalada salen de la captura del usuario y de las cuentas de R.1 y UX-37 (zona segura de arriba de 62 pt y de abajo de 34, supuestas para ese modelo).
+- La **carga** y **sin lecturas** de esta pantalla (no se pidieron; `glucosa-sin-lecturas` existe en el script como `44`).
+- El **gesto de volver** de iOS al arrastrar desde el borde, la letra agrandada, el sol y el giro del teléfono.
+
+### R.10 Verificación de UX-37 a UX-40 (2026-11-28)
+
+Capturas de antes: `scripts/ux-screens/out/rev3-antes/` (iPhone 15, claro) y `rev3-antes-max-oscuro/` (Pro Max, oscuro). Después: `rev3-despues/`, `rev3-despues-max-oscuro/` (estados `43-glucosa` y `45-glucosa-toque`) y `rev3-despues-sin/44-glucosa-sin-lecturas.png`. Ninguna falló.
+
+| # | Resultado | Dónde se ve |
+|---|---|---|
+| UX-37 | **Cumplida.** En Safari del iPhone 15 el dibujo queda cerca del mínimo (~265 px) y la leyenda entra sin desplazar (antes quedaba tapada); en el Pro Max crece (~330 px). Rótulos a 14 px, punto de ahora más grande, punto tocado bien visible. "Sin lecturas" tiene la misma forma que con datos. | `rev3-despues/43-glucosa.png`, `rev3-despues-max-oscuro/43-glucosa.png`, `rev3-despues-sin/44-glucosa-sin-lecturas.png` |
+| UX-38 | **Cumplida.** Panel de borde a borde en `surface`, con borde arriba y abajo; "300" alineado con el margen de 16 px; el punto de ahora y "ahora" terminan a 16 px del borde. En oscuro el panel se separa de la página. | `rev3-despues/45-glucosa-toque.png`, `rev3-despues-max-oscuro/45-glucosa-toque.png` |
+| UX-39 | **Cumplida.** Un renglón: "‹ Inicio", "Glucosa" a 17 px centrado y el ⓘ; el número pasa a ser lo más grande de la pantalla. | `rev3-despues/43-glucosa.png` |
+| UX-40 | **Cumplida.** Inicio marcada con la píldora en las tres capturas. | las tres |
+
+Decisiones del implementer, revisadas: 360 × 260 por defecto antes de medir, título a 17 px, encabezado en grilla centrada, íconos de comida desde x = 69 (no pisan "mg/dL"), punto tocado de radio 7, carga con `min-h-86` y los ~32 px de margen de `<main>` debajo del panel: todas bien.
+
+Nada empeoró en lo capturado. Para corregir, opcional:
+
+1. **Pulido**: la franja de ~32 px de `paper` entre el borde de abajo del panel y la barra de pestañas se lee como un resto vacío (es justo lo que motivó el pedido, aunque más chico). Si en la app instalada molesta, el panel puede llegar hasta la barra (descontar ese margen solo en esta pantalla) y perder su borde de abajo. Decidir después de verlo en el iPhone.
+2. **Pulido**: en "sin lecturas", "Volvé en un rato." corta con "en un rato." solo en el segundo renglón; `text-balance` en ese párrafo lo reparte mejor.
+
+A probar en el iPhone: los puntos de R.7, en especial el alto en la app instalada (sin hueco y sin desplazar), que el gráfico no cambie de tamaño al desplazar en Safari y que no parpadee al abrir.
