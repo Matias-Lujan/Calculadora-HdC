@@ -102,7 +102,7 @@ export function FoodsPage() {
                 (open or folded, as it was) when the search is emptied. */}
             {searching ? (
               results.length === 0 ? (
-                <p>{`No hay alimentos que coincidan con «${query.trim()}».`}</p>
+                <p>{`No hay alimentos que coincidan con "${query.trim()}".`}</p>
               ) : (
                 <FoodList foods={results} />
               )
@@ -142,7 +142,7 @@ export function FoodsPage() {
           </button>
         </div>
       ) : (
-        // The search and «Ver todos los alimentos».
+        // The search and "Ver todos los alimentos".
         <LoadingShapes shapes={['h-16', 'h-11 w-64']} />
       )}
     </section>

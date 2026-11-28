@@ -225,17 +225,17 @@ export type MealItemFoodError = Exclude<ItemErrorCode, 'INVALID_QUANTITY'>
 
 const MEAL_ITEM_ERRORS: Record<MealItemFoodError, string> = {
   INVALID_CARBS:
-    'Los HC cada 100 g de este alimento no son válidos. Revisalo en «Mis alimentos».',
+    'Los HC cada 100 g de este alimento no son válidos. Revisalo en "Mis alimentos".',
   MISSING_COOKING_FACTOR:
-    'Falta cuánto rinde al cocinarlo. Cargalo en «Mis alimentos» para usar este alimento.',
+    'Falta cuánto rinde al cocinarlo. Cargalo en "Mis alimentos" para usar este alimento.',
   INVALID_COOKING_FACTOR:
-    'Lo que rinde al cocinarlo no es válido. Revisalo en «Mis alimentos».',
+    'Lo que rinde al cocinarlo no es válido. Revisalo en "Mis alimentos".',
   MISSING_UNIT_WEIGHT:
     'Este alimento no tiene peso por unidad. Cargá la cantidad en gramos.',
   UNITS_NOT_ALLOWED_FOR_RAW_COOKED:
     'Este alimento se carga en gramos cocidos, no en unidades.',
   EFFECTIVE_CARBS_OVER_100:
-    'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en «Mis alimentos» cuánto rinde.',
+    'Con lo que rinde al cocinarlo, este alimento da más de 100 g de HC cada 100 g. Revisá en "Mis alimentos" cuánto rinde.',
 }
 
 export function mealItemErrorMessage(code: MealItemFoodError): string {
@@ -444,7 +444,7 @@ export function mealCopySkipMessage(
   foodName: string,
   reason: MealCopySkipReason,
 ): string {
-  const start = `No se pudo traer «${foodName}»: `
+  const start = `No se pudo traer "${foodName}": `
   switch (reason) {
     case 'NOT_IN_CATALOG':
       return `${start}ya no está en Mis alimentos.`
