@@ -50,7 +50,7 @@ export function ArchiveFoodSection({ food }: Props) {
   return (
     <div className="flex flex-col gap-3 rounded-card border border-danger bg-danger-soft p-4">
       <p>
-        ¿Archivar {food.name}? Deja de aparecer en «Mis alimentos» y no vas a
+        ¿Archivar {food.name}? Deja de aparecer en "Mis alimentos" y no vas a
         poder volver a usarlo. Las comidas ya registradas no cambian.
       </p>
       {archive.isError && (

@@ -83,7 +83,7 @@ describe('foodDetailSentences', () => {
 
   it('eaten cooked with a yield that cannot be shown', () => {
     expect(foodDetailSentences({ ...rice, cooking_factor: 1e307 })).toEqual([
-      'No se puede mostrar cuánto rinde al cocinarlo. Revisalo con «Editar».',
+      'No se puede mostrar cuánto rinde al cocinarlo. Revisalo con "Editar".',
     ])
   })
 

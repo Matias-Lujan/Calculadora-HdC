@@ -119,7 +119,7 @@ export function FoodSearchSheet({
             <RecentFoods foods={recents} onPick={onPick} />
           ) : noResults ? (
             <div className="flex flex-col gap-3">
-              <p role="status">{`No hay alimentos que coincidan con «${trimmed}».`}</p>
+              <p role="status">{`No hay alimentos que coincidan con "${trimmed}".`}</p>
               <PhotoPickerButton
                 label="Agregar con una foto"
                 variant="secondary"

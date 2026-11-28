@@ -43,7 +43,7 @@ export function foodDetailSentences(
     const yieldText = cookedPer100gText(food.cooking_factor)
     sentences.push(
       yieldText === null
-        ? 'No se puede mostrar cuánto rinde al cocinarlo. Revisalo con «Editar».'
+        ? 'No se puede mostrar cuánto rinde al cocinarlo. Revisalo con "Editar".'
         : `Al cocinarlo, ${yieldText}.`,
     )
   }

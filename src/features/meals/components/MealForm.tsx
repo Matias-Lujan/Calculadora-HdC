@@ -763,7 +763,7 @@ export function MealForm({
               </p>
               {correcting.skipped.length > 0 && (
                 <p>
-                  {`Al guardar, la comida nueva no va a tener: ${correcting.skipped.map((item) => `«${item.foodName}»`).join(', ')}.`}
+                  {`Al guardar, la comida nueva no va a tener: ${correcting.skipped.map((item) => `"${item.foodName}"`).join(', ')}.`}
                 </p>
               )}
               <button
