@@ -7,16 +7,14 @@ import {
   useState,
   type KeyboardEvent,
   type PointerEvent,
+  type Ref,
 } from 'react'
 import {
-  GLUCOSE_CHART_BAND_LEGEND,
-  GLUCOSE_CHART_HINT,
   GLUCOSE_CHART_LABEL,
-  GLUCOSE_CHART_MEAL_LEGEND,
-  chartAtText,
   chartGapText,
   chartMealText,
   chartReadingValueText,
+  clockText,
   isStaleReading,
 } from '../glucose.ts'
 import {
@@ -56,21 +54,30 @@ type Props = {
 
 // The drawing, in real px (UX-37): its box grows with the free height of
 // the screen, between 260 and 520 px, and the viewBox is what it measures,
-// so the text never stretches. Edge to edge (UX-38): the axis labels end at
-// 38, so "300" starts about where the text of the page does, and the plot
-// ends 16 px before the edge. The row on top holds "mg/dL" and the meal
-// icons.
-const LEFT = 44
+// so the text never stretches. Edge to edge (UX-38): the axis labels and
+// "mg/dL" end at 52, right-aligned (UX-43), so "mg/dL" (about 36 px wide
+// at 13 px) starts about where the text of the page does, and the plot
+// ends 16 px before the edge. The row on top (40 px, UX-46) holds "mg/dL",
+// the meal icons and, after a tap, the bubble of the picked reading.
+const LEFT = 58
 const RIGHT = 16
-const TOP = 30
+const TOP = 40
 const BOTTOM = 26
-const FONT = 14
-const UNIT_X = 16
-const ICON_Y = 13
+const FONT = 13
+const ICON_Y = 20
 const ICON_R = 11
 const ICON_SIZE = 14
-// The meal icons start after "mg/dL" (about 38 px wide), not over it.
-const ICON_MIN_X = UNIT_X + 42 + ICON_R
+// The bubble goes from 4 to 36 px; the line of the pick starts under it.
+const BUBBLE_BOTTOM = 36
+// A guide closer than this to 70 or 180 keeps its line, not its number
+// (UX-44): 11 px of air with 13 px text, so they read as two.
+const LABEL_CLEARANCE = 24
+// The bubble keeps this far from the sides of the drawing.
+const BUBBLE_EDGE = 8
+// A meal icon closer than this to the bubble is hidden while it shows.
+const BUBBLE_AIR = 4
+
+type BubbleSpan = { left: number; width: number }
 
 type BoxSize = { width: number; height: number }
 
@@ -126,14 +133,14 @@ const KEY_STEPS: Record<string, number> = {
  * The glucose of the chosen period (spec §6.10), drawn by hand in SVG.
  * Only props, so it can go on any screen; the picked reading is its own
  * state. A light green band from 70 to 180 mg/dL, the same for everybody,
- * with its own color (not the green of "guardado"); guides at 100, 200,
- * 300; the line, cut where readings are missing; the point of now and the
- * lowest and highest values; and a mark with a fork and knife at each
- * meal, without carbs nor dose. Touching or dragging over it shows the
- * closest reading and its time (UX-29); for VoiceOver and the keyboard it
- * is adjustable, one reading at a time. It fills the width and the height
- * of its container (a flex column): made for a panel from edge to edge, so
- * the texts above and below take the 16 px of the page themselves.
+ * with its own color (not the green of "guardado"); guides every 50 from
+ * 100 (UX-44); the line, cut where readings are missing; the point of now
+ * and the lowest and highest values; and a mark with a fork and knife at
+ * each meal, without carbs nor dose. Touching or dragging over it shows
+ * the closest reading and its time in a bubble on top, joined to the
+ * vertical line (UX-29, UX-46); for VoiceOver and the keyboard it is
+ * adjustable, one reading at a time. It fills the width and the height of
+ * its container (a flex column): made for a panel from edge to edge.
  */
 export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const [picked, setPicked] = useState<number | null>(null)
@@ -172,11 +179,12 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const y = (mgdl: number) => TOP + chartY(mgdl, top, plotH)
   const bandTop = y(BAND_HIGH_MGDL)
   const bandBottom = y(BAND_LOW_MGDL)
+  // Inside the plot, like everything else of the drawing (UX-51).
   const icons = spreadMarks(
     marks.map(x),
     ICON_R + 1,
-    ICON_MIN_X,
-    box.width - RIGHT,
+    LEFT + ICON_R,
+    LEFT + plotW - ICON_R,
   )
   const description = chartDescription(points, marks.length, windowMs)
 
@@ -184,6 +192,41 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const pickTime =
     pick === null ? null : pick.kind === 'reading' ? pick.point.time : picked
   const meal = pickTime === null ? null : mealNear(marks, pickTime)
+  const pickX = pickTime === null ? null : x(pickTime)
+
+  // The bubble, centered on the line of the pick but inside the drawing.
+  // Placed before the paint each time what it shows or where it goes
+  // changes, so it does not jump when its width changes ("Sin lecturas
+  // entre…" is longer than a value).
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  // Where the bubble is, so the meal icons and "mg/dL" under it step aside.
+  const [bubbleSpan, setBubbleSpan] = useState<BubbleSpan | null>(null)
+  useLayoutEffect(() => {
+    const bubble = bubbleRef.current
+    if (bubble === null || pickX === null) return
+    const width = bubble.offsetWidth
+    const left = Math.max(
+      BUBBLE_EDGE,
+      Math.min(pickX - width / 2, box.width - BUBBLE_EDGE - width),
+    )
+    bubble.style.left = `${left}px`
+    setBubbleSpan((current) =>
+      current !== null && current.left === left && current.width === width
+        ? current
+        : { left, width },
+    )
+    // `picked`, `meal` and `readings` change what the bubble says, so its
+    // width.
+  }, [pickX, box.width, picked, meal, readings])
+  const span = pick !== null ? bubbleSpan : null
+  // An icon too close to the bubble is not drawn: half covered, it reads
+  // as a broken drawing. Its dashed line stays, from under the bubble.
+  const underBubble = (cx: number) =>
+    span !== null &&
+    cx + ICON_R > span.left - BUBBLE_AIR &&
+    cx - ICON_R < span.left + span.width + BUBBLE_AIR
+  const hiddenIcons = icons.map(underBubble)
+  const unitHidden = span !== null && span.left < LEFT
 
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
     // In px of the drawing: the viewBox is the measured box, so the scale
@@ -232,8 +275,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         )
 
   return (
-    <div ref={rootRef} className="flex flex-1 flex-col gap-2">
-      <PickedReading pick={pick} meal={meal} />
+    <div ref={rootRef} className="flex flex-1 flex-col">
       {/* Only the drawing grows, between 260 and 520 px (UX-37). */}
       <div
         ref={boxRef}
@@ -289,21 +331,25 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             />
           ))}
 
-          <text
-            x={UNIT_X}
-            y={ICON_Y}
-            fontSize={FONT}
-            dominantBaseline="middle"
-            className="fill-ink-soft"
-          >
-            mg/dL
-          </text>
+          {/* The label of the column of numbers, right-aligned with them. */}
+          {unitHidden ? null : (
+            <text
+              x={LEFT - 6}
+              y={ICON_Y}
+              fontSize={FONT}
+              textAnchor="end"
+              dominantBaseline="middle"
+              className="fill-ink-soft"
+            >
+              mg/dL
+            </text>
+          )}
           {chartGuides(top).map((mgdl) => {
             const at = y(mgdl)
             // A guide too close to 70 or 180 keeps its line, not its label.
             const labeled =
-              Math.abs(at - bandTop) >= FONT &&
-              Math.abs(at - bandBottom) >= FONT
+              Math.abs(at - bandTop) >= LABEL_CLEARANCE &&
+              Math.abs(at - bandBottom) >= LABEL_CLEARANCE
             return (
               <g key={mgdl}>
                 <line
@@ -353,14 +399,15 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               </g>
             )
           })}
+          {/* The time of now (UX-45): "ahora" is already said above. */}
           <text
             x={LEFT + plotW}
             y={box.height - 7}
             fontSize={FONT}
             textAnchor="end"
-            className="fill-ink-soft"
+            className="fill-ink-soft tabular-nums"
           >
-            ahora
+            {clockText(now)}
           </text>
           <line
             x1={LEFT}
@@ -376,31 +423,33 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               key={`${time}-${index}`}
               x1={x(time)}
               x2={x(time)}
-              y1={ICON_Y + ICON_R}
+              y1={hiddenIcons[index] === true ? BUBBLE_BOTTOM : ICON_Y + ICON_R}
               y2={TOP + plotH}
               strokeWidth={1}
               strokeDasharray="3 3"
               className="stroke-line-strong"
             />
           ))}
-          {icons.map((at, index) => (
-            <g key={`${marks[index]}-${index}`}>
-              <circle
-                cx={at}
-                cy={ICON_Y}
-                r={ICON_R}
-                strokeWidth={1}
-                className="fill-accent-soft stroke-surface"
-              />
-              <Utensils
-                x={at - ICON_SIZE / 2}
-                y={ICON_Y - ICON_SIZE / 2}
-                size={ICON_SIZE}
-                strokeWidth={2}
-                className="text-accent"
-              />
-            </g>
-          ))}
+          {icons.map((at, index) =>
+            hiddenIcons[index] === true ? null : (
+              <g key={`${marks[index]}-${index}`}>
+                <circle
+                  cx={at}
+                  cy={ICON_Y}
+                  r={ICON_R}
+                  strokeWidth={1}
+                  className="fill-accent-soft stroke-surface"
+                />
+                <Utensils
+                  x={at - ICON_SIZE / 2}
+                  y={ICON_Y - ICON_SIZE / 2}
+                  size={ICON_SIZE}
+                  strokeWidth={2}
+                  className="text-accent"
+                />
+              </g>
+            ),
+          )}
 
           {bridges.map(({ from, to }) => (
             <line
@@ -484,12 +533,13 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             />
           ) : null}
 
-          {pick !== null && pickTime !== null ? (
+          {pick !== null && pickX !== null ? (
             <g>
+              {/* From the bottom of the bubble to the axis (UX-46). */}
               <line
-                x1={x(pickTime)}
-                x2={x(pickTime)}
-                y1={TOP}
+                x1={pickX}
+                x2={pickX}
+                y1={BUBBLE_BOTTOM}
                 y2={TOP + plotH}
                 strokeWidth={1.5}
                 className="stroke-ink"
@@ -506,11 +556,13 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             </g>
           ) : null}
         </svg>
+        {pick !== null ? (
+          <PickedBubble ref={bubbleRef} pick={pick} meal={meal} />
+        ) : null}
       </div>
       <p id={descriptionId} className="sr-only">
         {description}
       </p>
-      <Legend />
     </div>
   )
 }
@@ -554,71 +606,52 @@ function AxisLabel({ y, strong = false, children }: AxisLabelProps) {
   )
 }
 
-type PickedReadingProps = { pick: ChartPick | null; meal: number | null }
-
-/**
- * The row on top of the chart (44 px, kept so nothing jumps): the picked
- * reading with its time, or a gap, and a meal close to it; without a pick,
- * how to use the chart. Never confused with the current value: it always
- * says its time.
- */
-function PickedReading({ pick, meal }: PickedReadingProps) {
-  const mealText =
-    meal === null ? null : (
-      <span className="text-sm text-ink-soft">· {chartMealText(meal)}</span>
-    )
-  return (
-    <div
-      aria-hidden="true"
-      className="flex min-h-11 flex-wrap items-baseline gap-x-2 px-4"
-    >
-      {pick === null ? (
-        <p className="self-center text-sm text-ink-soft">
-          {GLUCOSE_CHART_HINT}
-        </p>
-      ) : pick.kind === 'reading' ? (
-        <p className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-display text-2xl font-semibold text-ink tabular-nums">
-            {pick.point.mgdl}
-          </span>
-          <span className="text-sm text-ink">mg/dL</span>
-          <span className="text-sm text-ink-soft tabular-nums">
-            · {chartAtText(pick.point.time)}
-          </span>
-          {mealText}
-        </p>
-      ) : (
-        <p className="flex flex-wrap items-baseline gap-x-2 self-center">
-          <span className="text-base text-ink">
-            {chartGapText(pick.before?.time ?? null, pick.after?.time ?? null)}
-          </span>
-          {mealText}
-        </p>
-      )}
-    </div>
-  )
+type PickedBubbleProps = {
+  ref: Ref<HTMLDivElement>
+  pick: ChartPick
+  meal: number | null
 }
 
-/** What the band and the icons are, in sight (UX-34). */
-function Legend() {
+/**
+ * The picked reading with its time, or a gap, and a meal close to it, in a
+ * bubble on top of the drawing (UX-46), joined to the vertical line. HTML,
+ * so it grows with the letter size; it takes two lines if it has to,
+ * growing down over the drawing without moving anything. Dark on the
+ * light chart, so it is never confused with the current value above.
+ * Hidden from VoiceOver: the slider already says the same.
+ */
+function PickedBubble({ ref, pick, meal }: PickedBubbleProps) {
   return (
-    <p className="flex flex-wrap gap-x-4 gap-y-1 px-4 text-xs text-ink-soft">
-      <span className="flex items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className="inline-block h-3 w-4 rounded-xs border border-range-line bg-range"
-        />
-        {GLUCOSE_CHART_BAND_LEGEND}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span
-          aria-hidden="true"
-          className="flex size-5 items-center justify-center rounded-full bg-accent-soft text-accent"
-        >
-          <Utensils className="size-3" strokeWidth={2} />
+    <div
+      ref={ref}
+      aria-hidden="true"
+      className="pointer-events-none absolute top-1 z-10 flex min-h-8 w-max max-w-[calc(100%-16px)] flex-wrap items-baseline gap-x-1.5 rounded-full bg-ink px-3 py-1 text-surface shadow-level-1"
+    >
+      {pick.kind === 'reading' ? (
+        <>
+          <span className="font-display text-base font-semibold tabular-nums">
+            {pick.point.mgdl}
+          </span>
+          <span className="text-xs">mg/dL</span>
+          <span className="text-xs tabular-nums">
+            · {clockText(pick.point.time)}
+          </span>
+        </>
+      ) : (
+        <span className="text-xs">
+          {chartGapText(pick.before?.time ?? null, pick.after?.time ?? null)}
         </span>
-        {GLUCOSE_CHART_MEAL_LEGEND}
-      </span>
-    </p>
+      )}
+      {meal !== null ? (
+        <span className="text-xs tabular-nums">
+          ·{' '}
+          <Utensils
+            aria-hidden="true"
+            className="inline size-3.5 align-[-2px]"
+          />{' '}
+          {clockText(meal)}
+        </span>
+      ) : null}
+    </div>
   )
 }

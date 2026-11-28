@@ -520,6 +520,8 @@ Hecho por el implementer, parte 2 (pantalla y gráfico, #100 a #104): `glucoseCh
 
 **Lectura actual guardada (misma rama, 2026-11-28)**: en `prod` se vio que el gráfico de LibreLinkUp llega con 15 a 30 min de atraso y el último tramo nunca quedaba guardado. `glucose-latest` guarda también la lectura actual, como mucho una cada 15 min (`sync.ts`, con tests; #110, spec §9.8). Falta desplegar la función en `dev` y en `prod` antes de mergear (sin migración).
 
+**Revisión de detalle (misma rama, 2026-11-28)**: el `ux-designer` propuso UX-41 a UX-52 (`docs/ux/revision-2.md`, "Revisión de detalle"), seis pedidas por el usuario y el resto delegadas. Hecho, salvo UX-48 (resuelta por #110): el gráfico sin ⓘ ni leyenda, con el título centrado, guías de 50 en 50, textos a 13 px, la hora actual al final del eje, la lectura tocada en un globo arriba del dibujo y el panel hasta la barra de pestañas; el número y "mg/dL" sobre la misma línea; la franja de la curva de Inicio del ancho de la línea; y todos los ⓘ de la app abren un globo encima, sin mover nada (#111 a #113). Falta probarlo en el iPhone (D.5 del informe).
+
 **Terminada cuando**:
 - [ ] El gráfico muestra las últimas 24 h en el iPhone, sin huecos aunque la app haya estado cerrada más de 12 h. Se comprueba en `prod`, con la app instalada, al día siguiente del merge (en `dev` se confirmó el guardado de 12 h, y la tarea quedó apagada para no leer la cuenta real; se prende con `cron.alter_job(..., active := true)`).
 - [x] La tabla tiene RLS probada con `rls-check` y guarda solo 24 h.

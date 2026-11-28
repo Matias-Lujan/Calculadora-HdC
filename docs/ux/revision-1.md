@@ -79,6 +79,7 @@ Los contrastes de las tablas los calculé a mano con la fórmula de WCAG; convie
 | `ink-soft` | `#5F555A` | Texto secundario (marca, ayudas, rótulos) | 6,6:1 sobre `paper`; 7,2:1 sobre `surface`; 6,0:1 sobre `sunken` |
 | `line` | `#E4DCCF` | Línea fina de tarjetas y separadores (decorativa) | — |
 | `line-strong` | `#857A80` | Borde de los campos | 4,1:1 sobre `surface`; 3,8:1 sobre `paper` (pide 3:1) |
+| `line-raised` | `#E4DCCF` | Borde de lo que flota encima, como el globo del ⓘ (agregado en la revisión 2, UX-42; en claro es igual a `line`: la sombra ya lo separa) | decorativa |
 | `accent` | `#5B2A6E` | Berenjena: botón principal, links, pestaña activa | 9,7:1 sobre `paper`; blanco encima: 10,5:1 |
 | `accent-soft` | `#EFE4F2` | Fondo de botones suaves y de la pestaña activa | `accent` encima: 8,5:1 |
 | `display` | `#2B1B33` | Fondo del visor de la dosis | — |
@@ -112,6 +113,7 @@ Reglas de uso:
 | `ink-soft` | `#B9ADB3` | 8,5:1 sobre `paper`; 7,8:1 sobre `surface` |
 | `line` | `#3A3037` | decorativa |
 | `line-strong` | `#8C8087` | 4,9:1 sobre `paper`; 4,5:1 sobre `surface` |
+| `line-raised` | `#6B6066` | 2,8:1 sobre `surface`; 3,1:1 sobre `paper` (en oscuro la sombra no separa lo que flota) |
 | `accent` | `#D9A8E8` | 9,5:1 sobre `paper`; texto `#221B1F` encima: 8,6:1 |
 | `accent-soft` | `#3A2542` | — |
 | `display` | `#2F2038` | `on-display` encima: 14,1:1 |

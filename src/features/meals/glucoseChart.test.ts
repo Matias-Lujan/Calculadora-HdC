@@ -314,10 +314,10 @@ describe('sparklineScale', () => {
 })
 
 describe('chartGuides', () => {
-  it('100, 200 and 300, and one more each 100 the top goes up', () => {
-    expect(chartGuides(300)).toEqual([100, 200, 300])
-    expect(chartGuides(350)).toEqual([100, 200, 300])
-    expect(chartGuides(400)).toEqual([100, 200, 300, 400])
+  it('from 100 to the top, every 50, without 50', () => {
+    expect(chartGuides(300)).toEqual([100, 150, 200, 250, 300])
+    expect(chartGuides(350)).toEqual([100, 150, 200, 250, 300, 350])
+    expect(chartGuides(400)).toEqual([100, 150, 200, 250, 300, 350, 400])
   })
 })
 

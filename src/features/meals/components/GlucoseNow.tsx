@@ -46,9 +46,9 @@ export function GlucoseNow({ reading, now }: Props) {
   const ago = glucoseAgoText(minutes)
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
       <p
-        className={`flex items-center gap-2 ${stale ? 'text-ink-soft' : 'text-ink'}`}
+        className={`flex items-baseline gap-1.5 ${stale ? 'text-ink-soft' : 'text-ink'}`}
       >
         <span className="font-display text-4xl leading-none font-bold tabular-nums">
           {reading.mgdl}
@@ -58,7 +58,7 @@ export function GlucoseNow({ reading, now }: Props) {
           <Arrow
             role="img"
             aria-label={trendLabel(reading.trend)}
-            className="size-7"
+            className="ml-0.5 size-7 self-center"
           />
         ) : null}
       </p>

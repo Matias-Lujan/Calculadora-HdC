@@ -42,7 +42,7 @@ export function FoodDetail({ food }: Props) {
           </span>
         )}
         {isFromTable(food) && (
-          <div className="flex flex-wrap items-center">
+          <div className="flex flex-wrap items-center gap-x-1.5">
             <p className="text-sm text-ink-soft">De la tabla de alimentos</p>
             <InfoTip text={TABLE_VALUE_INFO} />
           </div>
