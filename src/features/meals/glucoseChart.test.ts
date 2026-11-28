@@ -298,8 +298,8 @@ describe('chartX and chartTime with a shorter period', () => {
 
 describe('sparklineScale', () => {
   it('always the whole band, with 10 mg/dL of air', () => {
-    expect(sparklineScale([point(0, 120)])).toEqual({ bottom: 60, top: 190 })
-    expect(sparklineScale([])).toEqual({ bottom: 60, top: 190 })
+    expect(sparklineScale([point(0, 120)])).toEqual({ bottom: 70, top: 180 })
+    expect(sparklineScale([])).toEqual({ bottom: 70, top: 180 })
   })
 
   it('goes beyond the band when a reading does', () => {

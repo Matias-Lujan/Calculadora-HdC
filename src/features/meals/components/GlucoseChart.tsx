@@ -20,6 +20,7 @@ import {
 import {
   BAND_HIGH_MGDL,
   BAND_LOW_MGDL,
+  LOW_MGDL,
   chartBridges,
   chartDescription,
   chartExtremes,
@@ -70,7 +71,7 @@ const FONT = 13
 // The numbers of the lowest and the highest, a step down so they do not
 // compete with the line.
 const EXTREME_FONT = 12
-// 70 and 180, smaller and lighter than the other numbers of the axis (#116).
+// 80 and 170, smaller and lighter than the other numbers of the axis (#116).
 // The light ink at 70 % keeps about 3.4:1 on the light panel and 4.5:1 on
 // the dark one.
 const BAND_FONT = 11
@@ -80,7 +81,7 @@ const ICON_R = 11
 const ICON_SIZE = 14
 // The bubble goes from 4 to 36 px; the line of the pick starts under it.
 const BUBBLE_BOTTOM = 36
-// A guide closer than this to 70 or 180 keeps its line, not its number
+// A guide closer than this to 80 or 170 keeps its line, not its number
 // (UX-44): 11 px of air with 13 px text, so they read as two.
 const LABEL_CLEARANCE = 24
 // The bubble keeps this far from the sides of the drawing.
@@ -146,8 +147,9 @@ const KEY_STEPS: Record<string, number> = {
 /**
  * The glucose of the chosen period (spec §6.10), drawn by hand in SVG.
  * Only props, so it can go on any screen; the picked reading is its own
- * state. A light green band from 70 to 180 mg/dL, the same for everybody,
- * with its own color (not the green of "guardado"); guides every 50 from
+ * state. A light green band from 80 to 170 mg/dL, the same for everybody,
+ * with its own color (not the green of "guardado"); the line red under 70
+ * (#119); guides every 50 from
  * 100 (UX-44); the line, cut where readings are missing; the point of now
  * and the lowest and highest values; and a mark with a fork and knife at
  * each meal, without carbs nor dose. Touching or dragging over it shows
@@ -169,6 +171,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const plotW = box.width - LEFT - RIGHT
   const plotH = box.height - TOP - BOTTOM
   const descriptionId = useId()
+  const clipId = useId()
 
   // Only whether there is a pick: a drag changes it every frame.
   const hasPick = picked !== null
@@ -202,6 +205,10 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
   const y = (mgdl: number) => TOP + chartY(mgdl, top, plotH)
   const bandTop = y(BAND_HIGH_MGDL)
   const bandBottom = y(BAND_LOW_MGDL)
+  // Under 70 the line goes red (#119): drawn twice, each cut at 70.
+  const lowY = y(LOW_MGDL)
+  const pointFill = (mgdl: number) =>
+    mgdl < LOW_MGDL ? 'fill-glucose-low' : 'fill-accent'
   // Inside the plot, like everything else of the drawing (UX-51).
   const icons = spreadMarks(
     marks.map(x),
@@ -446,7 +453,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
           )}
           {chartGuides(top).map((mgdl) => {
             const at = y(mgdl)
-            // A guide too close to 70 or 180 keeps its line, not its label.
+            // A guide too close to 80 or 170 keeps its line, not its label.
             const labeled =
               Math.abs(at - bandTop) >= LABEL_CLEARANCE &&
               Math.abs(at - bandBottom) >= LABEL_CLEARANCE
@@ -582,6 +589,43 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
             />
           ))}
 
+          <defs>
+            <clipPath id={`${clipId}-above`}>
+              <rect x={0} y={0} width={box.width} height={lowY} />
+            </clipPath>
+            <clipPath id={`${clipId}-below`}>
+              <rect
+                x={0}
+                y={lowY}
+                width={box.width}
+                height={Math.max(0, box.height - lowY)}
+              />
+            </clipPath>
+          </defs>
+          {(['above', 'below'] as const).map((side) => (
+            <g key={side} clipPath={`url(#${clipId}-${side})`}>
+              {segments.map((segment) =>
+                segment.length < 2 ? null : (
+                  <path
+                    key={segment[0]?.time}
+                    d={monotonePath(
+                      segment.map((point) => ({
+                        x: x(point.time),
+                        y: y(point.mgdl),
+                      })),
+                    )}
+                    fill="none"
+                    strokeWidth={3}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    className={
+                      side === 'above' ? 'stroke-accent' : 'stroke-glucose-low'
+                    }
+                  />
+                ),
+              )}
+            </g>
+          ))}
           {segments.map((segment) =>
             segment.length === 1 && segment[0] !== undefined ? (
               <circle
@@ -589,24 +633,9 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                 cx={x(segment[0].time)}
                 cy={y(segment[0].mgdl)}
                 r={2.5}
-                className="fill-accent"
+                className={pointFill(segment[0].mgdl)}
               />
-            ) : (
-              <path
-                key={segment[0]?.time}
-                d={monotonePath(
-                  segment.map((point) => ({
-                    x: x(point.time),
-                    y: y(point.mgdl),
-                  })),
-                )}
-                fill="none"
-                strokeWidth={3}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                className="stroke-accent"
-              />
-            ),
+            ) : null,
           )}
 
           {extremeLabels.map(({ point, above }) => {
@@ -622,7 +651,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                   cx={x(point.time)}
                   cy={at}
                   r={2.5}
-                  className="fill-accent"
+                  className={pointFill(point.mgdl)}
                 />
                 <text
                   x={Math.min(
@@ -649,7 +678,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
               className={
                 lastStale
                   ? 'fill-surface stroke-ink-soft'
-                  : 'fill-accent stroke-surface'
+                  : `${pointFill(last.mgdl)} stroke-surface`
               }
             />
           ) : null}
@@ -671,7 +700,7 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
                   cy={pickY}
                   r={7}
                   strokeWidth={2}
-                  className="fill-accent stroke-surface"
+                  className={`${pickY > lowY ? 'fill-glucose-low' : 'fill-accent'} stroke-surface`}
                 />
               ) : null}
             </g>
@@ -715,7 +744,7 @@ type AxisLabelProps = { y: number; children: number; soft?: boolean }
 
 /**
  * A value on the left of the chart, left-aligned with "mg/dL". `soft`, for
- * 70 and 180 (#116): smaller and lighter, so the band does not shout.
+ * 80 and 170 (#116): smaller and lighter, so the band does not shout.
  */
 function AxisLabel({ y, children, soft = false }: AxisLabelProps) {
   return (
