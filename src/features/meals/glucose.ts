@@ -73,10 +73,6 @@ export function glucoseRetryText(retryAt: string): string | null {
 
 export const GLUCOSE_CHART_TITLE = 'Glucosa'
 
-/** The ⓘ of the chart: the band and the meals are in the legend (UX-34). */
-export const GLUCOSE_CHART_INFO =
-  'Las lecturas de tu sensor, para tenerlas a mano. No cambian la dosis.'
-
 export const GLUCOSE_CHART_EMPTY_TEXT = 'Todavía no hay lecturas guardadas.'
 
 /** Under the empty text, without readings in the 24 hours (UX-36). */
@@ -102,13 +98,6 @@ export function chartPeriodText(hours: number): {
 /** The name of the selector, for screen readers. */
 export const GLUCOSE_CHART_PERIODS_LABEL = 'Horas a mostrar'
 
-/** Above the chart, while no reading is picked (UX-29). */
-export const GLUCOSE_CHART_HINT = 'Tocá la línea para ver cada lectura.'
-
-/** The legend under the chart (UX-34). */
-export const GLUCOSE_CHART_BAND_LEGEND = 'De 70 a 180 mg/dL'
-export const GLUCOSE_CHART_MEAL_LEGEND = 'Comida guardada'
-
 /** The name of the chart for screen readers (it is adjustable, UX-29). */
 export const GLUCOSE_CHART_LABEL = 'Lecturas de glucosa'
 
@@ -120,14 +109,12 @@ const clock = new Intl.DateTimeFormat('es-AR', {
   hourCycle: 'h23',
 })
 
-/** "16:40", in Buenos Aires time. */
+/**
+ * "16:40", in Buenos Aires time: the time of a picked reading (UX-46) and
+ * the time of now at the end of the axis (UX-45).
+ */
 export function clockText(time: number): string {
   return clock.format(time)
-}
-
-/** "a las 16:40", after the value picked on the chart. */
-export function chartAtText(time: number): string {
-  return `a las ${clockText(time)}`
 }
 
 /**

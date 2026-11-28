@@ -576,3 +576,297 @@ Nada empeoró en lo capturado. Para corregir, opcional:
 2. **Pulido**: en "sin lecturas", "Volvé en un rato." corta con "en un rato." solo en el segundo renglón; `text-balance` en ese párrafo lo reparte mejor.
 
 A probar en el iPhone: los puntos de R.7, en especial el alto en la app instalada (sin hueco y sin desplazar), que el gráfico no cambie de tamaño al desplazar en Safari y que no parpadee al abrir.
+
+## Revisión de detalle (2026-11-28)
+
+- **Rama**: `mejora-grafico-glucosa-espacio` (PR #31, con UX-37 a UX-40 hechas). **Alcance**: la pantalla del gráfico (`/glucose`: `pages/GlucoseChartPage.tsx`, `components/GlucoseChart.tsx`, `glucoseChart.ts`, `glucose.ts`), el valor actual que comparte con Inicio (`components/GlucoseNow.tsx`), el recuadro de Inicio (`components/GlucoseCard.tsx`, `components/GlucoseSparkline.tsx`) y el ⓘ (`src/components/InfoTip.tsx`).
+- **Pedido**: el usuario ve, en la app instalada (modo oscuro), seis cosas que quiere cambiar (las marco **"pedida por el usuario"**) y pidió una pasada de detalle completa, delegando el resto (**"delegada por el usuario"**). Todas llevan **"Decisión: se hace"**.
+- **Capturas**: `scripts/ux-screens/out/rev4-antes/` (iPhone 15 Pro Max, 430 × 739, oscuro: `43-glucosa.png` en 24 h y `45-glucosa-toque.png` en 6 h con una lectura tocada) y `scripts/ux-screens/out/rev4-antes-inicio/42-inicio-glucosa.png` (el recuadro de Inicio). Ninguna falló. Más la **captura del usuario** en su iPhone (402 × 874 pt, 3 px por pt, app instalada, 12 h): tiene datos reales, así que acá van solo medidas y posiciones, ningún valor ni hora.
+- **Medidas**: en px de CSS (= pt de iOS). Los tamaños de letra de la app son tokens de `src/index.css`: `text-xs` 13 px, `text-sm` 15, `text-base` 17, `text-lg` 18, `text-2xl` 24.
+
+### D.1 Lo que se ve, elemento por elemento
+
+En la captura del usuario y en las de `rev4-antes`, de arriba abajo:
+
+1. **Renglón de arriba.** "Glucosa" no está centrado en la pantalla: la grilla `1fr auto auto 1fr` centra el par título + ⓘ, así que el título queda corrido ~14 px a la izquierda del centro (en `rev4-antes/43-glucosa.png`, su centro cae en ~201 de 430; lo mismo en la captura del usuario). Al tocar el ⓘ, la explicación entra como un renglón a todo el ancho y **empuja toda la pantalla** ~50 pt hacia abajo (lo que vio el usuario).
+2. **Valor actual.** El número (36 px) y "mg/dL" (17 px) están centrados en vertical, no sobre la misma línea base: "mg/dL" flota a media altura del número (en la captura del usuario, su base queda ~7 pt arriba de la del número). Salud y Acciones apoyan la unidad en la base del número. A la derecha, "ahora" o "hace 3 min", también centrado.
+3. **Selector**: bien. Sin cambios.
+4. **Renglón "Tocá la línea para ver cada lectura."**: 44 px fijos + 8 de separación arriba del dibujo, para algo que no hace falta explicar (tocar un gráfico es lo que se hace en cualquier app); es el que el usuario quiere sacar. También es el lugar reservado de la lectura tocada (UX-29).
+5. **"mg/dL" del eje**: empieza en x = 16 (el margen) y mide ~38 px, mientras que los números del eje están alineados a la derecha y terminan en x = 38. La unidad sobresale ~18 px a la derecha de la columna: no está alineada con nada de lo que tiene abajo. Además va a 14 px, igual que los números, sin diferencia de jerarquía.
+6. **Rótulos del eje a 14 px**: 14 no está en la escala de la app (13, 15, 17…). Es un valor suelto.
+7. **Escala**: guías en 100, 200 y 300, más 70 y 180 de la franja. Los intervalos no son parejos a la vista (70, 100, 180, 200, 300) y "200" queda pegado a "180" (~22 pt entre centros en el iPhone del usuario): se leen como un par.
+8. **El punto de ahora, separado de la línea**: **confirmado**. En la captura del usuario, la línea termina ~18 pt antes del punto y más abajo; el punto queda flotando en el borde derecho. No es un error de dibujo: entre la última lectura guardada y la lectura en vivo pasaron más de 30 minutos, así que la regla de #101 corta la línea y la lectura en vivo queda sola (su puntito de 2,5 queda tapado por el punto grande). Va a pasar seguido, no por un hueco real del sensor: las lecturas se guardan **a lo sumo cada 15 min** y LibreLinkUp da el gráfico de a una lectura cada ~15 min (spec §9.8), así que la última guardada puede tener bastante más de 15 minutos cuando la en vivo es de recién.
+9. **Final del eje de las horas**: "ahora", que repite el "ahora" del valor actual de arriba (en la captura del usuario se leen dos "ahora" en la misma pantalla) y no dice la hora, que es lo que uno busca en un eje de horas.
+10. **Íconos de comida**: el último se corre hasta `box.width − RIGHT` como **centro** (`spreadMarks(…, box.width - RIGHT)`), así que su círculo de radio 11 pasa 11 px el borde derecho del dibujo (se ve en `rev4-antes/43-glucosa.png`, arriba a la derecha: dos íconos que llegan casi al borde de la pantalla).
+11. **Leyenda** ("De 70 a 180 mg/dL" y "Comida guardada"): repite lo que ya dicen los rótulos "70" y "180" en seminegrita sobre los bordes de la franja, y el ícono de cubiertos es el mismo de la pestaña Inicio, que la persona ve todos los días. Ocupa ~26 px (8 de separación y ~18 de texto).
+12. **Abajo del panel**: entre el borde de abajo del panel y la barra de pestañas quedan ~33 pt del fondo de la página (`paper`), una franja vacía de otro color (lo que la verificación R.10 dejó para "decidir después de verlo en el iPhone": se ve, y molesta).
+13. **Recuadro de Inicio** (`rev4-antes-inicio/42-inicio-glucosa.png`): el ⓘ también abre su explicación como un renglón dentro de la tarjeta y empuja todo Inicio; el número y "mg/dL" tienen el mismo problema de línea base (punto 2); la franja de la curva chica va de borde a borde (0 a 96) pero la línea va de 4 a 92, así que la franja "se pasa" 4 px de cada lado y se lee como un rectángulo pegado atrás.
+
+Cómo lo resuelven las apps de Apple: **Salud** pone la unidad junto al número del encabezado, no repite leyendas obvias, y al tocar el gráfico muestra el valor y la hora en un **globo arriba del dibujo**, unido por la línea vertical a lo que se tocó; **Acciones** recorre el gráfico con una línea vertical y escribe horas reales en los rótulos. Las dos usan intervalos redondos en el eje. Lo que tomo: el globo unido a la línea (Salud), la hora real (Acciones), los intervalos parejos (las dos). Lo que no: el eje a la derecha (ya descartado en UX-38) ni reemplazar el valor actual por el tocado (UX-29: nunca se confunden).
+
+### D.2 Propuestas
+
+| # | Propuesta | Prioridad | Esfuerzo | Decisión |
+|---|---|---|---|---|
+| UX-41 | Sin ⓘ en el gráfico, y el título centrado | Uso diario | S | Se hace (pedida por el usuario). Hecha |
+| UX-42 | El ⓘ de toda la app abre un globo encima, sin mover nada | Uso diario | M | Se hace (delegada por el usuario). Hecha |
+| UX-43 | "mg/dL" alineado con la columna de números, y el eje a 13 px | Pulido | S | Se hace (pedida por el usuario). Hecha |
+| UX-44 | La escala de 50 en 50 | Uso diario | S | Se hace (pedida por el usuario). Hecha |
+| UX-45 | La hora real al final del eje, en lugar de "ahora" | Pulido | S | Se hace (pedida por el usuario). Hecha |
+| UX-46 | Sin "Tocá la línea…": la lectura tocada en un globo arriba del dibujo | Uso diario | M | Se hace (pedida por el usuario). Hecha |
+| UX-47 | Sin leyenda | Pulido | S | Se hace (delegada por el usuario, a partir del pedido). Hecha |
+| UX-48 | La última lectura nunca queda suelta: unida con puntos | Uso diario | S | No se hace (resuelto por #110) |
+| UX-49 | El panel llega hasta la barra de pestañas | Pulido | S | Se hace (delegada por el usuario). Hecha |
+| UX-50 | El número y "mg/dL" sobre la misma línea base | Pulido | S | Se hace (delegada por el usuario). Hecha |
+| UX-51 | Los íconos de comida no pasan el borde del dibujo | Pulido | S | Se hace (delegada por el usuario). Hecha |
+| UX-52 | La curva de Inicio: la franja del ancho de la línea | Pulido | S | Se hace (delegada por el usuario). Hecha |
+
+Por prioridad: 0 de Seguridad, 5 de Uso diario, 0 de Identidad y 7 de Pulido. Ninguna toca el cálculo ni la dosis; la glucosa sigue sin entrar al cálculo (regla 7) y nada va en `src/domain/` (es dibujo, como dice #105). Se mantienen la franja con `range` y `range-line`, los 44 px de lo que se toca, los textos sin jerga y `GlucoseChart` como componente que recibe todo por props (sus props no cambian).
+
+**Cuánto gana el dibujo** (UX-46, UX-47 y UX-49 juntas): dentro del panel, hoy van 4 de relleno + 44 del renglón + 8 + el dibujo + 8 + ~18 de leyenda + 12 de relleno (el dibujo + 94); con las propuestas, 12 + el dibujo + 8 (el dibujo + 20): **+74 px**. Más los ~32 de UX-49: **~+106 px de alto para el dibujo**; la franja de arriba del dibujo crece 10 (UX-46), así que la zona de la línea gana **~96 px**: en el iPhone del usuario, de ~294 a ~390 pt de alto (con el tope de 520 px del dibujo de #109). El ancho pierde 14 px (UX-43).
+
+#### UX-41 — Sin ⓘ en el gráfico, y el título centrado
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario; `scripts/ux-screens/out/rev4-antes/43-glucosa.png`.
+- **Qué se observa**: D.1, punto 1: la explicación empuja la pantalla y el ⓘ descentra el título.
+- **Por qué importa**: lo que se abre no tiene que mover lo que se está mirando; y la explicación no agrega nada en esta pantalla: se llega desde el recuadro de Inicio, que ya tiene su ⓘ con "No cambia la dosis.". Cada elemento de más compite con lo importante (heurística 8 de [NN/g](https://www.nngroup.com/articles/ten-usability-heuristics/)).
+- **Propuesta** (elijo sacarlo, no el globo, en esta pantalla):
+  1. En `GlucoseChartPage.tsx`, se borra `<InfoTip text={GLUCOSE_CHART_INFO} />` y su import. La grilla del renglón pasa de `grid-cols-[1fr_auto_auto_1fr]` a **`grid-cols-[1fr_auto_1fr]`** y se borra `[&>p]:col-span-full`. "Glucosa" queda centrado exacto en la pantalla.
+  2. En `glucose.ts` se borra `GLUCOSE_CHART_INFO` (y su caso en `src/plainWords.test.ts`).
+  3. El comentario del renglón ("with its ⓘ…") se actualiza.
+- **Prioridad**: Uso diario. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: spec §6.10, primer punto (se borran "con un ⓘ: …" y "La explicación del ⓘ se abre debajo, a todo el ancho").
+- **Decisión: se hace (pedida por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-42 — El ⓘ de toda la app abre un globo encima, sin mover nada
+
+- **Pantallas y capturas**: el recuadro de Inicio (`scripts/ux-screens/out/rev4-antes-inicio/42-inicio-glucosa.png`) y los otros lugares con ⓘ (`FoodDetail`, `FoodForm`, `FormControls`, `MealItemCard`, `SettingsForm`).
+- **Qué se observa**: `InfoTip` muestra la explicación como un párrafo a todo el ancho debajo del rótulo (`basis-full`): en Inicio, la tarjeta de glucosa crece y baja "¿Qué vas a comer?" y todo lo demás; en un formulario, baja los campos que siguen. Es el mismo problema que el usuario vio en el gráfico.
+- **Por qué importa**: una explicación es un dato de paso; si mueve la pantalla, la persona pierde dónde estaba y, en Inicio, el lugar de lo que iba a tocar. Un globo (una burbuja que se abre encima del contenido, apuntando a lo que explica) no cambia nada de lugar y se cierra solo.
+- **Propuesta** (un cambio en `src/components/InfoTip.tsx`, que vale para todos los ⓘ):
+  1. **Con el `popover` del navegador** (Safari 17 o más nuevo): el botón lleva `popoverTarget={id}` y el texto va en `<div id={id} popover="auto">`, **justo después del botón** en el HTML (así VoiceOver lo lee al deslizar al siguiente). El navegador se encarga de abrirlo y cerrarlo con el mismo ⓘ, de cerrarlo al tocar afuera o con Escape, y lo pinta encima de todo (en la "capa superior", sin que lo recorte ni lo afecte una tarjeta). Sin dependencias nuevas.
+  2. **El botón** queda igual: el ícono de 20 px en `text-ink-soft`, el área de toque de 44 × 44 (el `before:-inset-3`) y `aria-label="Más información"`. `aria-expanded` sigue el evento `toggle` del globo (`onToggle` → estado `open`).
+  3. **Dónde aparece**: al abrirse (`toggle` con `newState === 'open'`), se mide el ícono (`getBoundingClientRect`) y el globo (su ancho `w` y alto `h`), y se ubica con `position: fixed`:
+     - `left = clamp(16, centroDelÍcono − w / 2, anchoDeLaPantalla − 16 − w)`;
+     - `top = abajoDelÍcono + 10`; si no entra arriba de la barra de pestañas (`top + h > innerHeight − 96 − zona segura de abajo`), va arriba: `top = arribaDelÍcono − 10 − h`.
+     - Se cierra (`hidePopover()`) si la página se desplaza (un `scroll` en `window`, con `{ passive: true }`), porque con `fixed` no seguiría al ícono.
+  4. **Cómo se ve**: `m-0 w-max max-w-[min(20rem,calc(100vw-32px))] rounded-control border border-line bg-surface px-3 py-2 text-sm text-ink shadow-level-2` (15 px, el mismo tamaño que hoy, ahora en `ink` porque es lo único que se lee en ese momento). Una **puntita** de 10 × 10 px que señala el ícono: un cuadrado rotado 45° con el mismo fondo y el borde en sus dos lados de afuera, en `left: calc(var(--tip-x) - 5px)` (con `--tip-x` = centro del ícono − `left` del globo), arriba del globo o abajo según dónde se abrió. Aparece con el `enter` de la app (`motion-safe:animate-enter`; nada con "Reducir movimiento").
+  5. **Contraste**: `ink` sobre `surface`, ~16:1 en claro y ~14:1 en oscuro; el borde `line` y la sombra `level-2` lo separan de una tarjeta del mismo color.
+  6. Se borra `basis-full` y se reescribe el comentario del componente ("No hover, popover or portal…"): ahora es un globo, sin hover y con el dedo.
+  7. En la tarjeta de Inicio (`GlucoseCard`), el ⓘ queda donde está, encima del link estirado; el globo no es parte del link, así que tocarlo no abre el gráfico.
+- **Prioridad**: Uso diario. **Esfuerzo**: M (un componente, pero varios lugares que verificar).
+- **Depende de**: nada. Con UX-41, el gráfico ya no tiene ⓘ.
+- **Cambia**: la forma del ⓘ de UX-24 (revisión 1) y de decisiones #48 (el ⓘ sigue, con los mismos textos); spec §6.9 (el ⓘ del recuadro "se abre en un globo encima") y cualquier otra sección del spec que diga que la explicación "se abre debajo". Una fila nueva en `docs/decisiones.md`.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`). En la verificación, capturar también los estados con ⓘ de alimentos, comida y configuración.
+
+#### UX-43 — "mg/dL" alineado con la columna de números, y el eje a 13 px
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario; `rev4-antes/43-glucosa.png`.
+- **Qué se observa**: D.1, puntos 5 y 6.
+- **Por qué importa**: una columna de números alineados a la derecha tiene un solo borde que manda, el derecho; la unidad es el rótulo de esa columna y tiene que terminar en el mismo lugar. Apple pide rótulos del eje vertical cortos, y rótulos suaves cuando se puede tocar el gráfico para ver cada valor ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)); y los tamaños de una pantalla salen de una escala, sin valores sueltos (*Refactoring UI*).
+- **Propuesta** (en `GlucoseChart.tsx`):
+  1. **Todos los textos del dibujo pasan de 14 a 13 px** (`FONT = 13`, el `text-xs` de la app): números del eje, horas, la hora del final (UX-45) y los números del más bajo y el más alto.
+  2. **"mg/dL" va alineado a la derecha, con los números**: `x = LEFT − 6`, `textAnchor="end"`, `y = ICON_Y` (el centro de la franja de arriba, ver UX-46), `dominantBaseline="middle"`, `fill-ink-soft`, 13 px. Se borra `UNIT_X`.
+  3. **`LEFT` pasa de 44 a 58**: "mg/dL" mide ~36 px a 13 px, así que termina en x = 52 y **empieza a ~16, en el margen de la página**: la columna entera (unidad y números) queda entre el margen y el dibujo. Si en la captura de verificación su borde izquierdo no cae entre 14 y 18 px, se ajusta `LEFT` entre 56 y 60, sin tocar lo demás. Los números ("300", "70") quedan alineados a la derecha en x = 52.
+  4. La zona de la línea pierde 14 px de ancho (en el iPhone del usuario, de ~342 a ~328 pt; ~4 %), que se recuperan de sobra en alto (UX-46, UX-47, UX-49).
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: UX-46 (la franja de arriba, `ICON_Y`).
+- **Cambia**: spec §6.10 ("14 px" → "13 px"; "Arriba de los rótulos, "mg/dL"" → "arriba de los rótulos y alineado a la derecha con ellos"); el punto 4 de UX-37 (`FONT = 14`) y el punto 2 de UX-38 (`LEFT = 44`).
+- **Decisión: se hace (pedida por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-44 — La escala de 50 en 50
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario; `rev4-antes/43-glucosa.png`.
+- **Qué se observa**: D.1, punto 7.
+- **Por qué importa**: Apple pide "secuencias de valores conocidas" en los rótulos, para que se sepa de un vistazo que cada uno es el anterior más un paso fijo ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)). De 50 en 50 se cuenta sin pensar, y es lo que usan las apps del sensor.
+- **Propuesta**:
+  1. En `glucoseChart.ts`, `chartGuides(top)` devuelve **de 100 al techo, de 50 en 50** (`for (let mgdl = 100; mgdl <= top; mgdl += 50)`). **Sin guía en 50**: el piso de la escala es 40 (#100), así que una guía en 50 quedaría a ~11 px del eje de abajo, como una segunda raya pegada; el 70 de la franja ya marca esa zona. Se actualiza su test en `glucoseChart.test.ts` (techo 300 → `[100, 150, 200, 250, 300]`; 350 → `[…, 300, 350]`) y el comentario ("UX-30, UX-44").
+  2. **Números que no se pisan con 70 y 180**: en `GlucoseChart.tsx`, una guía conserva su número solo si está a **24 px o más** del 70 y del 180 (hoy, a `FONT`); si está más cerca, queda la raya sin número. Con 13 px de letra son 11 px de aire: los dos números se leen como dos, no como un par. En el iPhone del usuario, con UX-46 a UX-49 (~1,5 px por mg/dL), "200" y "150" quedan a ~30 y ~45 px de "180": se ven todos; en el mínimo de 260 px de alto (~0,8 px por mg/dL), "200" pierde el número y conserva la raya.
+  3. Las guías siguen en `stroke-line` (suaves) y el 70 y el 180 en seminegrita, con sus bordes `range-line`. El techo sigue como dice #100 (múltiplo de 50).
+- **Prioridad**: Uso diario. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: spec §6.10 (Escala: "guías … en 100, 150, 200, 250 y 300, y de 50 en 50 si el techo sube; un número a menos de 24 px del 70 o del 180 no se escribe") y el punto de UX-30 sobre las guías. Queda reemplazado lo que la revisión del espacio puso en "Lo que consideré y no recomiendo" (guías cada 50). Fila nueva en `docs/decisiones.md` (amplía #100).
+- **Decisión: se hace (pedida por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-45 — La hora real al final del eje, en lugar de "ahora"
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario (dos "ahora"); `rev4-antes/45-glucosa-toque.png` ("00 h" y "ahora" casi pegados).
+- **Qué se observa**: D.1, punto 9.
+- **Por qué importa**: un rótulo de un eje de horas dice una hora; Acciones escribe horas reales. Y el "ahora" del valor actual ya dice que el final es el presente.
+- **Propuesta**:
+  1. En `GlucoseChart.tsx`, el `<text>` de "ahora" pasa a `{clockText(now)}` (de `glucose.ts`, la misma función de la lectura tocada: "16:40", con dos cifras en la hora y en hora de Argentina), con `tabular-nums`, `fill-ink-soft`, 13 px, `textAnchor="end"` en `x = LEFT + plotW`. Avanza cada 15 s con `useNow`, como el gráfico.
+  2. `CHART_HOUR_CLEARANCE` sigue en **52 px**: "16:40" mide ~33 px a 13 px, y la mitad de "15 h" ~12; quedan ~7 px de aire. Se actualiza el comentario de la constante ("the time of now goes there, about 33 px wide at 13 px").
+  3. Las horas redondas siguen como hoy ("06 h", "15 h"): dos cifras, igual que la hora del final.
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: UX-43 (13 px).
+- **Cambia**: spec §6.10 ("Al final, "ahora"" → "Al final, la hora actual, como "16:40"") y #108 (donde dice que "ahora" va al final del eje).
+- **Decisión: se hace (pedida por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-46 — Sin "Tocá la línea…": la lectura tocada en un globo arriba del dibujo
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario; `rev4-antes/43-glucosa.png` y `rev4-antes/45-glucosa-toque.png`.
+- **Qué se observa**: D.1, punto 4. El renglón ocupa 52 px (44 + 8) siempre, para algo que se usa a veces.
+- **Por qué importa**: la lectura tocada tiene que aparecer sin que nada salte (UX-29), pero no necesita un renglón propio: Salud la muestra en un globo arriba del dibujo, unido por la línea vertical a lo que se tocó. Lo que está unido por una línea se lee como una sola cosa ("los elementos unidos visualmente se perciben más relacionados", [Laws of UX, Uniform Connectedness](https://lawsofux.com/law-of-uniform-connectedness/)). Apple: "no exijas interacción para mostrar información crítica" ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)): lo crítico (el valor actual, la escala, la franja) sigue a la vista; el valor de cada punto es un detalle a pedido.
+- **Propuesta** (en `GlucoseChart.tsx`, `glucose.ts` y `GlucoseChartPage.tsx`):
+  1. **Se borra el renglón**: el componente `PickedReading`, la constante `GLUCOSE_CHART_HINT` y su caso en `plainWords.test.ts`. La raíz del componente pasa de `flex flex-1 flex-col gap-2` a `flex flex-1 flex-col`.
+  2. **La franja de arriba del dibujo crece de 30 a 40 px** (`TOP = 40`, `ICON_Y = 20`): ahí viven "mg/dL", los íconos de comida y, al tocar, el globo.
+  3. **El globo** es HTML (no SVG, para que crezca con el tamaño de letra, como pide #105), dentro del área táctil (que ya es `relative`), encima del SVG:
+     - `<div aria-hidden="true" className="pointer-events-none absolute top-1 z-10 flex min-h-8 max-w-[calc(100%-16px)] flex-wrap items-baseline gap-x-1.5 rounded-full bg-ink px-3 py-1 text-surface shadow-level-1">` (32 px de alto, de y = 4 a 36; queda 4 px arriba de la guía más alta).
+     - **Una lectura**: `<span className="font-display text-base font-semibold tabular-nums">166</span>`, `<span className="text-xs">mg/dL</span>`, `<span className="text-xs tabular-nums">· 16:40</span>` (la hora con `clockText`, sin "a las": el globo es corto). Si hay una comida cerca (#102), se suma `<span className="text-xs tabular-nums">· <Utensils aria-hidden="true" className="inline size-3.5 align-[-2px]" /> 13:05</span>` (el mismo ícono de las marcas del gráfico).
+     - **Un hueco**: `<span className="text-xs">{chartGapText(…)}</span>` ("Sin lecturas entre las 10:15 y las 12:20"), más la comida si hay.
+     - **Dónde**: centrado en la línea vertical, sin salirse del dibujo: `left = clamp(8, x(pickTime) − w / 2, box.width − 8 − w)`, con `w` el ancho del globo medido en un `useLayoutEffect` cada vez que cambia lo tocado (antes de pintar, así no salta). Con letra agrandada puede pasar a dos renglones (`flex-wrap`): crece hacia abajo, encima del dibujo, sin mover nada.
+     - **Colores**: el globo invertido, `bg-ink` y texto `text-surface` (~17:1 en claro, ~14:1 en oscuro), para que no se confunda nunca con el valor actual de arriba (sobre `paper`, a 36 px y sin hora).
+  4. **La línea vertical** de lo tocado arranca en el borde de abajo del globo (`y1 = 36`, no `TOP`) y sigue hasta el eje: globo, línea y punto se leen como una sola cosa. Mientras hay globo, tapa lo que tenga debajo en esa franja ("mg/dL" o un ícono de comida); al tocar afuera, vuelve todo.
+  5. **VoiceOver no cambia**: el globo es `aria-hidden` y lo que se oye sigue saliendo de `aria-valuetext` (con "Comiste a las…").
+  6. **El panel** (`panel` en `GlucoseChartPage.tsx`) pasa de `pt-1 pb-3` a **`pt-3 pb-2`**: 12 px arriba del globo y ~12 debajo del texto de las horas (8 de relleno más los ~4 que quedan bajo la base del texto). `EmptyChart` y `LoadingShapes` pasan de `min-h-86` (344) a **`min-h-70`** (280 = 260 del dibujo + 20 de relleno), así la pantalla tiene la misma forma en los tres casos.
+- **Prioridad**: Uso diario. **Esfuerzo**: M (medir el globo y ubicarlo). **Depende de**: nada; UX-43 usa su `ICON_Y`.
+- **Cambia**: spec §6.10 (Tocar o arrastrar: "en un globo arriba del gráfico, unido a la línea vertical: "132 mg/dL · 16:40"…"; se borra "Sin marca, el renglón dice "Tocá la línea…""); UX-29 (el renglón de 44 px) y la nota de la revisión del espacio que no lo sacaba. Fila nueva en `docs/decisiones.md` (cambia la forma de #105, no su lógica).
+- **Decisión: se hace (pedida por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-47 — Sin leyenda
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario; `rev4-antes/43-glucosa.png`.
+- **Qué se observa**: D.1, punto 11.
+- **Por qué importa**: Apple usa una leyenda para lo que **no** se entiende por la posición, como un color o una forma que separa categorías ([HIG, Charts](https://developer.apple.com/design/human-interface-guidelines/charts)). La franja ya está explicada por su posición: "70" y "180" en seminegrita sobre sus dos bordes. Y los cubiertos son el ícono de "comida" de toda la app (la pestaña Inicio); al tocar cerca, el globo dice la hora de la comida. La leyenda repite, y nadie la extrañaría.
+- **Propuesta**: en `GlucoseChart.tsx` se borra el componente `Legend` y su uso; en `glucose.ts`, `GLUCOSE_CHART_BAND_LEGEND` y `GLUCOSE_CHART_MEAL_LEGEND` (y sus casos en `plainWords.test.ts`). Nada más: la descripción para VoiceOver ya nombra las comidas.
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: spec §6.10 (se borra "Debajo, una leyenda…") y la parte de la leyenda de UX-34 (la franja verde, sus tokens y #106 siguen).
+- **Decisión: se hace (delegada por el usuario, a partir del pedido 6).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-48 — La última lectura nunca queda suelta: unida con puntos
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario (el punto, ~18 pt a la derecha del final de la línea y más arriba).
+- **Qué se observa**: D.1, punto 8.
+- **Por qué importa**: un punto suelto se lee como un dato aparte, o como un error del dibujo. Unirlo con la línea llena inventaría el recorrido (#101); unirlo con **puntos** dice las dos cosas: es la misma curva, y en el medio no hay lecturas guardadas.
+- **Propuesta**:
+  1. En `glucoseChart.ts`, `chartLastLink(points): ChartBridge | null` (con su test en `glucoseChart.test.ts`): devuelve `{ from, to }` con las dos últimas lecturas **si entre ellas pasaron más de 30 min (`CHART_GAP_MS`) y una hora o menos (`CHART_BRIDGE_MS`)**; si no, `null`. Casos: 30 min justos → `null` (ya están unidas); 31 → el par; 60 → el par; 61 → `null` (es un hueco de verdad y lleva su puente gris, como hoy); menos de dos lecturas → `null`. Es dibujo: no va en `src/domain/`.
+  2. En `GlucoseChart.tsx`, si hay `lastLink`, una línea recta de `(x(from), y(from))` a `(x(to), y(to))`, dibujada **antes** del punto de ahora (que queda encima): `strokeWidth={2.5}`, `strokeLinecap="round"`, `strokeDasharray="0 6"` (puntos redondos de 2,5 px cada 6 px), `className="stroke-accent"` (o `stroke-ink-soft` si la última lectura es vieja, como su punto). Contraste: el de la línea, 6,3:1 sobre la franja en oscuro.
+  3. Al tocar en ese tramo, el globo dice lo que corresponde con la regla de hoy (la lectura a 30 min o menos, o "Sin lecturas entre…"): no cambia.
+  4. Lo mismo en la curva chica de Inicio (`GlucoseSparkline`), con `strokeWidth={2}` y `strokeDasharray="0 4"`.
+- **Prioridad**: Uso diario. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: #101 (se suma: "la última lectura, si está a más de 30 min y a una hora o menos de la anterior, se une con una línea de puntos del color de la línea") y spec §6.10 ("La línea se corta").
+- **Decisión: no se hace (resuelto por #110).** Antes: se hace (delegada por el usuario). La causa (las lecturas se guardan con retraso respecto de la en vivo) está en la función `glucose-latest`; guardar también la lectura en vivo en `glucose_readings` achicaría el hueco, pero es un cambio de la Edge Function que llega a `prod`: queda para que lo decida la sesión principal, fuera de esta tanda.
+
+#### UX-49 — El panel llega hasta la barra de pestañas
+
+- **Pantallas y capturas**: `/glucose`. Captura del usuario (~33 pt de `paper` entre el panel y la barra).
+- **Qué se observa**: D.1, punto 12.
+- **Por qué importa**: un resto vacío de otro color entre dos bloques del mismo color (`surface`) se lee como algo que faltó cargar. En Salud y en las apps del sensor el gráfico llega a la barra de abajo. Es el punto 1 de "Para corregir" de R.10, ahora visto en el iPhone.
+- **Propuesta**:
+  1. En `GlucoseChartPage.tsx`, la `<section>` pasa a `min-h-[calc(100svh-88px-env(safe-area-inset-top)-env(safe-area-inset-bottom))]` (88 = los 24 de arriba de `<main>` y los 64 de la barra, sin los 32 de margen de abajo) y suma **`-mb-8`**, para comerse ese margen solo en esta pantalla.
+  2. El `panel` pierde el borde de abajo (`border-y` → `border-t`): la barra de pestañas ya tiene su `border-t border-line`, y dos rayas juntas se verían dobles.
+  3. Vale también para `EmptyChart` y la forma de carga (usan `panel`).
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: spec §6.10 ("llena el alto libre de la pantalla, hasta la barra de pestañas") y #109.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-50 — El número y "mg/dL" sobre la misma línea base
+
+- **Pantallas y capturas**: `/glucose` y el recuadro de Inicio. Captura del usuario; `rev4-antes/43-glucosa.png`; `rev4-antes-inicio/42-inicio-glucosa.png`.
+- **Qué se observa**: D.1, punto 2.
+- **Por qué importa**: un número y su unidad se leen como una sola cosa si se apoyan en la misma línea (la línea base: la línea imaginaria donde se apoyan las letras); con tamaños distintos, se alinean por ahí y no por el centro (*Refactoring UI*). Es lo que hacen Salud y Clima.
+- **Propuesta** (en `GlucoseNow.tsx`, que vale para las dos pantallas):
+  1. El contenedor de afuera pasa de `items-center` a **`items-baseline`** (así "hace 3 min" también se apoya en la base del número).
+  2. El `<p>` del valor, de `flex items-center gap-2` a **`flex items-baseline gap-1.5`**: el número y "mg/dL" sobre la misma base, a 6 px.
+  3. La flecha sigue centrada en el alto de las cifras: `className="size-7 self-center ml-0.5"` (con el `gap`, a 8 px de "mg/dL", como hoy).
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: nada del spec.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-51 — Los íconos de comida no pasan el borde del dibujo
+
+- **Pantallas y capturas**: `/glucose`. `rev4-antes/43-glucosa.png` (arriba a la derecha).
+- **Qué se observa**: D.1, punto 10.
+- **Por qué importa**: todo lo del dibujo termina donde termina el dibujo; el punto de ahora y la hora del final ya terminan en `LEFT + plotW`.
+- **Propuesta**: en `GlucoseChart.tsx`, `spreadMarks(marks.map(x), ICON_R + 1, LEFT + ICON_R, LEFT + plotW - ICON_R)`: los centros quedan entre `LEFT + 11` y `LEFT + plotW − 11`. Se borra `ICON_MIN_X` (con UX-43, "mg/dL" termina antes de `LEFT` y ya no hay que esquivarlo).
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: UX-43.
+- **Cambia**: nada del spec.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### UX-52 — La curva de Inicio: la franja del ancho de la línea
+
+- **Pantallas y capturas**: el recuadro de Inicio. `rev4-antes-inicio/42-inicio-glucosa.png`.
+- **Qué se observa**: D.1, punto 13: la franja va de 0 a 96 y la línea de 4 a 92.
+- **Por qué importa**: la franja es el fondo de la línea; tiene que empezar y terminar con ella, como en el gráfico grande.
+- **Propuesta**: en `GlucoseSparkline.tsx`, el `<rect>` de la franja pasa a `x={PAD}` y `width={WIDTH - 2 * PAD}`, con `rx={2}` (esquinas apenas redondeadas).
+- **Prioridad**: Pulido. **Esfuerzo**: S. **Depende de**: nada.
+- **Cambia**: nada del spec.
+- **Decisión: se hace (delegada por el usuario).** **Hecha** (2026-11-28, rama `mejora-glucosa-lectura-actual`).
+
+#### Lo que consideré y no recomiendo
+
+- **Sacar "mg/dL" del eje** (Apple sugiere que la unidad puede ir en el título, y el número de arriba ya la dice): sería lo más limpio, pero el usuario pidió alinearla, y en el eje sirve cuando se mira el gráfico solo.
+- **La lectura tocada en el lugar del valor actual** (como Acciones): UX-29 pide que nunca se confundan.
+- **Un globo para el ⓘ del gráfico** en lugar de sacarlo: posible con UX-42, pero la explicación no agrega nada en esta pantalla.
+- **Un "Tocá la línea" solo la primera vez**: tocar un gráfico es lo esperable (ley de Jakob: la gente espera que una app funcione como las otras que ya usa), y sumaría algo que recordar en el teléfono.
+- **Horas sin "h"** (como Salud): "15 h" es como se escribe la hora en español y ya está en el spec.
+
+### D.3 Orden y ciclo
+
+1. **Una tanda en `GlucoseChart.tsx`, `glucoseChart.ts`, `glucose.ts` y `GlucoseChartPage.tsx`**: UX-41, UX-43 a UX-49 y UX-51. Es dibujo y textos, sin cálculo ni base: un implementer, sin tester ni reviewer. Tests: actualizar `chartGuides` y sumar `chartLastLink` en `glucoseChart.test.ts`; sacar de `plainWords.test.ts` los textos borrados.
+2. **UX-50 y UX-52** (el valor actual y la curva de Inicio): en la misma tanda; son unas líneas cada una.
+3. **UX-42** (el ⓘ de toda la app): al final de la tanda o aparte, porque toca todos los ⓘ.
+4. Verificación con `--device "iPhone 15 Pro Max" --oscuro --solo glucosa,glucosa-toque,glucosa-sin-lecturas,inicio-glucosa`, otra en claro con el iPhone 15 y, por UX-42, los estados con ⓘ (por ejemplo `16-alimento-tabla`, `22-alimento-agregar-a-mano`, `29-configuracion`).
+
+### D.4 Flujos
+
+- **"¿Cómo vengo?"**: igual (1 toque en el recuadro, el número arriba), con la línea ~96 pt más alta en el iPhone del usuario y el punto de ahora unido a ella.
+- **"¿Cómo me fue después de cenar?"**: igual en toques (recuadro, "6 h", tocar la línea: 3 toques, 1 pantalla). Cambia que el valor tocado aparece arriba de la línea que se tocó, unido a ella, en lugar de en un renglón aparte; y la pantalla no se mueve en ningún momento.
+- **"¿Qué quiere decir esto?"** (el ⓘ de Inicio): 1 toque abre el globo, 1 toque afuera lo cierra; Inicio no se mueve.
+
+### D.5 A probar en el iPhone
+
+1. **El globo del ⓘ** (UX-42) en la app instalada: que abra con el primer toque, que se cierre al tocar afuera y al desplazar, que no lo tapen la barra de pestañas ni la isla, y que VoiceOver lo lea después del ⓘ. Necesita iOS 17 o más nuevo.
+2. **El globo de lo tocado** (UX-46): arrastrando el dedo de punta a punta, que no se salga del dibujo, que no tiemble al cambiar de ancho ("Sin lecturas entre…" es más largo que un valor) y que el dedo no lo tape al arrastrar.
+3. **"mg/dL"** (UX-43): que su borde izquierdo caiga sobre el margen de la página con la letra real del iPhone (las capturas usan otra).
+4. **La hora del final** (UX-45): que avance sola con la pantalla abierta y no choque con la hora redonda anterior.
+5. **El punto de ahora** (UX-48): que se vea unido a la línea por los puntos cuando la última guardada es de hace un rato.
+6. **El panel hasta la barra** (UX-49): sin franja vacía ni raya doble, en la app instalada y en Safari.
+7. **Letra agrandada**: el globo en dos renglones y "mg/dL" sin salirse por la izquierda.
+8. **Modo claro al sol**: el globo oscuro sobre el gráfico blanco, y los números del eje a 13 px.
+
+### D.6 Fuentes consultadas
+
+Leídas para esta sección el 2026-11-28:
+
+- **Apple Human Interface Guidelines**, [Charts](https://developer.apple.com/design/human-interface-guidelines/charts) (en su versión JSON): rótulos del eje vertical cortos, y la unidad puede ir en otro lugar, como el título; leyenda para lo que no se entiende por la posición; "preferí secuencias de valores conocidas"; menos guías y rótulos suaves cuando se puede tocar; "no exijas interacción para mostrar información crítica"; recorrer el gráfico con una línea vertical, como Acciones; maximizar el ancho en pantallas angostas.
+- **Laws of UX**, [Law of Uniform Connectedness](https://lawsofux.com/law-of-uniform-connectedness/).
+- Ya citadas en esta revisión y no releídas: [10 Usability Heuristics](https://www.nngroup.com/articles/ten-usability-heuristics/) de NN/g (8, diseño minimalista); [WCAG 2.2, 1.4.11](https://www.w3.org/TR/WCAG22/#non-text-contrast).
+- Citado como marco, sin leerlo: Adam Wathan y Steve Schoger, *Refactoring UI* (escala de tamaños, alineación por línea base).
+- **Captura del usuario** (app instalada): medidas y posiciones, sin copiar ningún dato.
+
+### D.7 Lo que no se pudo capturar
+
+- **La app instalada** y su alto real: las medidas de UX-49 y de "Cuánto gana el dibujo" salen de la captura del usuario y del código.
+- **La letra real de iOS**: las capturas de WebKit usan otra, así que el ancho de "mg/dL" (UX-43) se confirma en el iPhone.
+- **El hueco entre la última lectura guardada y la en vivo** (UX-48): los datos de demo no lo tienen; se vio solo en la captura del usuario.
+- **El `popover`** (UX-42) en Safari de iOS, VoiceOver, letra agrandada y uso al sol.
+
+### D.8 Verificación (2026-11-28)
+
+- **Rama**: `mejora-glucosa-lectura-actual`. **Antes**: `scripts/ux-screens/out/rev4-antes/` y `rev4-antes-inicio/` (iPhone 15 Pro Max, oscuro). **Después**: `rev4-despues/` (42 a 48, oscuro, con tres ⓘ abiertos), `rev4-despues-claro/` (iPhone 15, 393 × 659, claro: glucosa, toque, Inicio y su ⓘ) y `rev4-despues-cerrado/` (oscuro, los ⓘ cerrados de `16-alimento-tabla`, `22-alimento-agregar-a-mano`, `29-configuracion` y `05-inicio-items`). Ninguna captura falló.
+
+| # | Resultado | Lo que muestra |
+|---|---|---|
+| UX-41 | Cumplida | Sin ⓘ; "Glucosa" centrado exacto (centro en 215 de 430). `rev4-despues/43-glucosa.png`. |
+| UX-42 | Parcial | El globo se abre encima, apunta al ⓘ y no mueve nada (`46-inicio-glucosa-info.png`, `47-…`, `48-…`, y en claro). En oscuro el borde casi no se ve (abajo, punto 2). |
+| UX-43 | Cumplida | "mg/dL" va de x ≈ 14 a 52, alineado a la derecha con los números, en los dos tamaños de pantalla; todo a 13 px. |
+| UX-44 | Cumplida | 100, 150, 200, 250, 300, más 70 y 180. "200" queda a ~25 px de "180" en el iPhone 15 y a ~31 en el Pro Max: se ve, sin pisarse. |
+| UX-45 | Cumplida | "01:17" / "01:19" al final, sin chocar con "18 h" ni "00 h". |
+| UX-46 | Parcial | Sin el renglón; globo invertido de 32 px, unido a la línea vertical (`45-glucosa-toque.png`, oscuro y claro). Pero tapa a medias un ícono de comida (abajo, punto 1). |
+| UX-47 | Cumplida | Sin leyenda. |
+| UX-49 | Cumplida | El panel llega a la barra de pestañas, sin franja de `paper` ni raya doble; también sin lecturas (`44-glucosa-sin-lecturas.png`). |
+| UX-50 | Cumplida | Número, "mg/dL" y "hace 3 min" sobre la misma base, en el gráfico y en Inicio; la flecha centrada en las cifras. |
+| UX-51 | Cumplida | El último ícono termina en el borde del dibujo (centro en 403, radio 11, borde en 414). |
+| UX-52 | Cumplida | La franja de la curva chica empieza y termina con la línea. |
+
+Contrastes de lo nuevo: el globo de lo tocado, `surface` sobre `ink`, ~17:1 en claro y ~14:1 en oscuro; el texto del ⓘ, `ink` sobre `surface`, ~16:1 y ~14:1.
+
+**Para corregir** (en orden de importancia):
+
+1. **El globo de lo tocado tapa a medias un ícono de comida** (UX-46). En `45-glucosa-toque.png` (oscuro y claro), el globo termina a ~3 px del ícono de las 23:xx y deja asomar media burbuja con medio cubierto: se lee como un dibujo roto. Corrección en `GlucoseChart.tsx`: guardar en estado el tramo del globo (`left` y `width`, los mismos que ya calcula el `useLayoutEffect`, actualizándolo solo si cambian) y **no dibujar el ícono** (círculo y cubiertos) cuando su círculo queda a menos de 4 px del globo: `cx + ICON_R > left − 4 && cx − ICON_R < left + width + 4`. Su línea punteada se dibuja igual, desde `y = 36` (el borde de abajo del globo) en lugar de `ICON_Y + ICON_R`. Lo mismo con "mg/dL" si `left < LEFT`. Al soltar, vuelven.
+2. **En oscuro, el borde del globo del ⓘ casi no se ve** (UX-42; lo que avisó el implementer). `line` (#3a3037) da 1,3:1 sobre `surface` (#221b21) y 1,5:1 sobre `paper`, y la sombra negra no se nota sobre un fondo oscuro: sobre una tarjeta (`46-inicio-glucosa-info.png`, `48-configuracion-info.png`) el globo se confunde con ella, y la puntita casi desaparece. Corrección: un token nuevo en `src/index.css`, **`--color-line-raised`**, `#e4dccf` en claro (igual que `line`: ahí la sombra ya separa bien, se ve en `rev4-despues-claro/46-…`) y **`#6b6066` en oscuro** (2,8:1 sobre `surface`, 3,1:1 sobre `paper`: se ve como borde sin gritar). El globo y su puntita pasan de `border-line` a `border-line-raised`. Es lo que hace iOS en oscuro: lo que flota se separa con un borde más claro, no con sombra.
+3. **El ⓘ pegado al texto** (no es de esta tanda, pero se ve en `47-…` y en `rev4-despues-cerrado/16-alimento-tabla.png` y `29-configuracion.png`): "alimentos" y "(unidades)" tocan el círculo del ⓘ (0 px de aire). En `rev4-despues-cerrado/22-…` (FormControls) y en Inicio hay ~6 px. Corrección: **`gap-x-1.5`** (6 px) en las tres filas que no lo tienen: `FoodDetail.tsx` (la fila de "De la tabla de alimentos"), `MealItemCard.tsx` (nombre del alimento) y `SettingsForm.tsx` (rótulo de cada alerta). El área de toque de 44 px no cambia.
+
+**Corregido** (2026-11-28, los tres puntos): el gráfico no dibuja los íconos de comida (ni "mg/dL") que quedan a menos de 4 px del globo mientras se ve, y su línea punteada arranca debajo del globo; el globo del ⓘ y su puntita usan el token nuevo `line-raised` (revisión 1, §2.3); las tres filas tienen `gap-x-1.5`. Capturas en `rev4-final/`.
+
+Nada empeoró en las otras pantallas capturadas (Inicio con ítems, alta a mano, detalle del alimento, configuración).
+
+**A probar en el iPhone** (además de D.5): el globo del ⓘ en oscuro, con el borde nuevo, sobre la tarjeta de Inicio y sobre Configuración; arrastrar el dedo por debajo de los íconos de comida y ver que desaparecen y vuelven sin parpadear; el ⓘ abriendo con el primer toque en la app instalada (iOS 17 o más).

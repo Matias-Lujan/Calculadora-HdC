@@ -1471,7 +1471,7 @@ function buildStates(
     {
       name: 'glucosa-toque',
       description:
-        'Gráfico de la glucosa en 6 horas, después de tocar la línea a un poco más de la mitad: la línea vertical, el punto y arriba el valor con su hora.',
+        'Gráfico de la glucosa en 6 horas, después de tocar la línea a un poco más de la mitad: la línea vertical, el punto y, en un globo arriba, el valor con su hora (UX-46).',
       run: async (page) => {
         await fakeGlucose(page)
         await go(page, '/glucose')
@@ -1482,9 +1482,40 @@ function buildStates(
         if (box === null) throw new Error('El gráfico no está a la vista.')
         await page.mouse.click(box.x + box.width * 0.6, box.y + box.height / 2)
         await page
-          .getByText(/· a las \d{2}:\d{2}$/)
+          .getByText(/^· \d{2}:\d{2}$/)
           .first()
           .waitFor()
+      },
+    },
+    // Added in the detail batch of revision 2 (UX-42): the ⓘ opens a
+    // bubble over the screen.
+    {
+      name: 'inicio-glucosa-info',
+      description:
+        'Inicio con el ⓘ del recuadro de la glucosa abierto: la explicación en un globo encima, sin mover nada (UX-42).',
+      run: async (page) => {
+        await fakeGlucose(page)
+        await emptyMeal(page)
+        await page.getByRole('link', { name: /^Glucosa del sensor/ }).waitFor()
+        await openInfo(page)
+      },
+    },
+    {
+      name: 'alimento-tabla-info',
+      description:
+        'Detalle de un alimento de la tabla con el ⓘ de «De la tabla de alimentos» abierto (UX-42).',
+      run: async (page) => {
+        await foodDetail(page, need(foods.table, 'copiado de la tabla'))
+        await openInfo(page)
+      },
+    },
+    {
+      name: 'configuracion-info',
+      description: 'Configuración con su primer ⓘ abierto (UX-42).',
+      run: async (page) => {
+        await go(page, '/settings')
+        await page.getByRole('button', { name: 'Cerrar sesión' }).waitFor()
+        await openInfo(page)
       },
     },
   ]
@@ -1496,6 +1527,13 @@ function buildStates(
 // hours so the cut line shows. Nothing reaches the base.
 const LATEST_GLUCOSE_ROUTE = '**/functions/v1/glucose-latest'
 const SAVED_GLUCOSE_ROUTE = '**/rest/v1/glucose_readings*'
+
+// Opens the first ⓘ of the screen and waits for its bubble.
+async function openInfo(page: Page): Promise<void> {
+  const button = page.getByRole('button', { name: 'Más información' }).first()
+  await button.click()
+  await page.locator('[popover]:popover-open').waitFor()
+}
 
 async function realGlucose(page: Page): Promise<void> {
   await page.unroute(LATEST_GLUCOSE_ROUTE)

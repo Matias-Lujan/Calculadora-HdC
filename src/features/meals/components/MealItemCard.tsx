@@ -106,7 +106,7 @@ export function MealItemCard({
         <div className="flex min-w-0 flex-col">
           {/* The ⓘ of a table food goes next to its name, always in sight
               (spec §14 #51 (8)). */}
-          <div className="flex flex-wrap items-center">
+          <div className="flex flex-wrap items-center gap-x-1.5">
             <span className="font-semibold">{food.name}</span>
             {isFromTable(food) && <InfoTip text={TABLE_VALUE_INFO} />}
           </div>

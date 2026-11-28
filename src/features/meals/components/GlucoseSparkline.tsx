@@ -48,10 +48,11 @@ export function GlucoseSparkline({ readings, now, windowMs }: Props) {
       className="pointer-events-none h-10 w-24 shrink-0"
     >
       <rect
-        x={0}
+        x={PAD}
         y={y(BAND_HIGH_MGDL)}
-        width={WIDTH}
+        width={WIDTH - 2 * PAD}
         height={y(BAND_LOW_MGDL) - y(BAND_HIGH_MGDL)}
+        rx={2}
         className="fill-range"
       />
       {chartSegments(points).map((segment) =>

@@ -147,10 +147,14 @@ export function chartTop(points: readonly ChartPoint[]): number {
   return Math.max(CHART_MIN_TOP_MGDL, Math.ceil(highest / 50) * 50)
 }
 
-/** The horizontal guides (UX-30): 100, 200, 300… up to the top. */
+/**
+ * The horizontal guides (UX-30, UX-44): from 100 up to the top, every 50.
+ * None at 50: the bottom of the scale is 40, so it would be a second line
+ * glued to the axis, and the 70 of the band already marks that zone.
+ */
 export function chartGuides(top: number): number[] {
   const guides: number[] = []
-  for (let mgdl = 100; mgdl <= top; mgdl += 100) guides.push(mgdl)
+  for (let mgdl = 100; mgdl <= top; mgdl += 50) guides.push(mgdl)
   return guides
 }
 
@@ -348,7 +352,7 @@ const argentinaHour = new Intl.DateTimeFormat('es-AR', {
 
 /**
  * An hour under the chart: its time and its text ("06 h"), or null when
- * the text would go over "ahora" (its line stays).
+ * the text would go over the time of now at the end (its line stays).
  */
 export type ChartHour = { time: number; label: string | null }
 
@@ -361,17 +365,17 @@ function hourStep(windowMs: number): number {
 
 /**
  * How close to the right edge the text of an hour can be, in px of the
- * width given to chartHours: "ahora" goes there, about 36 px wide at 14 px,
- * and the text of an hour is centered on it, about 27 wide: at about 50 the
- * two texts touch. The chart is drawn in real px (UX-37), so it holds for
- * any width.
+ * width given to chartHours: the time of now goes there ("16:40", UX-45),
+ * about 33 px wide at 13 px, and the text of an hour is centered on it,
+ * about 24 wide: 52 leaves about 7 px between them. The chart is drawn in
+ * real px (UX-37), so it holds for any width.
  */
 export const CHART_HOUR_CLEARANCE = 52
 
 /**
  * The hours under the chart, in Argentina time, inside the window and
  * before now, oldest first: every hour for 3 and 6 hours, every 3 for 12
- * and 00, 06, 12 and 18 for 24. "ahora" goes at the end, so an hour less
+ * and 00, 06, 12 and 18 for 24. The time of now goes at the end, so an hour less
  * than CHART_HOUR_CLEARANCE from the right edge of a drawing `width` wide
  * keeps its line but not its text. They are looked for among the whole UTC
  * hours, so they stay right if the offset of Argentina ever changes.

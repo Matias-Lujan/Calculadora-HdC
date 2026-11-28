@@ -252,7 +252,7 @@ export function SettingsForm({ saved }: Props) {
           const errorId = `${inputId}-error`
           return (
             <div key={name} className="flex flex-col gap-1">
-              <div className="flex flex-wrap items-center">
+              <div className="flex flex-wrap items-center gap-x-1.5">
                 <label htmlFor={inputId} className={fieldLabel}>
                   {label}
                 </label>

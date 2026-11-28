@@ -25,6 +25,9 @@
   --color-ink-soft: #5f555a;
   --color-line: #e4dccf;
   --color-line-strong: #857a80;
+  /* The border of what floats (the ⓘ bubble): in dark, a shadow does not
+     separate it, so it is lighter than line (UX-42). */
+  --color-line-raised: #e4dccf;
   --color-accent: #5b2a6e;
   --color-accent-soft: #efe4f2;
   --color-on-accent: #ffffff;
@@ -175,6 +178,7 @@
       --color-ink-soft: #b9adb3;
       --color-line: #3a3037;
       --color-line-strong: #8c8087;
+      --color-line-raised: #6b6066;
       --color-accent: #d9a8e8;
       --color-accent-soft: #3a2542;
       --color-on-accent: #221b1f;
