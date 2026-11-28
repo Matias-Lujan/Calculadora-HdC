@@ -42,7 +42,7 @@ export function SettingsPage() {
           </button>
         </div>
       ) : (
-        // «Tu ratio» and «Alertas».
+        // "Tu ratio" and "Alertas".
         <LoadingShapes shapes={['h-40', 'h-56']} />
       )}
 

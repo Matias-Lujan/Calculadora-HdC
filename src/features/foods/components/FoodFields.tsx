@@ -20,7 +20,7 @@ const COOKED_OPTIONS: readonly { value: Food['state']; label: string }[] = [
 ]
 
 const COOKED_INFO =
-  'Elegí «Sí» si los HC que cargás son del alimento crudo, como en el paquete de arroz o de fideos. Si ya son del alimento cocido, elegí «No».'
+  'Elegí "Sí" si los HC que cargás son del alimento crudo, como en el paquete de arroz o de fideos. Si ya son del alimento cocido, elegí "No".'
 
 const MORE_OPTIONS_ID = 'food-more-options'
 
