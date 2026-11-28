@@ -316,7 +316,14 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
     })
   }
 
-  const letGo = () => {
+  // Only one finger picks: the first one down. A second finger is ignored,
+  // so lifting one of two does not leave the pick of the other without a
+  // finger (it showed the bubble of the keyboard).
+  const fingerRef = useRef<number | null>(null)
+
+  const letGo = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerId !== fingerRef.current) return
+    fingerRef.current = null
     cancelFrame()
     setDragging(false)
     setPicked(null)
@@ -383,18 +390,21 @@ export function GlucoseChart({ readings, mealTimes, now, windowMs }: Props) {
         aria-valuetext={valueText(pick, meal, last)}
         className="relative max-h-[520px] min-h-[260px] flex-1 cursor-crosshair touch-pan-y rounded-control select-none"
         onPointerDown={(event) => {
+          if (fingerRef.current !== null) return
+          fingerRef.current = event.pointerId
           event.currentTarget.setPointerCapture(event.pointerId)
           cancelFrame()
           setDragging(true)
           setPicked(timeAt(event))
         }}
         onPointerMove={(event) => {
-          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          if (event.pointerId === fingerRef.current) {
             pickOnNextFrame(timeAt(event))
           }
         }}
         onPointerUp={letGo}
         onPointerCancel={letGo}
+        onLostPointerCapture={letGo}
         onKeyDown={onKeyDown}
       >
         <svg
