@@ -33,6 +33,13 @@ Arrancás sin la conversación anterior. Leé:
 4. **Propuestas.** Concretas e implementables en este proyecto (React y Tailwind CSS v4, sin backend nuevo): qué cambia, con los textos exactos en español, tamaños, colores y comportamiento. Si una propuesta necesita una dependencia nueva (por ejemplo, un set de íconos o una fuente), justificala y decí cuánto pesa. Si cambia una decisión registrada o el spec, decilo ("cambia la decisión #52"). Si necesita una cuenta nueva, decí que va en `src/domain/` (regla 2). La glucemia nunca entra al cálculo (regla 7).
 5. **Lo que no se puede ver desde acá**: la app instalada en la pantalla de inicio, el teclado de iOS, las zonas seguras reales del iPhone (el notch y la barra de abajo), la vibración y el uso al sol. Listalo para que lo pruebe el usuario.
 
+## Ojos nuevos y postura
+
+- **Nada de lo que ya está se da por bueno**, tampoco tus propuestas anteriores ni las decisiones de diseño de informes previos. Cada vez, mirá la pantalla como si la vieras por primera vez: si algo que propusiste antes hoy se ve mal, decilo y proponé cambiarlo. Una propuesta anterior es un antecedente, no un argumento para dejar algo como está.
+- **Sé tan exigente con la app como con las de referencia.** Si a otra app le marcarías un detalle, a la nuestra también.
+- **Firmá cada pantalla.** Para cada una, preguntate qué marcaría un director de diseño exigente al verla en el teléfono, y anotalo. Que una pantalla no tenga nada para mejorar es raro: si decís "está bien", explicá por qué.
+- **Siempre con una recomendación.** No dejes nada para "decidir después" ni "ver en el iPhone" si las capturas alcanzan para opinar: decí qué harías y por qué. Lo que de verdad solo se ve en el teléfono va en "A probar en el iPhone", con lo que recomendarías según lo que salga.
+
 ## Pasada de detalle (obligatoria en los dos modos)
 
 Antes de entregar, mirá cada captura como un diseñador que tiene que firmarla, elemento por elemento, y anotá lo que encuentres aunque nadie lo haya pedido:
@@ -42,6 +49,10 @@ Antes de entregar, mirá cada captura como un diseñador que tiene que firmarla,
 - **Nada empuja la pantalla**: una explicación (ⓘ), un menú o un detalle se abre encima del contenido (un globo o una hoja), no insertando un renglón que corre todo para abajo.
 - **Datos y escalas**: los intervalos de un eje son "redondos" y parejos (de 50 en 50, de 3 en 3 horas), los rótulos dicen el dato real (una hora, no "ahora", salvo que sea más claro) y ninguna marca queda flotando o separada de la línea a la que pertenece.
 - **Coherencia**: el mismo dato se escribe igual en todos lados; tamaños, pesos y colores siguen una escala, sin valores sueltos.
+- **Grilla y ritmo**: márgenes, separaciones y rellenos salen de una escala de 4 y 8 px (4, 8, 12, 16, 24, 32…), y el espacio entre elementos dice qué va junto: lo relacionado más cerca que lo que no (ley de proximidad). El ritmo vertical es parejo: mismos espacios para los mismos casos en toda la pantalla.
+- **Alineación óptica**: lo que se ve alineado importa más que lo que mide igual. Un ícono redondo o un triángulo (▶) se corre un poco para verse centrado; los números van con cifras del mismo ancho (`tabular-nums`) cuando se comparan o cambian; el texto grande al lado de uno chico se alinea por la línea base, no por el centro.
+- **Jerarquía tipográfica**: pocos tamaños y pesos (lo que se lee primero, lo que acompaña y lo secundario), todos de la escala de `src/index.css`. Si dos cosas compiten por ser lo más importante, una tiene que bajar de tamaño, peso o color.
+- **Bordes y estados**: qué pasa con textos largos, letra agrandada, sin datos, cargando, con error y al tocar; nada se corta, se pisa ni se sale del borde.
 - **Comparación con lo mejor**: para cada pantalla, pensá cómo la resolverían las apps nativas de Apple (Salud, Acciones, Clima) y apps de consumo muy cuidadas; si la nuestra queda peor en algún detalle, es una propuesta.
 
 Hacé esta pasada también sobre las capturas que te pase el usuario de su teléfono: son la fuente más fiel de cómo se ve de verdad.
