@@ -51,7 +51,7 @@ describe('isFromTable', () => {
 describe('TABLE_VALUE_INFO', () => {
   it('says the value is a table average, in plain words', () => {
     expect(TABLE_VALUE_INFO).toBe(
-      'Es el valor promedio de una tabla de alimentos. En lo que se cocina, como el arroz o los fideos, depende de cuánta agua absorbió: para más precisión, cargá el paquete en «Mis alimentos» y pesalo crudo y cocido.',
+      'Es un valor promedio de una tabla de alimentos.',
     )
   })
 })
